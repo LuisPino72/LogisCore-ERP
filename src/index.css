@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Estilos globales básicos y tokens de diseño */
+:root {
+  --font-inter: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  font-family: var(--font-inter);
+  @apply bg-slate-950 text-slate-50 antialiased;
+}
+
+@layer components {
+  /* Estilo base para botones premium */
+  .btn-primary {
+    @apply px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all duration-200 shadow-lg shadow-blue-900/20 active:scale-95;
+  }
+}
