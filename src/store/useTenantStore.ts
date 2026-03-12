@@ -1,6 +1,8 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 interface TenantConfig {
+  id: string
   name: string
   slug: string
   modules: {
@@ -8,14 +10,20 @@ interface TenantConfig {
     inventory: boolean
     purchases: boolean
     recipes: boolean
+    reports: boolean
   }
+  config?: any
 }
 
 interface TenantState {
   currentTenant: TenantConfig | null
   role: 'super_admin' | 'owner' | 'employee' | null
+  permissions: Record<string, any>
+  isImpersonating: boolean
   setTenant: (tenant: TenantConfig | null) => void
-  setRole: (role: 'super_admin' | 'owner' | 'employee' | null) => void
+  setRole: (role: 'super_admin' | 'owner' | 'employee' | null, permissions?: Record<string, any>) => void
+  startImpersonation: (tenant: TenantConfig) => void
+  stopImpersonation: () => void
   clear: () => void
 }
 
@@ -23,10 +31,21 @@ interface TenantState {
  * Store de Zustand para gestionar el contexto del tenant actual y el rol del usuario.
  * Se utiliza en toda la app para filtrar la UI y servicios por cliente.
  */
-export const useTenantStore = create<TenantState>((set) => ({
-  currentTenant: null,
-  role: null,
-  setTenant: (tenant) => set({ currentTenant: tenant }),
-  setRole: (role) => set({ role }),
-  clear: () => set({ currentTenant: null, role: null }),
-}))
+export const useTenantStore = create<TenantState>()(
+  persist(
+    (set) => ({
+      currentTenant: null,
+      role: null,
+      permissions: {},
+      isImpersonating: false,
+      setTenant: (tenant) => set({ currentTenant: tenant }),
+      setRole: (role, permissions = {}) => set({ role, permissions }),
+      startImpersonation: (tenant) => set({ currentTenant: tenant, isImpersonating: true }),
+      stopImpersonation: () => set({ currentTenant: null, isImpersonating: false }),
+      clear: () => set({ currentTenant: null, role: null, permissions: {}, isImpersonating: false }),
+    }),
+    {
+      name: 'logiscore-tenant-storage',
+    }
+  )
+)

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { db, Product } from '../../services/db';
+import { db, Product, Sale } from '../../services/db';
 import { useTenantStore } from '../../store/useTenantStore';
 import { EventBus, Events } from '../../services/events/EventBus';
+import { SyncEngine } from '../../services/sync/SyncEngine';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { ShoppingCart, Plus, Minus, X, Trash2, CreditCard, Banknote } from 'lucide-react';
@@ -80,17 +81,40 @@ export default function POS() {
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
+    const saleItems = cart.map(item => ({
+      productId: item.product.localId,
+      productName: item.product.name,
+      quantity: item.quantity,
+      unitPrice: item.product.price,
+      total: item.product.price * item.quantity,
+    }));
+
+    const newSale: Sale = {
+      localId: crypto.randomUUID(),
+      tenantId: tenant!.slug,
+      items: saleItems,
+      subtotal: cartTotal,
+      tax: 0,
+      total: cartTotal,
+      paymentMethod,
+      status: 'completed',
+      createdAt: new Date(),
+    };
+
+    await db.sales.add(newSale);
+    await SyncEngine.addToQueue('sales', 'create', newSale as unknown as Record<string, unknown>, newSale.localId);
+
+    for (const item of cart) {
+      const newStock = item.product.stock - item.quantity;
+      await db.products.update(item.product.localId, { stock: newStock, updatedAt: new Date() });
+    }
+
     EventBus.emit(Events.SALE_COMPLETED, {
       items: cart,
       total: cartTotal,
       paymentMethod,
       timestamp: new Date(),
-    });
-
-    cart.forEach((item) => {
-      const newStock = item.product.stock - item.quantity;
-      db.products.update(item.product.localId, { stock: newStock });
     });
 
     setCart([]);

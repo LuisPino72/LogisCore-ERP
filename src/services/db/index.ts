@@ -46,19 +46,81 @@ export interface TenantSetting {
   tenantId: string;
 }
 
+export interface Sale {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  items: { productId: string; productName: string; quantity: number; unitPrice: number; total: number }[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  paymentMethod: 'cash' | 'card';
+  status: 'completed' | 'cancelled' | 'refunded';
+  createdAt: Date;
+  syncedAt?: Date;
+}
+
+export interface Purchase {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  supplier: string;
+  invoiceNumber: string;
+  items: { productId: string; productName: string; quantity: number; cost: number; total: number }[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  createdAt: Date;
+  syncedAt?: Date;
+}
+
+export interface Recipe {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  productId: string;
+  ingredients: { productId: string; quantity: number; unit: string }[];
+  yield: number;
+  isActive: boolean;
+  createdAt: Date;
+  syncedAt?: Date;
+}
+
+export interface ProductionLog {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  recipeId: string;
+  quantity: number;
+  ingredientsUsed: { productId: string; quantity: number }[];
+  createdAt: Date;
+  syncedAt?: Date;
+}
+
 class LogisCoreDB extends Dexie {
   syncQueue!: Table<SyncQueueItem>;
   products!: Table<Product>;
   categories!: Table<Category>;
   settings!: Table<TenantSetting>;
+  sales!: Table<Sale>;
+  purchases!: Table<Purchase>;
+  recipes!: Table<Recipe>;
+  productionLogs!: Table<ProductionLog>;
 
   constructor() {
     super('LogisCoreERP');
-    this.version(1).stores({
+    this.version(2).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
       products: '++id, localId, tenantId, sku, categoryId',
       categories: '++id, localId, tenantId, name',
       settings: 'key, tenantId',
+      sales: '++id, localId, tenantId, status, createdAt',
+      purchases: '++id, localId, tenantId, status, createdAt',
+      recipes: '++id, localId, tenantId, isActive',
+      productionLogs: '++id, localId, tenantId, recipeId, createdAt',
     });
   }
 }

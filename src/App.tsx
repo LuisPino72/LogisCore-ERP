@@ -4,27 +4,97 @@ import Login from './components/Login';
 import AdminPanel from './components/AdminPanel';
 import SyncStatus from './components/SyncStatus';
 import { initializeCatalogs } from './services/db';
-import { Package, ShoppingCart, ShoppingBasket, Menu, X, LayoutDashboard, ChefHat, BarChart3 } from 'lucide-react';
+import { supabase } from './services/supabase';
+import { db } from './services/db';
+import { Package, ShoppingCart, ShoppingBasket, Menu, X, LayoutDashboard, ChefHat, BarChart3, Loader2 } from 'lucide-react';
 
 const Inventory = lazy(() => import('./components/inventory/Inventory'));
 const POS = lazy(() => import('./components/pos/POS'));
 const Recipes = lazy(() => import('./components/recipes/Recipes'));
 const Reports = lazy(() => import('./components/reports/Reports'));
 const Purchases = lazy(() => import('./components/purchases/Purchases'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
 
 type Module = 'dashboard' | 'inventory' | 'pos' | 'recipes' | 'reports' | 'purchases';
 
 function App() {
   const role = useTenantStore((state) => state.role);
   const tenant = useTenantStore((state) => state.currentTenant);
+  const isImpersonating = useTenantStore((state) => state.isImpersonating);
+  const stopImpersonation = useTenantStore((state) => state.stopImpersonation);
   const [activeModule, setActiveModule] = useState<Module>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
 
   useEffect(() => {
     if (tenant?.slug) {
       initializeCatalogs(tenant.slug);
+      loadTenantData(tenant.slug);
     }
   }, [tenant]);
+
+  const loadTenantData = async (tenantSlug: string) => {
+    setIsLoadingData(true);
+    try {
+      const [productsRes, categoriesRes, salesRes, recipesRes, purchasesRes] = await Promise.all([
+        supabase.from('products').select('*').eq('tenant_id', tenantSlug),
+        supabase.from('categories').select('*').eq('tenant_id', tenantSlug),
+        supabase.from('sales').select('*').eq('tenant_id', tenantSlug),
+        supabase.from('recipes').select('*').eq('tenant_id', tenantSlug),
+        supabase.from('purchases').select('*').eq('tenant_id', tenantSlug),
+      ]);
+
+      if (categoriesRes.data) {
+        await db.categories.bulkPut(categoriesRes.data.map(c => ({
+          ...c,
+          localId: c.id,
+          tenantId: tenantSlug,
+          createdAt: new Date(c.created_at),
+        })));
+      }
+
+      if (productsRes.data) {
+        await db.products.bulkPut(productsRes.data.map(p => ({
+          ...p,
+          localId: p.id,
+          tenantId: tenantSlug,
+          createdAt: new Date(p.created_at),
+          updatedAt: new Date(p.updated_at),
+        })));
+      }
+
+      if (salesRes.data) {
+        await db.sales.bulkPut(salesRes.data.map(s => ({
+          ...s,
+          localId: s.id,
+          tenantId: tenantSlug,
+          createdAt: new Date(s.created_at),
+        })));
+      }
+
+      if (recipesRes.data) {
+        await db.recipes.bulkPut(recipesRes.data.map(r => ({
+          ...r,
+          localId: r.id,
+          tenantId: tenantSlug,
+          createdAt: new Date(r.created_at),
+        })));
+      }
+
+      if (purchasesRes.data) {
+        await db.purchases.bulkPut(purchasesRes.data.map(p => ({
+          ...p,
+          localId: p.id,
+          tenantId: tenantSlug,
+          createdAt: new Date(p.created_at),
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading tenant data:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
 
   if (!role) {
     return <Login />;
@@ -40,11 +110,57 @@ function App() {
   ] as const;
 
   const renderModule = () => {
-    if (role === 'super_admin') {
+    if (role === 'super_admin' && !isImpersonating) {
       return <AdminPanel />;
     }
 
+    if (role === 'super_admin' && isImpersonating && tenant) {
+      return (
+        <div className="space-y-4">
+          {isLoadingData && (
+            <div className="flex items-center gap-3 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              <span className="text-blue-400">Cargando datos de {tenant.name}...</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+            <div>
+              <span className="text-blue-400 font-medium">Gestionando:</span>
+              <span className="text-white ml-2 font-semibold">{tenant.name}</span>
+            </div>
+            <button
+              onClick={stopImpersonation}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Volver al Panel Admin
+            </button>
+          </div>
+          {renderModulesContent()}
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {isLoadingData && (
+          <div className="flex items-center gap-3 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-4">
+            <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+            <span className="text-blue-400">Cargando datos de {tenant?.name}...</span>
+          </div>
+        )}
+        {renderModulesContent()}
+      </>
+    );
+  };
+
+  const renderModulesContent = () => {
     switch (activeModule) {
+      case 'dashboard':
+        return (
+          <Suspense fallback={<div className="p-8 text-center text-slate-400">Cargando...</div>}>
+            <Dashboard />
+          </Suspense>
+        );
       case 'inventory':
         return (
           <Suspense fallback={<div className="p-8 text-center text-slate-400">Cargando...</div>}>
@@ -108,17 +224,17 @@ function App() {
               </p>
             </div>
 
-            {role !== 'super_admin' && (
+            {role !== 'super_admin' || isImpersonating ? (
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="lg:hidden p-2 hover:bg-slate-800 rounded-lg"
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
-            )}
+            ) : null}
           </div>
 
-          {role !== 'super_admin' && (
+          {(role !== 'super_admin' || isImpersonating) && (
             <nav className={`lg:flex items-center gap-1 mt-4 ${mobileMenuOpen ? 'flex flex-col absolute left-0 right-0 bg-slate-900 p-4 border-b border-slate-800' : 'hidden'}`}>
               {modules.map((mod) => (
                 <button
@@ -155,14 +271,7 @@ function App() {
       </header>
 
       <main className="p-6">
-        {role === 'super_admin' ? (
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-white">Administración General</h2>
-            <AdminPanel />
-          </div>
-        ) : (
-          renderModule()
-        )}
+        {renderModule()}
       </main>
       <SyncStatus />
     </div>

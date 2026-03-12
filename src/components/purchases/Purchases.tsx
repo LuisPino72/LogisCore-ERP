@@ -1,22 +1,11 @@
 import { useState, useEffect } from 'react';
-import { db, Product } from '../../services/db';
+import { db, Product, Purchase } from '../../services/db';
 import { useTenantStore } from '../../store/useTenantStore';
+import { SyncEngine } from '../../services/sync/SyncEngine';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { ShoppingBasket, Plus, Truck, Package, X, Check } from 'lucide-react';
-
-interface Purchase {
-  id?: number;
-  localId: string;
-  tenantId: string;
-  supplier: string;
-  invoiceNumber: string;
-  items: { productId: string; productName: string; quantity: number; cost: number }[];
-  total: number;
-  status: 'pending' | 'completed' | 'cancelled';
-  createdAt: Date;
-}
 
 export default function Purchases() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -25,7 +14,7 @@ export default function Purchases() {
   const [form, setForm] = useState({
     supplier: '',
     invoiceNumber: '',
-    items: [] as { productId: string; productName: string; quantity: number; cost: number }[],
+    items: [] as { productId: string; productName: string; quantity: number; cost: number; total: number }[],
   });
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItem, setNewItem] = useState({ productId: '', quantity: 1, cost: 0 });
@@ -34,12 +23,12 @@ export default function Purchases() {
   useEffect(() => {
     async function loadData() {
       if (!tenant?.slug) return;
-      const prods = await db.products.where('tenantId').equals(tenant.slug).toArray();
-      setProducts(prods);
-      setPurchases([
-        { localId: '1', tenantId: tenant.slug, supplier: 'Distribuidora ABC', invoiceNumber: 'FACT-001', items: [{ productId: '1', productName: 'Carne', quantity: 10, cost: 50 }], total: 500, status: 'completed', createdAt: new Date() },
-        { localId: '2', tenantId: tenant.slug, supplier: 'Proveedor XYZ', invoiceNumber: 'FACT-002', items: [{ productId: '2', productName: 'Papas', quantity: 20, cost: 15 }], total: 300, status: 'pending', createdAt: new Date() },
+      const [prods, purcs] = await Promise.all([
+        db.products.where('tenantId').equals(tenant.slug).toArray(),
+        db.purchases.where('tenantId').equals(tenant.slug).reverse().sortBy('createdAt'),
       ]);
+      setProducts(prods);
+      setPurchases(purcs);
     }
     loadData();
   }, [tenant?.slug]);
@@ -50,7 +39,13 @@ export default function Purchases() {
     
     setForm({
       ...form,
-      items: [...form.items, { productId: product.localId, productName: product.name, quantity: newItem.quantity, cost: newItem.cost }],
+      items: [...form.items, { 
+        productId: product.localId, 
+        productName: product.name, 
+        quantity: newItem.quantity, 
+        cost: newItem.cost,
+        total: newItem.quantity * newItem.cost,
+      }],
     });
     setNewItem({ productId: '', quantity: 1, cost: 0 });
     setShowAddItem(false);
@@ -61,22 +56,28 @@ export default function Purchases() {
   };
 
   const handleSubmit = async () => {
-    const total = form.items.reduce((sum, item) => sum + (item.quantity * item.cost), 0);
+    if (!tenant?.slug) return;
+    const subtotal = form.items.reduce((sum, item) => sum + item.total, 0);
     const newPurchase: Purchase = {
       localId: crypto.randomUUID(),
-      tenantId: tenant!.slug,
+      tenantId: tenant.slug,
       supplier: form.supplier,
       invoiceNumber: form.invoiceNumber,
       items: form.items,
-      total,
+      subtotal,
+      tax: 0,
+      total: subtotal,
       status: 'completed',
       createdAt: new Date(),
     };
+
+    await db.purchases.add(newPurchase);
+    await SyncEngine.addToQueue('purchases', 'create', newPurchase as unknown as Record<string, unknown>, newPurchase.localId);
     
     for (const item of form.items) {
       const product = products.find(p => p.localId === item.productId);
       if (product) {
-        await db.products.update(product.localId, { stock: product.stock + item.quantity });
+        await db.products.update(product.localId, { stock: product.stock + item.quantity, updatedAt: new Date() });
       }
     }
     

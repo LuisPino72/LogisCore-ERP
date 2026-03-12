@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTenantStore } from '../../store/useTenantStore';
+import { db, Sale } from '../../services/db';
 import Card from '../ui/Card';
 import { TrendingUp, DollarSign, ShoppingCart, Package, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
@@ -11,28 +12,55 @@ interface Stats {
 }
 
 export default function Reports() {
-  const [stats] = useState<Stats>({
-    totalSales: 15750.00,
-    totalPurchases: 8200.00,
-    totalProducts: 45,
-    salesGrowth: 12.5,
+  const [stats, setStats] = useState<Stats>({
+    totalSales: 0,
+    totalPurchases: 0,
+    totalProducts: 0,
+    salesGrowth: 0,
   });
+  const [recentSales, setRecentSales] = useState<Sale[]>([]);
+  const [topProducts, setTopProducts] = useState<{ name: string; sales: number; revenue: number }[]>([]);
   const tenant = useTenantStore((state) => state.currentTenant);
 
-  const recentSales = [
-    { id: 1, date: '2024-01-15', items: 5, total: 125.50, method: 'efectivo' },
-    { id: 2, date: '2024-01-15', items: 3, total: 89.00, method: 'tarjeta' },
-    { id: 3, date: '2024-01-14', items: 8, total: 245.00, method: 'efectivo' },
-    { id: 4, date: '2024-01-14', items: 2, total: 45.00, method: 'tarjeta' },
-    { id: 5, date: '2024-01-13', items: 6, total: 178.25, method: 'efectivo' },
-  ];
+  useEffect(() => {
+    async function loadData() {
+      if (!tenant?.slug) return;
 
-  const topProducts = [
-    { name: 'Hamburguesa Clásica', sales: 145, revenue: 1812.50 },
-    { name: 'Papas Fritas', sales: 98, revenue: 490.00 },
-    { name: 'Refresco', sales: 87, revenue: 260.00 },
-    { name: 'Hot Dog', sales: 76, revenue: 608.00 },
-  ];
+      const [sales, purchases, products] = await Promise.all([
+        db.sales.where('tenantId').equals(tenant.slug).toArray(),
+        db.purchases.where('tenantId').equals(tenant.slug).toArray(),
+        db.products.where('tenantId').equals(tenant.slug).toArray(),
+      ]);
+
+      const totalSales = sales.filter(s => s.status === 'completed').reduce((sum, s) => sum + s.total, 0);
+      const totalPurchases = purchases.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.total, 0);
+
+      const productSales: Record<string, { name: string; sales: number; revenue: number }> = {};
+      sales.filter(s => s.status === 'completed').forEach(sale => {
+        sale.items.forEach(item => {
+          if (!productSales[item.productId]) {
+            productSales[item.productId] = { name: item.productName, sales: 0, revenue: 0 };
+          }
+          productSales[item.productId].sales += item.quantity;
+          productSales[item.productId].revenue += item.total;
+        });
+      });
+
+      const top = Object.values(productSales)
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+      setStats({
+        totalSales,
+        totalPurchases,
+        totalProducts: products.length,
+        salesGrowth: 0,
+      });
+      setRecentSales(sales.slice(-5).reverse());
+      setTopProducts(top);
+    }
+    loadData();
+  }, [tenant?.slug]);
 
   if (!tenant) return null;
 
@@ -127,13 +155,13 @@ export default function Reports() {
               </thead>
               <tbody>
                 {recentSales.map((sale) => (
-                  <tr key={sale.id} className="border-b border-slate-800/50">
-                    <td className="py-2 text-white">{sale.date}</td>
-                    <td className="py-2 text-center text-slate-300">{sale.items}</td>
+                  <tr key={sale.localId} className="border-b border-slate-800/50">
+                    <td className="py-2 text-white">{sale.createdAt.toLocaleDateString()}</td>
+                    <td className="py-2 text-center text-slate-300">{sale.items.length}</td>
                     <td className="py-2 text-right text-green-400">${sale.total.toFixed(2)}</td>
                     <td className="py-2 text-right">
-                      <span className={`px-2 py-0.5 rounded text-xs ${sale.method === 'efectivo' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                        {sale.method}
+                      <span className={`px-2 py-0.5 rounded text-xs ${sale.paymentMethod === 'cash' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                        {sale.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'}
                       </span>
                     </td>
                   </tr>
