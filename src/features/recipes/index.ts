@@ -1,1 +1,1 @@
-export { default as Recipes } from '@/components/recipes/Recipes';
+export { default as Recipes } from "@/features/recipes/components/Recipes";

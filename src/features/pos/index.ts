@@ -1,1 +1,1 @@
-export { default as POS } from '@/components/pos/POS';
+export { default as POS } from "@/features/pos/components/POS";

@@ -1,1 +1,1 @@
-export { default as Purchases } from '@/components/purchases/Purchases';
+export { default as Purchases } from "@/features/purchases/components/Purchases";

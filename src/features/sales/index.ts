@@ -1,1 +1,1 @@
-export { default as Sales } from '@/components/sales/Sales';
+export { default as Sales } from "@/features/sales/components/Sales";

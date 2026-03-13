@@ -1,1 +1,1 @@
-export { default as Employees } from '@/components/employees/Employees';
+export { default as Employees } from "@/features/employees/components/Employees";

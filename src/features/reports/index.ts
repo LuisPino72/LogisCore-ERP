@@ -1,1 +1,1 @@
-export { default as Reports } from '@/components/reports/Reports';
+export { default as Reports } from "@/features/reports/components/Reports";

@@ -126,11 +126,22 @@ export const useThemeStore = create<ThemeState>()(
         const secondaryPalette = generateColorPalette(state.themeColorSecondary, state.accentIntensity);
         const isDark = state.theme === 'dark';
 
-        // Base background calculation
-        const darkBgPrimary = adjustBrightness(state.themeColor, 0.03);
-        const darkBgSecondary = adjustBrightness(state.themeColor, 0.06);
-        const darkBgTertiary = adjustBrightness(state.themeColor, 0.1);
-        const darkBgElevated = adjustBrightness(state.themeColor, 0.14);
+        // Base background calculation - Optimized for professional dark mode
+        // Instead of pure brand-derived black, we use a very deep slate tinted with the brand color
+        const baseDark = { r: 15, g: 23, b: 42 }; // deep slate base
+        const brandRgb = hexToRgb(state.themeColor) || { r: 59, g: 130, b: 246 };
+        
+        // Blend function: (base * 0.9 + brand * 0.1)
+        const blend = (c1: number, c2: number, factor: number) => Math.round(c1 * (1 - factor) + c2 * factor);
+        
+        const tintedR = blend(baseDark.r, brandRgb.r, 0.08);
+        const tintedG = blend(baseDark.g, brandRgb.g, 0.08);
+        const tintedB = blend(baseDark.b, brandRgb.b, 0.12);
+        
+        const darkBgPrimary = `rgb(${tintedR}, ${tintedG}, ${tintedB})`;
+        const darkBgSecondary = `rgb(${tintedR + 5}, ${tintedG + 7}, ${tintedB + 10})`;
+        const darkBgTertiary = `rgb(${tintedR + 10}, ${tintedG + 15}, ${tintedB + 20})`;
+        const darkBgElevated = `rgb(${tintedR + 15}, ${tintedG + 22}, ${tintedB + 30})`;
 
         return `
           --brand-50: ${palette['50']};
@@ -163,11 +174,11 @@ export const useThemeStore = create<ThemeState>()(
           --bg-secondary: ${isDark ? darkBgSecondary : '#f8fafc'};
           --bg-tertiary: ${isDark ? darkBgTertiary : '#f1f5f9'};
           --bg-elevated: ${isDark ? darkBgElevated : '#f1f5f9'};
-          --text-primary: ${isDark ? '#fef3c7' : '#0f172a'};
-          --text-secondary: ${isDark ? '#d6d3d1' : '#475569'};
-          --text-muted: ${isDark ? '#a8a29e' : '#94a3b8'};
-          --border-color: ${isDark ? 'rgba(255,243,199,0.1)' : 'rgba(15,23,42,0.1)'};
-          --border-subtle: ${isDark ? 'rgba(255,243,199,0.05)' : 'rgba(15,23,42,0.05)'};
+          --text-primary: ${isDark ? '#f8fafc' : '#0f172a'};
+          --text-secondary: ${isDark ? '#cbd5e1' : '#475569'};
+          --text-muted: ${isDark ? '#94a3b8' : '#94a3b8'};
+          --border-color: ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)'};
+          --border-subtle: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)'};
         `.trim();
       },
 

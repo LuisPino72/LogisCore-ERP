@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useTenantStore, TenantThemeConfig } from '@/store/useTenantStore'
 import { useToast } from '@/providers/ToastProvider'
@@ -398,7 +398,7 @@ export default function AdminPanel() {
                     <div className="flex gap-3">
                       <input
                         type="color"
-                        value={editingTenant.config?.themeConfig?.themeColor || '#c2410c'}
+                        value={editingTenant.config?.themeConfig?.themeColor || '#ea580c'}
                         onChange={(e) => {
                           const newThemeConfig: TenantThemeConfig = {
                             themeColor: e.target.value,
@@ -412,7 +412,7 @@ export default function AdminPanel() {
                       />
                       <input
                         type="text"
-                        value={editingTenant.config?.themeConfig?.themeColor || '#c2410c'}
+                        value={editingTenant.config?.themeConfig?.themeColor || '#ea580c'}
                         onChange={(e) => {
                           const newThemeConfig: TenantThemeConfig = {
                             themeColor: e.target.value,
@@ -434,7 +434,7 @@ export default function AdminPanel() {
                         value={editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d'}
                         onChange={(e) => {
                           const newThemeConfig: TenantThemeConfig = {
-                            themeColor: editingTenant.config?.themeConfig?.themeColor || '#c2410c',
+                            themeColor: editingTenant.config?.themeConfig?.themeColor || 'var(--brand-600)',
                             themeColorSecondary: e.target.value,
                             mode: editingTenant.config?.themeConfig?.mode || 'dark',
                             accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
@@ -448,7 +448,7 @@ export default function AdminPanel() {
                         value={editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d'}
                         onChange={(e) => {
                           const newThemeConfig: TenantThemeConfig = {
-                            themeColor: editingTenant.config?.themeConfig?.themeColor || '#c2410c',
+                            themeColor: editingTenant.config?.themeConfig?.themeColor || 'var(--brand-600)',
                             themeColorSecondary: e.target.value,
                             mode: editingTenant.config?.themeConfig?.mode || 'dark',
                             accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
@@ -466,7 +466,7 @@ export default function AdminPanel() {
                         type="button"
                         onClick={() => {
                           const newThemeConfig: TenantThemeConfig = {
-                            themeColor: editingTenant.config?.themeConfig?.themeColor || '#c2410c',
+                            themeColor: editingTenant.config?.themeConfig?.themeColor || '#ea580c',
                             themeColorSecondary: editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d',
                             mode: 'dark',
                             accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
@@ -533,7 +533,7 @@ export default function AdminPanel() {
                           type="button"
                           onClick={() => {
                             const newThemeConfig: TenantThemeConfig = {
-                              themeColor: editingTenant.config?.themeConfig?.themeColor || '#c2410c',
+                              themeColor: editingTenant.config?.themeConfig?.themeColor || '#ea580c',
                               themeColorSecondary: editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d',
                               mode: editingTenant.config?.themeConfig?.mode || 'dark',
                               accentIntensity: intensity,
@@ -557,7 +557,7 @@ export default function AdminPanel() {
                       <span
                         className="ml-2 px-3 py-1.5 rounded-lg font-medium inline-block"
                         style={{
-                          backgroundColor: editingTenant.config?.themeConfig?.themeColor || '#c2410c',
+                          backgroundColor: editingTenant.config?.themeConfig?.themeColor || '#ea580c',
                           color: 'white'
                         }}
                       >
@@ -659,9 +659,8 @@ export default function AdminPanel() {
                 </thead>
                 <tbody className="divide-y divide-(--border-color)">
                   {filteredTenants.map((t) => (
-                    <>
+                    <Fragment key={t.id}>
                       <tr
-                        key={t.id}
                         className={`hover:bg-(--bg-tertiary)/30 transition-colors cursor-pointer ${viewMode === 'expandable' && expandedId === t.id ? 'bg-(--bg-tertiary)/30' : ''}`}
                         onClick={() => viewMode === 'expandable' && setExpandedId(expandedId === t.id ? null : t.id)}
                       >
@@ -742,7 +741,7 @@ export default function AdminPanel() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
