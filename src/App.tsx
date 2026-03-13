@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
 import { useTenantStore } from '@/store/useTenantStore';
+import { useThemeStore } from '@/store/useThemeStore';
 import { Login } from '@/features/auth';
 import AdminPanel from '@/components/AdminPanel';
 import SyncStatus from '@/components/SyncStatus';
@@ -10,7 +11,7 @@ import { db } from '@/lib/db';
 import { 
   Package, ShoppingCart, ShoppingBasket, Menu, X, LayoutDashboard, 
   ChefHat, BarChart3, Loader2, ChevronLeft, ChevronRight, LogOut,
-  Store, ShoppingBag
+  Store, ShoppingBag, Sun, Moon
 } from 'lucide-react';
 import Emblema from '@/assets/Emblema.ico';
 
@@ -29,10 +30,16 @@ function App() {
   const tenant = useTenantStore((state) => state.currentTenant);
   const isImpersonating = useTenantStore((state) => state.isImpersonating);
   const stopImpersonation = useTenantStore((state) => state.stopImpersonation);
+  const theme = useThemeStore((state) => state.theme);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const [activeModule, setActiveModule] = useState<Module>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
 
   const loadTenantData = useCallback(async (tenantSlug: string) => {
     setIsLoadingData(true);
@@ -257,15 +264,15 @@ function App() {
 
   const Sidebar = () => (
     <aside 
-      className={`fixed left-0 top-0 h-screen bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 z-50 ${
+      className={`fixed left-0 top-0 h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 z-50 ${
         sidebarCollapsed ? 'w-16' : 'w-60'
       } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
     >
-      <div className="p-4 flex items-center justify-between border-b border-slate-800">
+      <div className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
         {!sidebarCollapsed && (
           <div className="flex items-center gap-3">
             <img src={Emblema} alt="LogisCore" className="w-8 h-8 rounded-lg" />
-            <span className="font-bold text-white">LogisCore</span>
+            <span className="font-bold text-slate-900 dark:text-white">LogisCore</span>
           </div>
         )}
         {sidebarCollapsed && (
@@ -273,7 +280,7 @@ function App() {
         )}
         <button 
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className={`hidden lg:flex items-center justify-center w-6 h-6 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors ${sidebarCollapsed ? 'absolute -right-3 top-4' : ''}`}
+          className={`hidden lg:flex items-center justify-center w-6 h-6 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors ${sidebarCollapsed ? 'absolute -right-3 top-4' : ''}`}
         >
           {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -302,7 +309,7 @@ function App() {
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                   activeModule === mod.id
                     ? 'bg-blue-600 text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
                 title={sidebarCollapsed ? mod.label : undefined}
               >
@@ -314,11 +321,11 @@ function App() {
         </ul>
       </nav>
 
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-800">
         {!sidebarCollapsed ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden">
+              <div className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden">
                 {tenant?.config && typeof tenant.config === 'object' && 'logoUrl' in tenant.config && tenant.config.logoUrl ? (
                   <img src={String(tenant.config.logoUrl)} alt={tenant.name} className="w-full h-full object-cover" />
                 ) : (
@@ -326,13 +333,13 @@ function App() {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-white truncate">{tenant?.name}</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{tenant?.name}</p>
                 <p className="text-xs text-slate-500 capitalize">{role}</p>
               </div>
             </div>
             <button
               onClick={() => useTenantStore.getState().clear()}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors text-sm"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors text-sm"
             >
               <LogOut className="w-4 h-4" />
               Cerrar Sesión
@@ -341,7 +348,7 @@ function App() {
         ) : (
           <button
             onClick={() => useTenantStore.getState().clear()}
-            className="w-full flex items-center justify-center p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors"
+            className="w-full flex items-center justify-center p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors"
             title="Cerrar Sesión"
           >
             <LogOut className="w-5 h-5" />
@@ -352,29 +359,36 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-white">
       {!isAdminPanel && <Sidebar />}
       
       <div className={`transition-all duration-300 ${isAdminPanel ? '' : (sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60')}`}>
         {!isAdminPanel && (
-          <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+          <header className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
             <div className="px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="lg:hidden p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"
+                  className="lg:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 >
                   {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </button>
                 <div>
-                  <h1 className="text-xl font-bold text-white">
+                  <h1 className="text-xl font-bold text-slate-900 dark:text-white">
                     {allModules.find(m => m.id === activeModule)?.label || 'LogisCore'}
                   </h1>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-blue-400 border border-blue-500/30">
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                  title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+                >
+                  {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                </button>
+                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-blue-500 dark:text-blue-400 border border-slate-200 dark:border-blue-500/30">
                   {role}
                 </span>
                 {isImpersonating && (
@@ -388,22 +402,29 @@ function App() {
         )}
 
         {isAdminPanel && (
-          <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+          <header className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
             <div className="px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <img src={Emblema} alt="LogisCore" className="w-8 h-8 rounded-lg" />
                 <div>
-                  <h1 className="text-xl font-bold text-white">Administración</h1>
-                  <p className="text-xs text-slate-400">Gestión de tenants y sistema</p>
+                  <h1 className="text-xl font-bold text-slate-900 dark:text-white">Administración</h1>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Gestión de tenants y sistema</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-purple-400 border border-purple-500/30">
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                  title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+                >
+                  {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                </button>
+                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-purple-500 dark:text-purple-400 border border-slate-200 dark:border-purple-500/30">
                   {role}
                 </span>
                 <button
                   onClick={() => useTenantStore.getState().clear()}
-                  className="text-xs text-slate-400 hover:text-white transition-colors"
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                 >
                   Cerrar Sesión
                 </button>

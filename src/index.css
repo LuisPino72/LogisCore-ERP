@@ -1,13 +1,18 @@
 @import "tailwindcss";
 
-/* Estilos globales básicos y tokens de diseño */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --font-inter: "Inter", system-ui, -apple-system, sans-serif;
 }
 
 body {
   font-family: var(--font-inter);
-  @apply bg-slate-950 text-slate-50 antialiased;
+  @apply bg-white text-slate-900 antialiased;
+}
+
+.dark body {
+  @apply bg-slate-950 text-slate-50;
 }
 
 @keyframes slide-in {
