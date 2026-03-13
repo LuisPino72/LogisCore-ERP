@@ -21,7 +21,7 @@ const Purchases = lazy(() => import('./components/purchases/Purchases'));
 const Sales = lazy(() => import('./components/sales/Sales'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 
-type Module = 'dashboard' | 'inventory' | 'pos' | 'sales' | 'recipes' | 'reports' | 'purchases';
+type Module = 'dashboard' | 'sales' | 'inventory' | 'pos' | 'recipes' | 'reports' | 'purchases';
 
 function App() {
   const role = useTenantStore((state) => state.role);
@@ -214,6 +214,8 @@ function App() {
     }
   };
 
+  const isAdminPanel = role === 'super_admin' && !isImpersonating;
+
   const Sidebar = () => (
     <aside 
       className={`fixed left-0 top-0 h-screen bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 z-50 ${
@@ -309,8 +311,6 @@ function App() {
       </div>
     </aside>
   );
-
-  const isAdminPanel = role === 'super_admin' && !isImpersonating;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
