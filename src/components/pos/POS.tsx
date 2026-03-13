@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db, Product, Sale, Category } from '../../services/db';
 import { useTenantStore } from '../../store/useTenantStore';
 import { EventBus, Events } from '../../services/events/EventBus';
 import { SyncEngine } from '../../services/sync/SyncEngine';
+import { useToast } from '../ui/Toast';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { ShoppingCart, Plus, Minus, X, Trash2, CreditCard, Banknote, Package, Search } from 'lucide-react';
@@ -21,6 +22,7 @@ export default function POS() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [showCheckout, setShowCheckout] = useState(false);
   const tenant = useTenantStore((state) => state.currentTenant);
+  const { showError, showSuccess } = useToast();
 
   useEffect(() => {
     async function loadProducts() {
@@ -35,15 +37,17 @@ export default function POS() {
     loadProducts();
   }, [tenant?.slug]);
 
-  const filteredProducts = products.filter(
-    (p) => {
-      const matchesSearch = 
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.sku.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = !selectedCategory || p.categoryId === Number(selectedCategory);
-      return matchesSearch && matchesCategory && p.isActive && p.stock > 0;
-    }
-  );
+  const filteredProducts = useMemo(() => {
+    return products.filter(
+      (p) => {
+        const matchesSearch = 
+          p.name.toLowerCase().includes(search.toLowerCase()) ||
+          p.sku.toLowerCase().includes(search.toLowerCase());
+        const matchesCategory = !selectedCategory || p.categoryId === Number(selectedCategory);
+        return matchesSearch && matchesCategory && p.isActive && p.stock > 0;
+      }
+    );
+  }, [products, search, selectedCategory]);
 
   const addToCart = (product: Product) => {
     setCart((prev) => {
@@ -80,52 +84,59 @@ export default function POS() {
     setCart((prev) => prev.filter((item) => item.product.localId !== localId));
   };
 
-  const cartTotal = cart.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
-    0
+  const cartTotal = useMemo(() => 
+    cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+    [cart]
   );
 
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartCount = useMemo(() => 
+    cart.reduce((sum, item) => sum + item.quantity, 0),
+    [cart]
+  );
 
   const handleCheckout = async () => {
-    const saleItems = cart.map(item => ({
-      productId: item.product.localId,
-      productName: item.product.name,
-      quantity: item.quantity,
-      unitPrice: item.product.price,
-      total: item.product.price * item.quantity,
-    }));
+    try {
+      const saleItems = cart.map(item => ({
+        productId: item.product.localId,
+        productName: item.product.name,
+        quantity: item.quantity,
+        unitPrice: item.product.price,
+        total: item.product.price * item.quantity,
+      }));
 
-    const newSale: Sale = {
-      localId: crypto.randomUUID(),
-      tenantId: tenant!.slug,
-      items: saleItems,
-      subtotal: cartTotal,
-      tax: 0,
-      total: cartTotal,
-      paymentMethod,
-      status: 'completed',
-      createdAt: new Date(),
-    };
+      const newSale: Sale = {
+        localId: crypto.randomUUID(),
+        tenantId: tenant!.slug,
+        items: saleItems,
+        subtotal: cartTotal,
+        tax: 0,
+        total: cartTotal,
+        paymentMethod,
+        status: 'completed',
+        createdAt: new Date(),
+      };
 
-    await db.sales.add(newSale);
-    await SyncEngine.addToQueue('sales', 'create', newSale as unknown as Record<string, unknown>, newSale.localId);
+      await db.sales.add(newSale);
+      await SyncEngine.addToQueue('sales', 'create', newSale as unknown as Record<string, unknown>, newSale.localId);
 
-    for (const item of cart) {
-      const newStock = item.product.stock - item.quantity;
-      await db.products.update(item.product.localId, { stock: newStock, updatedAt: new Date() });
+      await Promise.all(cart.map(item => {
+        const newStock = item.product.stock - item.quantity;
+        return db.products.update(item.product.localId, { stock: newStock, updatedAt: new Date() });
+      }));
+
+      EventBus.emit(Events.SALE_COMPLETED, {
+        items: cart,
+        total: cartTotal,
+        paymentMethod,
+        timestamp: new Date(),
+      });
+
+      setCart([]);
+      setShowCheckout(false);
+      showSuccess('Venta registrada exitosamente!');
+    } catch (error) {
+      showError('Error al registrar la venta');
     }
-
-    EventBus.emit(Events.SALE_COMPLETED, {
-      items: cart,
-      total: cartTotal,
-      paymentMethod,
-      timestamp: new Date(),
-    });
-
-    setCart([]);
-    setShowCheckout(false);
-    alert('Venta registrada exitosamente!');
   };
 
   const getStockStatus = (stock: number) => {

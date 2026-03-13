@@ -10,10 +10,23 @@ export interface SyncResult {
   conflicts: SyncQueueItem[];
 }
 
+interface RetryConfig {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 10000,
+};
+
 class SyncEngineClass {
   private isSyncing = false;
   private syncInterval: ReturnType<typeof setInterval> | null = null;
   private readonly SYNC_INTERVAL_MS = 30000;
+  private retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG;
 
   async start(): Promise<void> {
     if (this.syncInterval) return;
@@ -30,6 +43,55 @@ class SyncEngineClass {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
     }
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private calculateDelay(attempt: number): number {
+    const delay = this.retryConfig.baseDelayMs * Math.pow(2, attempt);
+    const jitter = Math.random() * 0.3 * delay;
+    return Math.min(delay + jitter, this.retryConfig.maxDelayMs);
+  }
+
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    operationName: string
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < this.retryConfig.maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        const isRetryable = this.isRetryableError(error);
+        
+        if (!isRetryable || attempt === this.retryConfig.maxRetries - 1) {
+          throw lastError;
+        }
+        
+        const delay = this.calculateDelay(attempt);
+        console.log(`SyncEngine: Retry ${operationName} in ${delay}ms (attempt ${attempt + 1}/${this.retryConfig.maxRetries})`);
+        await this.sleep(delay);
+      }
+    }
+    
+    throw lastError;
+  }
+
+  private isRetryableError(error: unknown): boolean {
+    const errorStr = String(error).toLowerCase();
+    return (
+      errorStr.includes('network') ||
+      errorStr.includes('timeout') ||
+      errorStr.includes('econnrefused') ||
+      errorStr.includes('fetch failed') ||
+      errorStr.includes('503') ||
+      errorStr.includes('429')
+    );
   }
 
   async addToQueue(
@@ -111,15 +173,19 @@ class SyncEngineClass {
     
     await db.syncQueue.update(item.id!, { status: 'syncing' });
 
-    const { error } = await supabase.rpc('sync_table_item', {
-      p_schema: schema,
-      p_table: item.tableName,
-      p_operation: item.operation,
-      p_data: item.data,
-      p_local_id: item.localId,
-    });
+    const syncOperation = async () => {
+      const { error } = await supabase.rpc('sync_table_item', {
+        p_schema: schema,
+        p_table: item.tableName,
+        p_operation: item.operation,
+        p_data: item.data,
+        p_local_id: item.localId,
+      });
 
-    if (error) throw error;
+      if (error) throw error;
+    };
+
+    await this.retryOperation(syncOperation, `sync ${item.tableName}:${item.operation}`);
 
     await db.syncQueue.update(item.id!, {
       status: 'synced',

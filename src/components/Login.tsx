@@ -1,8 +1,28 @@
 import { useState } from 'react'
 import { supabase } from '../services/supabase'
 import { useTenantStore } from '../store/useTenantStore'
+import { useToast } from './ui/Toast'
 import { User, Lock, Loader2 } from 'lucide-react'
 import Emblema from '../assets/Emblema.ico'
+
+interface TenantData {
+  id: string;
+  name: string;
+  slug: string;
+  modules: {
+    sales: boolean;
+    inventory: boolean;
+    purchases: boolean;
+    recipes: boolean;
+    reports: boolean;
+  };
+  config?: Record<string, unknown>;
+}
+
+interface RoleData {
+  role: 'super_admin' | 'owner' | 'employee';
+  tenants: TenantData;
+}
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -11,9 +31,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const setRole = useTenantStore((state) => state.setRole)
   const setTenant = useTenantStore((state) => state.setTenant)
+  const { showError, showSuccess } = useToast()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!email.trim() || !password.trim()) {
+      showError('Por favor ingresa correo y contraseña');
+      return;
+    }
+    
     setLoading(true)
     
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -22,7 +49,7 @@ export default function Login() {
     })
 
     if (error) {
-      alert('Error al iniciar sesión: ' + error.message)
+      showError('Error al iniciar sesión: ' + error.message)
       setLoading(false)
       return
     }
@@ -32,13 +59,17 @@ export default function Login() {
         .from('user_roles')
         .select('role, tenants(*)')
         .eq('user_id', data.user.id)
-        .single()
+        .single() as { data: RoleData | null };
 
       if (roleData) {
         setRole(roleData.role)
         if (roleData.tenants) {
-          setTenant(roleData.tenants as any)
+          setTenant(roleData.tenants)
         }
+        showSuccess('¡Bienvenido a LogisCore!')
+      } else {
+        showError('Tu usuario no tiene un tenant asignado. Contacta al administrador.');
+        await supabase.auth.signOut();
       }
     }
     

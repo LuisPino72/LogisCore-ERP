@@ -129,9 +129,9 @@ class LogisCoreDB extends Dexie {
 
   constructor() {
     super('LogisCoreERP');
-    this.version(3).stores({
+    this.version(4).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
-      products: '++id, localId, tenantId, sku, categoryId',
+      products: '++id, localId, tenantId, sku, categoryId, isActive',
       categories: '++id, localId, tenantId, name',
       settings: 'key, tenantId',
       sales: '++id, localId, tenantId, status, createdAt',

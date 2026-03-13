@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Card from '../ui/Card';
+import { useToast } from '../ui/Toast';
 import { Plus, Search, Edit2, Trash2, Package, X, Cloud, CloudOff, LayoutGrid, List, Filter, PackageX, AlertTriangle } from 'lucide-react';
 import { useTenantStore } from '../../store/useTenantStore';
 import { createProduct, updateProduct, deleteProduct, getProducts } from '../../services/products.service';
 import { db, Product, Category } from '../../services/db';
 import { EventBus, Events } from '../../services/events/EventBus';
+import { isOk } from '../../types/result';
 
 type ViewMode = 'table' | 'grid';
 type StockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
@@ -36,16 +38,20 @@ export default function Inventory() {
   });
 
   const tenant = useTenantStore((state) => state.currentTenant);
+  const { showError, showSuccess } = useToast();
 
   const loadData = async () => {
     if (!tenant?.slug) return;
     setLoading(true);
     try {
-      const prodData = await getProducts();
-      const catData = await db.categories.where('tenantId').equals(tenant.slug).toArray();
+      const [prodData, catData] = await Promise.all([
+        getProducts(),
+        db.categories.where('tenantId').equals(tenant.slug).toArray()
+      ]);
       setProducts(prodData);
       setCategories(catData);
     } catch (error) {
+      showError('Error al cargar datos del inventario');
       console.error('Error loading inventory data:', error);
     } finally {
       setLoading(false);
@@ -62,39 +68,51 @@ export default function Inventory() {
     };
   }, [tenant?.slug]);
 
-  const filteredProducts = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-                         p.sku.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = !selectedCategory || p.categoryId === Number(selectedCategory);
-    
-    let matchesStock = true;
-    if (stockFilter === 'in_stock') matchesStock = p.stock > 10;
-    else if (stockFilter === 'low_stock') matchesStock = p.stock > 0 && p.stock <= 10;
-    else if (stockFilter === 'out_of_stock') matchesStock = p.stock === 0;
-    
-    let matchesStatus = true;
-    if (statusFilter === 'active') matchesStatus = p.isActive;
-    else if (statusFilter === 'inactive') matchesStatus = !p.isActive;
-    
-    let matchesPrice = true;
-    if (priceRange.min) matchesPrice = p.price >= Number(priceRange.min);
-    if (priceRange.max) matchesPrice = matchesPrice && p.price <= Number(priceRange.max);
-    
-    return matchesSearch && matchesCategory && matchesStock && matchesStatus && matchesPrice;
-  });
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+                           p.sku.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory = !selectedCategory || p.categoryId === Number(selectedCategory);
+      
+      let matchesStock = true;
+      if (stockFilter === 'in_stock') matchesStock = p.stock > 10;
+      else if (stockFilter === 'low_stock') matchesStock = p.stock > 0 && p.stock <= 10;
+      else if (stockFilter === 'out_of_stock') matchesStock = p.stock === 0;
+      
+      let matchesStatus = true;
+      if (statusFilter === 'active') matchesStatus = p.isActive;
+      else if (statusFilter === 'inactive') matchesStatus = !p.isActive;
+      
+      let matchesPrice = true;
+      if (priceRange.min) matchesPrice = p.price >= Number(priceRange.min);
+      if (priceRange.max) matchesPrice = matchesPrice && p.price <= Number(priceRange.max);
+      
+      return matchesSearch && matchesCategory && matchesStock && matchesStatus && matchesPrice;
+    });
+  }, [products, search, selectedCategory, stockFilter, statusFilter, priceRange.min, priceRange.max]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       if (editingId) {
-        await updateProduct(editingId, form);
+        const result = await updateProduct(editingId, form);
+        if (!isOk(result)) {
+          showError(result.error.message);
+          return;
+        }
+        showSuccess('Producto actualizado correctamente');
       } else {
-        await createProduct(form as any);
+        const result = await createProduct(form as any);
+        if (!isOk(result)) {
+          showError(result.error.message);
+          return;
+        }
+        showSuccess('Producto creado correctamente');
       }
       setShowModal(false);
       resetForm();
     } catch (error) {
-      console.error('Error saving product:', error);
+      showError('Error al guardar producto');
     }
   };
 
@@ -114,7 +132,12 @@ export default function Inventory() {
 
   const handleDelete = async (localId: string) => {
     if (confirm('¿Estás seguro de eliminar este producto?')) {
-      await deleteProduct(localId);
+      const result = await deleteProduct(localId);
+      if (!isOk(result)) {
+        showError(result.error.message);
+        return;
+      }
+      showSuccess('Producto eliminado correctamente');
     }
   };
 

@@ -1,8 +1,9 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
 import { useTenantStore } from './store/useTenantStore';
 import Login from './components/Login';
 import AdminPanel from './components/AdminPanel';
 import SyncStatus from './components/SyncStatus';
+import { ToastProvider } from './components/ui/Toast';
 import { initializeCatalogs } from './services/db';
 import { supabase } from './services/supabase';
 import { db } from './services/db';
@@ -33,14 +34,7 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
 
-  useEffect(() => {
-    if (tenant?.slug) {
-      initializeCatalogs(tenant.slug);
-      loadTenantData(tenant.slug);
-    }
-  }, [tenant]);
-
-  const loadTenantData = async (tenantSlug: string) => {
+  const loadTenantData = useCallback(async (tenantSlug: string) => {
     setIsLoadingData(true);
     try {
       const [productsRes, categoriesRes, salesRes, recipesRes, purchasesRes] = await Promise.all([
@@ -51,57 +45,102 @@ function App() {
         supabase.from('purchases').select('*').eq('tenant_id', tenantSlug),
       ]);
 
+      const sanitizeCategory = (c: Record<string, unknown>) => ({
+        localId: String(c.id ?? ''),
+        tenantId: tenantSlug,
+        name: String(c.name ?? ''),
+        description: c.description ? String(c.description) : undefined,
+        createdAt: c.created_at ? new Date(c.created_at as string) : new Date(),
+        syncedAt: c.created_at ? new Date(c.created_at as string) : undefined,
+      });
+
+      const sanitizeProduct = (p: Record<string, unknown>) => ({
+        localId: String(p.id ?? ''),
+        tenantId: tenantSlug,
+        name: String(p.name ?? ''),
+        sku: String(p.sku ?? ''),
+        price: Number(p.price) || 0,
+        cost: Number(p.cost) || 0,
+        stock: Number(p.stock) || 0,
+        categoryId: p.category_id ? Number(p.category_id) : undefined,
+        isActive: Boolean(p.is_active ?? true),
+        createdAt: p.created_at ? new Date(p.created_at as string) : new Date(),
+        updatedAt: p.updated_at ? new Date(p.updated_at as string) : new Date(),
+        syncedAt: p.created_at ? new Date(p.created_at as string) : undefined,
+      });
+
+      const sanitizeSale = (s: Record<string, unknown>) => ({
+        localId: String(s.id ?? ''),
+        tenantId: tenantSlug,
+        items: Array.isArray(s.items) ? s.items : [],
+        subtotal: Number(s.subtotal) || 0,
+        tax: Number(s.tax) || 0,
+        total: Number(s.total) || 0,
+        paymentMethod: (s.payment_method === 'cash' || s.payment_method === 'card') ? s.payment_method : 'cash',
+        status: (s.status === 'completed' || s.status === 'cancelled' || s.status === 'refunded') ? s.status : 'completed',
+        createdAt: s.created_at ? new Date(s.created_at as string) : new Date(),
+        syncedAt: s.created_at ? new Date(s.created_at as string) : undefined,
+      });
+
+      const sanitizeRecipe = (r: Record<string, unknown>) => ({
+        localId: String(r.id ?? ''),
+        tenantId: tenantSlug,
+        name: String(r.name ?? ''),
+        description: r.description ? String(r.description) : undefined,
+        productId: String(r.product_id ?? ''),
+        ingredients: Array.isArray(r.ingredients) ? r.ingredients : [],
+        yield: Number(r.yield) || 1,
+        isActive: Boolean(r.is_active ?? true),
+        createdAt: r.created_at ? new Date(r.created_at as string) : new Date(),
+        syncedAt: r.created_at ? new Date(r.created_at as string) : undefined,
+      });
+
+      const sanitizePurchase = (p: Record<string, unknown>) => ({
+        localId: String(p.id ?? ''),
+        tenantId: tenantSlug,
+        supplier: String(p.supplier ?? ''),
+        invoiceNumber: String(p.invoice_number ?? ''),
+        items: Array.isArray(p.items) ? p.items : [],
+        subtotal: Number(p.subtotal) || 0,
+        tax: Number(p.tax) || 0,
+        total: Number(p.total) || 0,
+        status: (p.status === 'pending' || p.status === 'completed' || p.status === 'cancelled') ? p.status : 'pending',
+        createdAt: p.created_at ? new Date(p.created_at as string) : new Date(),
+        syncedAt: p.created_at ? new Date(p.created_at as string) : undefined,
+      });
+
       if (categoriesRes.data) {
-        await db.categories.bulkPut(categoriesRes.data.map(c => ({
-          ...c,
-          localId: c.id,
-          tenantId: tenantSlug,
-          createdAt: new Date(c.created_at),
-        })));
+        await db.categories.bulkPut(categoriesRes.data.map(sanitizeCategory));
       }
 
       if (productsRes.data) {
-        await db.products.bulkPut(productsRes.data.map(p => ({
-          ...p,
-          localId: p.id,
-          tenantId: tenantSlug,
-          createdAt: new Date(p.created_at),
-          updatedAt: new Date(p.updated_at),
-        })));
+        await db.products.bulkPut(productsRes.data.map(sanitizeProduct));
       }
 
       if (salesRes.data) {
-        await db.sales.bulkPut(salesRes.data.map(s => ({
-          ...s,
-          localId: s.id,
-          tenantId: tenantSlug,
-          createdAt: new Date(s.created_at),
-        })));
+        await db.sales.bulkPut(salesRes.data.map(sanitizeSale) as any);
       }
 
       if (recipesRes.data) {
-        await db.recipes.bulkPut(recipesRes.data.map(r => ({
-          ...r,
-          localId: r.id,
-          tenantId: tenantSlug,
-          createdAt: new Date(r.created_at),
-        })));
+        await db.recipes.bulkPut(recipesRes.data.map(sanitizeRecipe) as any);
       }
 
       if (purchasesRes.data) {
-        await db.purchases.bulkPut(purchasesRes.data.map(p => ({
-          ...p,
-          localId: p.id,
-          tenantId: tenantSlug,
-          createdAt: new Date(p.created_at),
-        })));
+        await db.purchases.bulkPut(purchasesRes.data.map(sanitizePurchase) as any);
       }
     } catch (error) {
       console.error('Error loading tenant data:', error);
     } finally {
       setIsLoadingData(false);
     }
-  };
+  }, [db, supabase]);
+
+  useEffect(() => {
+    if (tenant?.slug) {
+      initializeCatalogs(tenant.slug);
+      loadTenantData(tenant.slug);
+    }
+  }, [tenant, initializeCatalogs, loadTenantData]);
 
   if (!role) {
     return <Login />;
@@ -389,4 +428,12 @@ function App() {
   );
 }
 
-export default App;
+function AppWrapper() {
+  return (
+    <ToastProvider>
+      <App />
+    </ToastProvider>
+  );
+}
+
+export default AppWrapper;
