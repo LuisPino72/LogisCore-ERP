@@ -232,7 +232,18 @@ function App() {
 
       <nav className="flex-1 py-4 overflow-y-auto">
         <ul className="space-y-1 px-2">
-          {allModules.map((mod) => (
+          {allModules.filter(mod => {
+            if (mod.id === 'dashboard' || mod.id === 'reports') return true;
+            const moduleMap: Record<string, string> = {
+              inventory: 'inventory',
+              sales: 'pos',
+              purchases: 'purchases',
+              recipes: 'recipes',
+            };
+            const tenantModule = moduleMap[mod.id];
+            const modules = tenant?.modules as Record<string, boolean> | undefined;
+            return tenantModule && modules?.[tenantModule];
+          }).map((mod) => (
             <li key={mod.id}>
               <button
                 onClick={() => {
