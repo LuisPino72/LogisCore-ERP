@@ -172,7 +172,7 @@ export default function AdminPanel() {
   const renderTenantCard = (tenant: Tenant) => (
     <div key={tenant.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg hover:shadow-xl hover:border-slate-700 transition-all duration-200">
       <div className="flex items-start gap-4 mb-4">
-        <div className="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+        <div className="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
           {tenant.config?.logoUrl ? (
             <img src={tenant.config.logoUrl} alt={tenant.name} className="w-full h-full object-cover" />
           ) : (
@@ -483,7 +483,7 @@ export default function AdminPanel() {
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                            <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
                               {t.config?.logoUrl ? (
                                 <img src={t.config.logoUrl} alt={t.name} className="w-full h-full object-cover" />
                               ) : (
