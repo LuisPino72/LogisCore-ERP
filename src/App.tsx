@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
-import { useTenantStore } from '@/store/useTenantStore';
-import { useThemeStore } from '@/store/useThemeStore';
+import { useTenantStore, TenantThemeConfig } from '@/store/useTenantStore';
+import { useThemeStore, applyCssVariables } from '@/store/useThemeStore';
 import { Login } from '@/features/auth';
 import AdminPanel from '@/components/AdminPanel';
 import SyncStatus from '@/components/SyncStatus';
@@ -31,11 +31,26 @@ function App() {
   const isImpersonating = useTenantStore((state) => state.isImpersonating);
   const stopImpersonation = useTenantStore((state) => state.stopImpersonation);
   const theme = useThemeStore((state) => state.theme);
+  const isTenantMode = useThemeStore((state) => state.isTenantMode);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const applyTenantTheme = useThemeStore((state) => state.applyTenantTheme);
+  const resetToSystem = useThemeStore((state) => state.resetToSystem);
   const [activeModule, setActiveModule] = useState<Module>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+
+  useEffect(() => {
+    applyCssVariables();
+  }, []);
+
+  useEffect(() => {
+    if (isImpersonating && tenant?.config?.themeConfig) {
+      applyTenantTheme(tenant.config.themeConfig as TenantThemeConfig);
+    } else if (!isImpersonating && isTenantMode) {
+      resetToSystem();
+    }
+  }, [isImpersonating, tenant, applyTenantTheme, resetToSystem, isTenantMode]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -177,14 +192,14 @@ function App() {
               <span className="text-blue-400">Cargando datos de {tenant.name}...</span>
             </div>
           )}
-          <div className="flex items-center justify-between bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+          <div className="flex items-center justify-between bg-(--brand-900)/20 border border-(--brand-500)/30 rounded-lg p-4">
             <div>
-              <span className="text-blue-400 font-medium">Gestionando:</span>
+              <span className="text-(--brand-400) font-medium">Gestionando:</span>
               <span className="text-white ml-2 font-semibold">{tenant.name}</span>
             </div>
             <button
               onClick={stopImpersonation}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-(--brand-600) hover:bg-(--brand-700) text-white rounded-lg text-sm font-medium transition-colors"
             >
               Volver al Panel Admin
             </button>
@@ -308,7 +323,7 @@ function App() {
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                   activeModule === mod.id
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-(--brand-600) text-white'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
                 title={sidebarCollapsed ? mod.label : undefined}

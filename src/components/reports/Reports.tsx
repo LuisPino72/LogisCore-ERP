@@ -140,7 +140,7 @@ export default function Reports() {
 
   const colorClasses: Record<string, string> = {
     green: 'bg-green-500/10 text-green-400 border-green-500/20',
-    blue: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    blue: 'bg-(--brand-500)/10 text-(--brand-400) border-(--brand-500)/20',
     purple: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
     red: 'bg-red-500/10 text-red-400 border-red-500/20',
   };
@@ -153,18 +153,18 @@ export default function Reports() {
             <BarChart3 className="w-6 h-6" />
             Reportes
           </h2>
-          <p className="text-slate-400">Análisis de tu negocio</p>
+          <p className="text-(--text-secondary)">Análisis de tu negocio</p>
         </div>
         
-        <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl p-1">
+        <div className="flex items-center gap-2 bg-(--bg-secondary) border border-(--border-color) rounded-xl p-1">
           {(['today', 'week', 'month', 'all'] as DateRange[]).map((range) => (
             <button
               key={range}
               onClick={() => setDateRange(range)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 dateRange === range
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-(--brand-600) text-white'
+                  : 'text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-tertiary)'
               }`}
             >
               {range === 'today' ? 'Hoy' : range === 'week' ? '7D' : range === 'month' ? '30D' : 'Todo'}
@@ -181,8 +181,8 @@ export default function Reports() {
                 <kpi.icon className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">{kpi.label}</p>
-            <p className="text-2xl font-bold text-white">{kpi.value}</p>
+            <p className="text-xs text-(--text-muted) uppercase tracking-wide mb-1">{kpi.label}</p>
+            <p className="text-2xl font-bold text-(--text-primary)">{kpi.value}</p>
           </Card>
         ))}
       </div>
@@ -199,11 +199,11 @@ export default function Reports() {
                   <div className="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center">
                     <Banknote className="w-5 h-5 text-green-400" />
                   </div>
-                  <span className="text-slate-400">Efectivo</span>
+                  <span className="text-(--text-secondary)">Efectivo</span>
                 </div>
-                <span className="text-white font-bold">${stats.cashPayments.toFixed(2)}</span>
+                <span className="text-(--text-primary) font-bold">${stats.cashPayments.toFixed(2)}</span>
               </div>
-              <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-3 bg-(--bg-tertiary) rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-green-500 rounded-full transition-all"
                   style={{ width: stats.totalSales > 0 ? `${(stats.cashPayments / stats.totalSales) * 100}%` : '0%' }}
@@ -213,16 +213,16 @@ export default function Reports() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                    <CreditCard className="w-5 h-5 text-blue-400" />
+                  <div className="w-10 h-10 bg-(--brand-500)/10 rounded-lg flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-(--brand-400)" />
                   </div>
-                  <span className="text-slate-400">Tarjeta</span>
+                  <span className="text-(--text-secondary)">Tarjeta</span>
                 </div>
-                <span className="text-white font-bold">${stats.cardPayments.toFixed(2)}</span>
+                <span className="text-(--text-primary) font-bold">${stats.cardPayments.toFixed(2)}</span>
               </div>
-              <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-3 bg-(--bg-tertiary) rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-blue-500 rounded-full transition-all"
+                  className="h-full bg-(--brand-500) rounded-full transition-all"
                   style={{ width: stats.totalSales > 0 ? `${(stats.cardPayments / stats.totalSales) * 100}%` : '0%' }}
                 />
               </div>
@@ -237,24 +237,24 @@ export default function Reports() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-slate-500" />
-                <span className="text-slate-400">Total</span>
+                <Package className="w-4 h-4 text-(--text-muted)" />
+                <span className="text-(--text-secondary)">Total</span>
               </div>
-              <span className="text-white font-bold">{stats.totalProducts}</span>
+              <span className="text-(--text-primary) font-bold">{stats.totalProducts}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <PackageX className="w-4 h-4 text-red-400" />
-                <span className="text-slate-400">Sin Stock</span>
+                <span className="text-(--text-secondary)">Sin Stock</span>
               </div>
               <span className="text-red-400 font-bold">0</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 text-blue-400" />
-                <span className="text-slate-400">Compras</span>
+                <ShoppingCart className="w-4 h-4 text-(--brand-400)" />
+                <span className="text-(--text-secondary)">Compras</span>
               </div>
-              <span className="text-white font-bold">${stats.totalPurchases.toFixed(2)}</span>
+              <span className="text-(--text-primary) font-bold">${stats.totalPurchases.toFixed(2)}</span>
             </div>
           </div>
         </Card>
@@ -268,11 +268,11 @@ export default function Reports() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-800">
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-slate-500 uppercase">Fecha</th>
-                  <th className="text-center py-3 px-2 text-xs font-semibold text-slate-500 uppercase">Items</th>
-                  <th className="text-right py-3 px-2 text-xs font-semibold text-slate-500 uppercase">Total</th>
-                  <th className="text-right py-3 px-2 text-xs font-semibold text-slate-500 uppercase">Método</th>
+                <tr className="border-b border-(--border-color)">
+                  <th className="text-left py-3 px-2 text-xs font-semibold text-(--text-muted) uppercase">Fecha</th>
+                  <th className="text-center py-3 px-2 text-xs font-semibold text-(--text-muted) uppercase">Items</th>
+                  <th className="text-right py-3 px-2 text-xs font-semibold text-(--text-muted) uppercase">Total</th>
+                  <th className="text-right py-3 px-2 text-xs font-semibold text-(--text-muted) uppercase">Método</th>
                 </tr>
               </thead>
               <tbody>
@@ -285,7 +285,7 @@ export default function Reports() {
                   </tr>
                 ) : (
                   recentSales.map((sale) => (
-                    <tr key={sale.localId} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                    <tr key={sale.localId} className="border-b border-(--border-color)/50 hover:bg-(--bg-tertiary)">
                       <td className="py-3 px-2 text-white text-sm">
                         {new Date(sale.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                       </td>
@@ -295,7 +295,7 @@ export default function Reports() {
                         <span className={`px-2 py-0.5 rounded text-xs ${
                           sale.paymentMethod === 'cash' 
                             ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
-                            : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            : 'bg-(--brand-500)/10 text-(--brand-400) border border-(--brand-500)/20'
                         }`}>
                           {sale.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'}
                         </span>
@@ -320,7 +320,7 @@ export default function Reports() {
               </div>
             ) : (
               topProducts.map((product, index) => (
-                <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-(--bg-tertiary) transition-colors">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${
                     index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
                     index === 1 ? 'bg-slate-300/20 text-slate-300' :

@@ -84,7 +84,8 @@ src/
 │   └── ToastProvider.tsx
 │
 ├── store/                    # Zustand stores
-│   └── useTenantStore.ts
+│   ├── useTenantStore.ts
+│   └── useThemeStore.ts
 │
 ├── types/                    # Global types
 │   └── result.ts             # Result<T>, AppError, etc.
@@ -154,7 +155,7 @@ import { create } from 'zustand';
 import { db, Product } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { EventBus, Events } from '@/lib/events/EventBus';
-import { useTenantStore } from '@/store/useTenantStore';
+import { useTenantStore, useThemeStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, AppError } from '@/types/result';
 import Button from '@/common/Button';
 ```
@@ -231,17 +232,17 @@ const { currentTenant } = useTenantStore.getState();
 - Use Tailwind 4.x classes
 - Keep className strings concise using template literals
 - Define variants/sizes objects for reusable component patterns
+- **IMPORTANT**: Use CSS variables `--brand-*` for brand colors instead of hardcoded colors
 
 ```typescript
+// Use dynamic brand colors (recommended)
 const variants = {
-  primary: 'bg-blue-600 hover:bg-blue-700 text-white',
-  secondary: 'bg-slate-700 hover:bg-slate-600 text-slate-200',
+  primary: 'bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white shadow-lg shadow-[var(--brand-600)]/20',
+  secondary: 'bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600',
 };
 
-const sizes = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-sm',
-};
+// For accent elements
+className = "bg-(--brand-500)/10 text-(--brand-400) border-(--brand-500)/20"
 ```
 
 ## Multi-Tenancy
@@ -252,6 +253,64 @@ Always include tenant filtering in database operations:
 const tenantId = currentTenant?.slug;
 // Use tenantId in all DB queries
 const products = await db.products.where('tenantId').equals(tenantId).toArray();
+```
+
+## Per-Tenant Theme Customization
+
+Each tenant can have its own brand color and theme settings. Configuration is stored in `tenant.config` (JSONB).
+
+### TenantThemeConfig Interface
+
+```typescript
+interface TenantThemeConfig {
+  themeColor: string;          // Hex color (e.g., "#8B4513")
+  themeColorSecondary?: string; // Optional secondary hex
+  mode: 'dark' | 'light' | 'system';
+  accentIntensity: 'subtle' | 'normal' | 'bold';
+}
+```
+
+### Session-Based Theme Application
+
+When impersonating a tenant, the theme automatically applies:
+- **Admin Panel** → System default (blue)
+- **Impersonating tenant** → Tenant's brand colors
+- **Stop impersonating** → Back to system default
+
+### Using Dynamic Brand Colors
+
+All brand colors are available as CSS variables. Use these instead of hardcoded colors:
+
+```typescript
+// Use brand colors in components
+className = "bg-(--brand-600) hover:bg-(--brand-700) text-white"
+className = "text-(--brand-400)"
+className = "bg-(--brand-500)/10 text-(--brand-400) border-(--brand-500)/20"
+className = "shadow-lg shadow-(--brand-500)/20"
+```
+
+### CSS Variables Available
+
+- `--brand-50` through `--brand-950` (full palette)
+- `--brand-400`, `--brand-500`, `--brand-600`, etc.
+- `--brand-bg`, `--brand-bg-hover`, `--brand-bg-active`
+
+### Example: Updating Components for Brand Colors
+
+```typescript
+// Bad - hardcoded blue
+className = "bg-blue-600 text-white"
+
+// Good - dynamic brand color
+className = "bg-(--brand-600) text-white"
+```
+
+### Theme Store Methods
+
+```typescript
+import { useThemeStore } from '@/store/useThemeStore';
+
+const { theme, themeColor, isTenantMode, applyTenantTheme, resetToSystem } = useThemeStore();
 ```
 
 ## Event Communication

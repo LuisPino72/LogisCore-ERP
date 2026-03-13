@@ -10,11 +10,19 @@ interface TenantModules {
   [key: string]: boolean | undefined
 }
 
+export interface TenantThemeConfig {
+  themeColor: string
+  themeColorSecondary?: string
+  mode: 'dark' | 'light' | 'system'
+  accentIntensity: 'subtle' | 'normal' | 'bold'
+}
+
 interface TenantConfig {
   id: string
   name: string
   slug: string
   modules: TenantModules
+  themeConfig?: TenantThemeConfig
   config?: Record<string, unknown>
 }
 

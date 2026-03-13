@@ -83,7 +83,7 @@ export default function Dashboard() {
   ];
 
   const colorClasses: Record<string, { bg: string; text: string; icon: string; border: string }> = {
-    blue: { bg: 'bg-blue-500/10', text: 'text-blue-400', icon: 'bg-blue-500/20', border: 'border-blue-500/20' },
+    blue: { bg: 'bg-[var(--brand-500)]/10', text: 'text-[var(--brand-400)]', icon: 'bg-[var(--brand-500)]/20', border: 'border-[var(--brand-500)]/20' },
     green: { bg: 'bg-green-500/10', text: 'text-green-400', icon: 'bg-green-500/20', border: 'border-green-500/20' },
     amber: { bg: 'bg-amber-500/10', text: 'text-amber-400', icon: 'bg-amber-500/20', border: 'border-amber-500/20' },
     red: { bg: 'bg-red-500/10', text: 'text-red-400', icon: 'bg-red-500/20', border: 'border-red-500/20' },
@@ -106,19 +106,19 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+      <div className="bg-(--bg-secondary) border border-(--border-color) rounded-2xl p-6 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">
+            <h2 className="text-2xl font-bold text-(--text-primary) mb-1">
               {getCurrentGreeting()} 👋
             </h2>
-            <p className="text-slate-400">
-              Bienvenido a <span className="text-blue-400 font-medium">{tenant?.name}</span>
+            <p className="text-(--text-secondary)">
+              Bienvenido a <span className="text-(--brand-400) font-medium">{tenant?.name}</span>
             </p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-slate-400 capitalize">{formatDate()}</p>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-(--text-secondary) capitalize">{formatDate()}</p>
+            <p className="text-xs text-(--text-muted)">
               {tenant?.config?.logoUrl ? 'Logo configurado' : 'Sin logo personalizado'}
             </p>
           </div>
@@ -131,7 +131,7 @@ export default function Dashboard() {
           return (
             <div 
               key={index}
-              className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg hover:shadow-xl hover:border-slate-700 transition-all"
+              className="bg-(--bg-secondary) border border-(--border-color) rounded-xl p-5 shadow-lg hover:shadow-xl hover:border-(--brand-500)/30 transition-all"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className={`p-2.5 rounded-lg ${colors.icon}`}>
@@ -146,8 +146,8 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-              <p className="text-slate-400 text-sm mb-1">{kpi.label}</p>
-              <p className="text-2xl font-bold text-white">{kpi.value}</p>
+              <p className="text-(--text-secondary) text-sm mb-1">{kpi.label}</p>
+              <p className="text-2xl font-bold text-(--text-primary)">{kpi.value}</p>
             </div>
           );
         })}

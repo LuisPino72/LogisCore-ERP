@@ -160,27 +160,27 @@ export default function Inventory() {
     const category = categories.find(c => c.id === product.categoryId);
     
     return (
-      <div key={product.localId} className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg hover:shadow-xl hover:border-slate-700 transition-all">
+      <div key={product.localId} className="bg-(--bg-secondary) border border-(--border-color) rounded-xl p-4 shadow-lg hover:shadow-xl hover:border-(--brand-500)/30 transition-all">
         <div className="flex items-start justify-between mb-3">
-          <div className="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center">
-            <Package className="w-6 h-6 text-slate-500" />
+          <div className="w-12 h-12 bg-(--bg-tertiary) rounded-lg flex items-center justify-center">
+            <Package className="w-6 h-6 text-(--text-muted)" />
           </div>
           <div className="flex gap-1">
-            <button onClick={() => handleEdit(product)} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
+            <button onClick={() => handleEdit(product)} className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg text-(--text-secondary) hover:text-(--text-primary) transition-all">
               <Edit2 className="w-4 h-4" />
             </button>
-            <button onClick={() => handleDelete(product.localId)} className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-all">
+            <button onClick={() => handleDelete(product.localId)} className="p-1.5 hover:bg-red-500/10 rounded-lg text-(--text-secondary) hover:text-red-400 transition-all">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
         
-        <h3 className="font-semibold text-white mb-1 truncate">{product.name}</h3>
-        <p className="text-xs text-slate-500 font-mono mb-3">{product.sku}</p>
+        <h3 className="font-semibold text-(--text-primary) mb-1 truncate">{product.name}</h3>
+        <p className="text-xs text-(--text-muted) font-mono mb-3">{product.sku}</p>
         
         <div className="flex flex-wrap gap-1.5 mb-3">
           {category && (
-            <span className="px-2 py-0.5 bg-slate-800 text-slate-400 text-[10px] rounded uppercase">
+            <span className="px-2 py-0.5 bg-(--bg-tertiary) text-(--text-secondary) text-[10px] rounded uppercase">
               {category.name}
             </span>
           )}
@@ -193,7 +193,7 @@ export default function Inventory() {
         
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-xs text-slate-500 mb-0.5">Precio</p>
+            <p className="text-xs text-(--text-muted) mb-0.5">Precio</p>
             <p className="text-lg font-bold text-green-400">${product.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
           </div>
           <div className="text-right">
@@ -204,9 +204,9 @@ export default function Inventory() {
           </div>
         </div>
         
-        <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
+        <div className="mt-3 pt-3 border-t border-(--border-color) flex items-center justify-between">
           {product.syncedAt ? (
-            <div className="flex items-center gap-1 text-blue-400 text-xs">
+            <div className="flex items-center gap-1 text-(--brand-400) text-xs">
               <Cloud className="w-3 h-3" />
               Sincronizado
             </div>
@@ -225,21 +225,21 @@ export default function Inventory() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Inventario</h2>
-          <p className="text-slate-400">{filteredProducts.length} productos</p>
+          <h2 className="text-2xl font-bold text-(--text-primary)">Inventario</h2>
+          <p className="text-(--text-secondary)">{filteredProducts.length} productos</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-slate-800/50 rounded-lg p-1 border border-slate-700">
+          <div className="flex items-center bg-(--bg-tertiary)/50 rounded-lg p-1 border border-(--border-color)">
             <button
               onClick={() => setViewMode('table')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-(--brand-600) text-white' : 'text-(--text-secondary) hover:text-(--text-primary)'}`}
               title="Vista Tabla"
             >
               <List className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-(--brand-600) text-white' : 'text-(--text-secondary) hover:text-(--text-primary)'}`}
               title="Vista Grid"
             >
               <LayoutGrid className="w-4 h-4" />
@@ -256,31 +256,31 @@ export default function Inventory() {
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-(--text-muted)" />
               <input
                 type="text"
                 placeholder="Buscar por nombre o SKU..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans"
+                className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500) transition-all font-sans"
               />
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${hasActiveFilters ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${hasActiveFilters ? 'bg-(--brand-500)/10 border-(--brand-500)/50 text-(--brand-400)' : 'bg-(--bg-tertiary) border-(--border-color) text-(--text-secondary) hover:text-(--text-primary)'}`}
             >
               <Filter className="w-4 h-4" />
               Filtros
-              {hasActiveFilters && <span className="w-2 h-2 bg-blue-400 rounded-full" />}
+              {hasActiveFilters && <span className="w-2 h-2 bg-(--brand-400) rounded-full" />}
             </button>
           </div>
 
           {showFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-950/50 rounded-xl border border-slate-800">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-(--bg-primary)/50 rounded-xl border border-(--border-color)">
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Categoría</label>
+                <label className="block text-xs text-(--text-muted) mb-1.5 uppercase tracking-wide">Categoría</label>
                 <select 
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                 >
@@ -291,9 +291,9 @@ export default function Inventory() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Stock</label>
+                <label className="block text-xs text-(--text-muted) mb-1.5 uppercase tracking-wide">Stock</label>
                 <select 
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={stockFilter}
                   onChange={(e) => setStockFilter(e.target.value as StockFilter)}
                 >
@@ -304,9 +304,9 @@ export default function Inventory() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Estado</label>
+                <label className="block text-xs text-(--text-muted) mb-1.5 uppercase tracking-wide">Estado</label>
                 <select 
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
                 >
@@ -316,21 +316,21 @@ export default function Inventory() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Rango Precio</label>
+                <label className="block text-xs text-(--text-muted) mb-1.5 uppercase tracking-wide">Rango Precio</label>
                 <div className="flex gap-2">
                   <input
                     type="number"
                     placeholder="Min"
                     value={priceRange.min}
                     onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   />
                   <input
                     type="number"
                     placeholder="Max"
                     value={priceRange.max}
                     onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   />
                 </div>
               </div>
@@ -341,11 +341,11 @@ export default function Inventory() {
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {loading ? (
-              <div className="col-span-full py-10 text-center text-slate-500">Cargando productos...</div>
+              <div className="col-span-full py-10 text-center text-(--text-muted)">Cargando productos...</div>
             ) : filteredProducts.length === 0 ? (
               <div className="col-span-full py-12 text-center">
-                <Package className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-                <p className="text-lg text-slate-400">No hay productos que coincidan</p>
+                <Package className="w-12 h-12 mx-auto mb-3 text-(--text-muted)" />
+                <p className="text-lg text-(--text-secondary)">No hay productos que coincidan</p>
                 <Button onClick={() => { resetForm(); setShowModal(true); }} className="mt-4">
                   <Plus className="w-4 h-4 mr-2" />
                   Crear Primer Producto
@@ -359,22 +359,22 @@ export default function Inventory() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-800">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Producto</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">SKU</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Categoría</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Precio</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Stock</th>
-                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sync</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                <tr className="border-b border-(--border-color)">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Producto</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase tracking-wider">SKU</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Categoría</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Precio</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Stock</th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Sync</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="py-10 text-center text-slate-500">Cargando productos...</td></tr>
+                  <tr><td colSpan={7} className="py-10 text-center text-(--text-muted)">Cargando productos...</td></tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500">
+                    <td colSpan={7} className="py-12 text-center text-(--text-muted)">
                       <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
                       <p className="text-lg">No hay productos que coincidan</p>
                     </td>
@@ -384,20 +384,20 @@ export default function Inventory() {
                     const stockStatus = getStockStatus(product.stock);
                     const StockIcon = stockStatus.icon;
                     return (
-                      <tr key={product.localId} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors group">
+                      <tr key={product.localId} className="border-b border-(--border-color)/50 hover:bg-(--bg-tertiary) transition-colors group">
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center shrink-0">
-                              <Package className="w-5 h-5 text-slate-500" />
+                            <div className="w-10 h-10 bg-(--bg-tertiary) rounded-lg flex items-center justify-center shrink-0">
+                              <Package className="w-5 h-5 text-(--text-muted)" />
                             </div>
                             <div>
-                              <div className="font-medium text-white">{product.name}</div>
+                              <div className="font-medium text-(--text-primary)">{product.name}</div>
                               {!product.isActive && <span className="text-[10px] text-red-500 font-bold uppercase">Inactivo</span>}
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-slate-400 font-mono text-sm">{product.sku}</td>
-                        <td className="py-4 px-4 text-slate-400">
+                        <td className="py-4 px-4 text-(--text-secondary) font-mono text-sm">{product.sku}</td>
+                        <td className="py-4 px-4 text-(--text-secondary)">
                           {categories.find(c => c.id === product.categoryId)?.name || 'Sin Categoría'}
                         </td>
                         <td className="py-4 px-4 text-right text-green-400 font-medium">
@@ -412,7 +412,7 @@ export default function Inventory() {
                         <td className="py-4 px-4 text-center">
                           {product.syncedAt ? (
                             <div title="Sincronizado">
-                              <Cloud className="w-4 h-4 text-blue-500 mx-auto" />
+                              <Cloud className="w-4 h-4 text-(--brand-500) mx-auto" />
                             </div>
                           ) : (
                             <div title="Pendiente de sincronizar">
@@ -422,10 +422,10 @@ export default function Inventory() {
                         </td>
                         <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEdit(product)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all">
+                            <button onClick={() => handleEdit(product)} className="p-2 hover:bg-(--bg-tertiary) rounded-lg text-(--text-secondary) hover:text-(--text-primary) transition-all">
                               <Edit2 className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleDelete(product.localId)} className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-all">
+                            <button onClick={() => handleDelete(product.localId)} className="p-2 hover:bg-red-500/10 rounded-lg text-(--text-secondary) hover:text-red-400 transition-all">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -441,18 +441,18 @@ export default function Inventory() {
       </Card>
 
       {showModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden ring-1 ring-white/10">
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-800/50 border-b border-slate-700/50">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                {editingId ? <Edit2 className="w-5 h-5 text-blue-400" /> : <Plus className="w-5 h-5 text-green-400" />}
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-(--bg-secondary) border border-(--border-color) rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden ring-1 ring-white/10">
+            <div className="flex items-center justify-between px-6 py-4 bg-(--bg-tertiary)/50 border-b border-(--border-color)/50">
+              <h3 className="text-lg font-bold text-(--text-primary) flex items-center gap-2">
+                {editingId ? <Edit2 className="w-5 h-5 text-(--brand-400)" /> : <Plus className="w-5 h-5 text-green-400" />}
                 {editingId ? 'Editar Producto' : 'Crear Nuevo Producto'}
               </h3>
               <button 
                 onClick={() => { setShowModal(false); resetForm(); }}
-                className="p-2 hover:bg-slate-700 rounded-full transition-colors"
+                className="p-2 hover:bg-(--bg-tertiary) rounded-full transition-colors"
               >
-                <X className="w-5 h-5 text-slate-400" />
+                <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
             
@@ -475,11 +475,11 @@ export default function Inventory() {
                     required
                   />
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-400">Categoría</label>
+                    <label className="text-sm font-medium text-(--text-secondary)">Categoría</label>
                     <select 
                       value={form.categoryId || ''}
                       onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : undefined })}
-                      className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                     >
                       <option value="">Seleccionar Categoría</option>
                       {categories.map(cat => (
@@ -514,30 +514,30 @@ export default function Inventory() {
                   />
                 </div>
 
-                <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-xl border border-slate-700/30">
+                <div className="flex items-center gap-3 p-3 bg-(--bg-tertiary)/30 rounded-xl border border-(--border-color)/30">
                   <input
                     type="checkbox"
                     id="isActive"
                     checked={form.isActive}
                     onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                    className="w-5 h-5 rounded-md bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500/20"
+                    className="w-5 h-5 rounded-md bg-(--bg-secondary) border-(--border-color) text-(--brand-600) focus:ring-(--brand-500)/20"
                   />
                   <div className="flex flex-col">
-                    <label htmlFor="isActive" className="text-sm font-semibold text-white">Producto Activo</label>
-                    <span className="text-xs text-slate-500">Visible en el punto de venta</span>
+                    <label htmlFor="isActive" className="text-sm font-semibold text-(--text-primary)">Producto Activo</label>
+                    <span className="text-xs text-(--text-muted)">Visible en el punto de venta</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex justify-end gap-3 pt-4 border-t border-(--border-color)">
                 <button 
                   type="button" 
                   onClick={() => { setShowModal(false); resetForm(); }}
-                  className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-(--text-secondary) hover:text-(--text-primary) transition-colors"
                 >
                   Descartar
                 </button>
-                <Button type="submit" className="px-8 shadow-lg shadow-blue-500/20">
+                <Button type="submit" className="px-8 shadow-lg shadow-(--brand-500)/20">
                   {editingId ? 'Actualizar Producto' : 'Crear Producto'}
                 </Button>
               </div>

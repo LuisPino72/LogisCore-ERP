@@ -158,7 +158,7 @@ export default function Inventory() {
     const category = categories.find(c => c.id === product.categoryId);
     
     return (
-      <div key={product.localId} className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg hover:shadow-xl hover:border-slate-700 transition-all">
+      <div key={product.localId} className="bg-(--bg-secondary) border border-(--border-color) rounded-xl p-4 shadow-lg hover:shadow-xl transition-all">
         <div className="flex items-start justify-between mb-3">
           <div className="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center">
             <Package className="w-6 h-6 text-slate-500" />
@@ -204,7 +204,7 @@ export default function Inventory() {
         
         <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
           {product.syncedAt ? (
-            <div className="flex items-center gap-1 text-blue-400 text-xs">
+            <div className="flex items-center gap-1 text-(--brand-400) text-xs">
               <Cloud className="w-3 h-3" />
               Sincronizado
             </div>
@@ -227,17 +227,17 @@ export default function Inventory() {
           <p className="text-slate-400">{filteredProducts.length} productos</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-slate-800/50 rounded-lg p-1 border border-slate-700">
+          <div className="flex items-center bg-(--bg-tertiary)/50 rounded-lg p-1 border border-(--border-color)">
             <button
               onClick={() => setViewMode('table')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-(--brand-600) text-white' : 'text-slate-400 hover:text-white'}`}
               title="Vista Tabla"
             >
               <List className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-(--brand-600) text-white' : 'text-slate-400 hover:text-white'}`}
               title="Vista Grid"
             >
               <LayoutGrid className="w-4 h-4" />
@@ -260,16 +260,16 @@ export default function Inventory() {
                 placeholder="Buscar por nombre o SKU..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans"
+                className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500) transition-all font-sans"
               />
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${hasActiveFilters ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${hasActiveFilters ? 'bg-(--brand-500)/10 border-(--brand-500)/50 text-(--brand-400)' : 'bg-(--bg-tertiary) border-(--border-color) text-(--text-secondary) hover:text-(--text-primary)'}`}
             >
               <Filter className="w-4 h-4" />
               Filtros
-              {hasActiveFilters && <span className="w-2 h-2 bg-blue-400 rounded-full" />}
+              {hasActiveFilters && <span className="w-2 h-2 bg-(--brand-400) rounded-full" />}
             </button>
           </div>
 
@@ -278,7 +278,7 @@ export default function Inventory() {
               <div>
                 <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Categoría</label>
                 <select 
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                 >
@@ -291,7 +291,7 @@ export default function Inventory() {
               <div>
                 <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Stock</label>
                 <select 
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={stockFilter}
                   onChange={(e) => setStockFilter(e.target.value as StockFilter)}
                 >
@@ -304,7 +304,7 @@ export default function Inventory() {
               <div>
                 <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Estado</label>
                 <select 
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
                 >
@@ -321,14 +321,14 @@ export default function Inventory() {
                     placeholder="Min"
                     value={priceRange.min}
                     onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   />
                   <input
                     type="number"
                     placeholder="Max"
                     value={priceRange.max}
                     onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   />
                 </div>
               </div>
@@ -382,7 +382,7 @@ export default function Inventory() {
                     const stockStatus = getStockStatus(product.stock);
                     const StockIcon = stockStatus.icon;
                     return (
-                      <tr key={product.localId} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors group">
+                      <tr key={product.localId} className="border-b border-(--border-color) hover:bg-(--brand-500)/5 transition-colors group">
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center shrink-0">
@@ -410,7 +410,7 @@ export default function Inventory() {
                         <td className="py-4 px-4 text-center">
                           {product.syncedAt ? (
                             <div title="Sincronizado">
-                              <Cloud className="w-4 h-4 text-blue-500 mx-auto" />
+                              <Cloud className="w-4 h-4 text-(--brand-500) mx-auto" />
                             </div>
                           ) : (
                             <div title="Pendiente de sincronizar">
@@ -440,10 +440,10 @@ export default function Inventory() {
 
       {showModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden ring-1 ring-white/10">
+          <div className="bg-(--bg-primary) border border-(--border-color) rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden ring-1 ring-white/10">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-800/50 border-b border-slate-700/50">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                {editingId ? <Edit2 className="w-5 h-5 text-blue-400" /> : <Plus className="w-5 h-5 text-green-400" />}
+                {editingId ? <Edit2 className="w-5 h-5 text-(--brand-400)" /> : <Plus className="w-5 h-5 text-green-400" />}
                 {editingId ? 'Editar Producto' : 'Crear Nuevo Producto'}
               </h3>
               <button 
@@ -477,7 +477,7 @@ export default function Inventory() {
                     <select 
                       value={form.categoryId || ''}
                       onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : undefined })}
-                      className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-(--bg-primary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                     >
                       <option value="">Seleccionar Categoría</option>
                       {categories.map(cat => (
@@ -518,7 +518,7 @@ export default function Inventory() {
                     id="isActive"
                     checked={form.isActive}
                     onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                    className="w-5 h-5 rounded-md bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500/20"
+                    className="w-5 h-5 rounded-md bg-(--bg-primary) border-(--border-color) text-blue-600 focus:ring-(--brand-500)/20"
                   />
                   <div className="flex flex-col">
                     <label htmlFor="isActive" className="text-sm font-semibold text-white">Producto Activo</label>
@@ -535,7 +535,7 @@ export default function Inventory() {
                 >
                   Descartar
                 </button>
-                <Button type="submit" className="px-8 shadow-lg shadow-blue-500/20">
+                <Button type="submit" className="px-8 shadow-lg shadow-(--brand-500)/20">
                   {editingId ? 'Actualizar Producto' : 'Crear Producto'}
                 </Button>
               </div>

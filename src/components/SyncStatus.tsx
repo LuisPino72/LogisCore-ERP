@@ -75,18 +75,18 @@ export default function SyncStatus() {
       </button>
 
       {showTooltip && (
-        <div className="absolute bottom-full right-0 mb-2 bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-xl min-w-[180px]">
-          <div className="text-sm font-medium text-white mb-2">
+        <div className="absolute bottom-full right-0 mb-2 bg-(--bg-secondary) border border-(--border-color) rounded-lg p-3 shadow-xl min-w-[180px]">
+          <div className="text-sm font-medium text-(--text-primary) mb-2">
             {isOnline ? 'Conectado' : 'Sin conexión'}
           </div>
-          <div className="text-xs text-slate-400">
+          <div className="text-xs text-(--text-secondary)">
             {pendingCount > 0 ? `${pendingCount} cambios pendientes` : 'Todo sincronizado'}
           </div>
           {pendingCount > 0 && isOnline && (
             <button
               onClick={handleSync}
               disabled={isSyncing}
-              className="mt-2 w-full text-xs bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded transition-colors"
+              className="mt-2 w-full text-xs bg-(--brand-600) hover:bg-(--brand-700) text-white py-1.5 rounded transition-colors"
             >
               {isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}
             </button>

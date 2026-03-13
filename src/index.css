@@ -4,15 +4,48 @@
 
 :root {
   --font-inter: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Theme: Light Professional (Defaults) */
+  /* Backgrounds */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-elevated: #e2e8f0;
+
+  /* Text */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  /* Border */
+  --border-color: #e2e8f0;
+  --border-subtle: #f1f5f9;
+
+  /* Brand - Terracotta warm default */
+  --brand-50: #fff7ed;
+  --brand-100: #ffedd5;
+  --brand-200: #fed7aa;
+  --brand-300: #fdba74;
+  --brand-400: #fb923c;
+  --brand-500: #ea580c;
+  --brand-600: #c2410c;
+  --brand-700: #9a3412;
+  --brand-800: #7c2d12;
+  --brand-900: #7c2d12;
+  --brand-950: #431407;
 }
 
 body {
   font-family: var(--font-inter);
-  @apply bg-white text-slate-900 antialiased;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  @apply antialiased transition-colors duration-200;
 }
 
-.dark body {
-  @apply bg-slate-950 text-slate-50;
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-(--brand-600) hover:bg-(--brand-500) text-white rounded-lg transition-all duration-200 shadow-lg shadow-(--brand-950)/20 active:scale-95;
+  }
 }
 
 @keyframes slide-in {
@@ -28,11 +61,4 @@ body {
 
 .animate-slide-in {
   animation: slide-in 0.3s ease-out forwards;
-}
-
-@layer components {
-  /* Estilo base para botones premium */
-  .btn-primary {
-    @apply px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all duration-200 shadow-lg shadow-blue-900/20 active:scale-95;
-  }
 }
