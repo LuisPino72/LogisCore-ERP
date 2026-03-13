@@ -1,18 +1,35 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../services/supabase'
 import { useTenantStore } from '../store/useTenantStore'
+import { useToast } from './ui/Toast'
 import { 
   Search, LayoutGrid, List, ChevronDown, ChevronUp,
   Store, Hash, Users, Plus, Edit2, LogIn,
   Building2, X, Check
 } from 'lucide-react'
 
+interface TenantModules {
+  sales?: boolean
+  inventory?: boolean
+  purchases?: boolean
+  recipes?: boolean
+  reports?: boolean
+  [key: string]: boolean | undefined
+}
+
+interface TenantConfig {
+  logoUrl?: string
+  maxEmployees?: number
+  themeColor?: string
+  [key: string]: unknown
+}
+
 interface Tenant {
   id: string
   name: string
   slug: string
-  modules: any
-  config: any
+  modules: TenantModules
+  config: TenantConfig
   created_at: string
 }
 
@@ -33,6 +50,7 @@ export default function AdminPanel() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
 
+  const { showError, showSuccess } = useToast()
   const startImpersonation = useTenantStore((state) => state.startImpersonation)
 
   useEffect(() => {
@@ -72,8 +90,14 @@ export default function AdminPanel() {
     const { error } = await supabase.from('tenants').insert([
       { name, slug: slug.toLowerCase().replace(/\s+/g, '-') }
     ])
-    if (error) alert('Error: ' + error.message)
-    else { setName(''); setSlug(''); fetchTenants() }
+    if (error) {
+      showError('Error al crear tenant: ' + error.message)
+    } else {
+      showSuccess('Tenant creado correctamente')
+      setName('')
+      setSlug('')
+      fetchTenants()
+    }
     setLoading(false)
   }
 
@@ -87,8 +111,13 @@ export default function AdminPanel() {
       config: editingTenant.config
     }).eq('id', editingTenant.id)
     
-    if (error) alert('Error: ' + error.message)
-    else { alert('Guardado con éxito'); setEditingTenant(null); fetchTenants() }
+    if (error) {
+      showError('Error al actualizar: ' + error.message)
+    } else {
+      showSuccess('Cambios guardados correctamente')
+      setEditingTenant(null)
+      fetchTenants()
+    }
     setLoading(false)
   }
 
@@ -105,27 +134,35 @@ export default function AdminPanel() {
       .upload(fileName, file, { upsert: true })
       
     if (uploadError) {
-      alert('Error subiendo logo: ' + uploadError.message)
+      showError('Error subiendo logo: ' + uploadError.message)
     } else {
       const { data } = supabase.storage.from('tenant_assets').getPublicUrl(fileName)
       setEditingTenant({
         ...editingTenant,
         config: { ...editingTenant.config, logoUrl: data.publicUrl }
       })
+      showSuccess('Logo actualizado')
     }
     setLoading(false)
   }
 
   const handleInviteOwner = async (tenantId: string) => {
-    if (!inviteEmail) return alert('Ingresa un correo')
+    if (!inviteEmail) {
+      showError('Ingresa un correo electrónico')
+      return
+    }
     setInviteLoading(true)
     const { error } = await supabase.from('invitations').insert([{
       tenant_id: tenantId,
       email: inviteEmail,
       role: 'owner'
     }])
-    if (error) alert('Error invitando (¿Usuario ya invitado?): ' + error.message)
-    else { alert('Invitación creada para ' + inviteEmail); setInviteEmail('') }
+    if (error) {
+      showError('Error invitando: ' + error.message)
+    } else {
+      showSuccess('Invitación enviada a ' + inviteEmail)
+      setInviteEmail('')
+    }
     setInviteLoading(false)
   }
 

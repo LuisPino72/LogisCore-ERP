@@ -86,6 +86,7 @@ export interface Recipe {
   yield: number;
   isActive: boolean;
   createdAt: Date;
+  updatedAt: Date;
   syncedAt?: Date;
 }
 

@@ -66,7 +66,9 @@ export default function Employees() {
     setLoading(false);
   };
 
-  const maxEmployees = tenant?.config?.maxEmployees || 3;
+  const maxEmployees = (tenant?.config && typeof tenant.config === 'object' && 'maxEmployees' in tenant.config) 
+    ? Number(tenant.config.maxEmployees) || 3 
+    : 3;
   const currentUsedSlots = employees.length + invitations.length;
   const canInvite = currentUsedSlots < maxEmployees;
 

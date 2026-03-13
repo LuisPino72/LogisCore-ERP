@@ -1,27 +1,30 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+interface TenantModules {
+  sales?: boolean
+  inventory?: boolean
+  purchases?: boolean
+  recipes?: boolean
+  reports?: boolean
+  [key: string]: boolean | undefined
+}
+
 interface TenantConfig {
   id: string
   name: string
   slug: string
-  modules: {
-    sales: boolean
-    inventory: boolean
-    purchases: boolean
-    recipes: boolean
-    reports: boolean
-  }
-  config?: any
+  modules: TenantModules
+  config?: Record<string, unknown>
 }
 
 interface TenantState {
   currentTenant: TenantConfig | null
   role: 'super_admin' | 'owner' | 'employee' | null
-  permissions: Record<string, any>
+  permissions: Record<string, unknown>
   isImpersonating: boolean
   setTenant: (tenant: TenantConfig | null) => void
-  setRole: (role: 'super_admin' | 'owner' | 'employee' | null, permissions?: Record<string, any>) => void
+  setRole: (role: 'super_admin' | 'owner' | 'employee' | null, permissions?: Record<string, unknown>) => void
   startImpersonation: (tenant: TenantConfig) => void
   stopImpersonation: () => void
   clear: () => void

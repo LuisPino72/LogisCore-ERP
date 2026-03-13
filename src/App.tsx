@@ -319,8 +319,8 @@ function App() {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden">
-                {tenant?.config?.logoUrl ? (
-                  <img src={tenant.config.logoUrl} alt={tenant.name} className="w-full h-full object-cover" />
+                {tenant?.config && typeof tenant.config === 'object' && 'logoUrl' in tenant.config && tenant.config.logoUrl ? (
+                  <img src={String(tenant.config.logoUrl)} alt={tenant.name} className="w-full h-full object-cover" />
                 ) : (
                   <Store className="w-4 h-4 text-slate-500" />
                 )}

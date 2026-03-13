@@ -7,7 +7,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { ChefHat, Plus, Play, X, Search, Package, Scale, PackageX, Check } from 'lucide-react';
 
-type RecipeForm = Omit<Recipe, 'id' | 'localId' | 'tenantId' | 'createdAt' | 'syncedAt'>;
+type RecipeForm = Omit<Recipe, 'id' | 'localId' | 'tenantId' | 'createdAt' | 'updatedAt' | 'syncedAt'>;
 
 export default function Recipes() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -60,6 +60,7 @@ export default function Recipes() {
       yield: form.yield,
       isActive: true,
       createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     await db.recipes.add(newRecipe);
