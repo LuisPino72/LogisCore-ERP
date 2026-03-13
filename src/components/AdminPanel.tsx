@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../services/supabase'
-import { useTenantStore } from '../store/useTenantStore'
-import { useToast } from './ui/Toast'
+import { supabase } from '@/lib/supabase'
+import { useTenantStore } from '@/store/useTenantStore'
+import { useToast } from '@/providers/ToastProvider'
 import { 
   Search, LayoutGrid, List, ChevronDown, ChevronUp,
   Store, Hash, Users, Plus, Edit2, LogIn,

@@ -1,26 +1,26 @@
 import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
-import { useTenantStore } from './store/useTenantStore';
-import Login from './components/Login';
-import AdminPanel from './components/AdminPanel';
-import SyncStatus from './components/SyncStatus';
-import { ToastProvider } from './components/ui/Toast';
-import { initializeCatalogs } from './services/db';
-import { supabase } from './services/supabase';
-import { db } from './services/db';
+import { useTenantStore } from '@/store/useTenantStore';
+import { Login } from '@/features/auth';
+import AdminPanel from '@/components/AdminPanel';
+import SyncStatus from '@/components/SyncStatus';
+import { ToastProvider } from '@/providers/ToastProvider';
+import { initializeCatalogs } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db';
 import { 
   Package, ShoppingCart, ShoppingBasket, Menu, X, LayoutDashboard, 
   ChefHat, BarChart3, Loader2, ChevronLeft, ChevronRight, LogOut,
   Store, ShoppingBag
 } from 'lucide-react';
-import Emblema from './assets/Emblema.ico';
+import Emblema from '@/assets/Emblema.ico';
 
-const Inventory = lazy(() => import('./components/inventory/Inventory'));
-const POS = lazy(() => import('./components/pos/POS'));
-const Recipes = lazy(() => import('./components/recipes/Recipes'));
-const Reports = lazy(() => import('./components/reports/Reports'));
-const Purchases = lazy(() => import('./components/purchases/Purchases'));
-const Sales = lazy(() => import('./components/sales/Sales'));
-const Dashboard = lazy(() => import('./components/Dashboard'));
+const Inventory = lazy(() => import('@/features/inventory/components/Inventory'));
+const POS = lazy(() => import('@/features/pos').then(m => ({ default: m.POS })));
+const Recipes = lazy(() => import('@/features/recipes').then(m => ({ default: m.Recipes })));
+const Reports = lazy(() => import('@/features/reports').then(m => ({ default: m.Reports })));
+const Purchases = lazy(() => import('@/features/purchases').then(m => ({ default: m.Purchases })));
+const Sales = lazy(() => import('@/features/sales').then(m => ({ default: m.Sales })));
+const Dashboard = lazy(() => import('@/components/Dashboard'));
 
 type Module = 'dashboard' | 'sales' | 'inventory' | 'pos' | 'recipes' | 'reports' | 'purchases';
 
