@@ -38,3 +38,6 @@ skills-lock.json
 .agent/
 _agents/
 _agent/
+
+# OpenCode MCP config (puede contener tokens)
+opencode.json
