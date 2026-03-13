@@ -11,7 +11,7 @@ import {
   ChefHat, BarChart3, Loader2, ChevronLeft, ChevronRight, LogOut,
   Store
 } from 'lucide-react';
-import Emblema from './assets/Emblema.png';
+import Emblema from './assets/Emblema.ico';
 
 const Inventory = lazy(() => import('./components/inventory/Inventory'));
 const POS = lazy(() => import('./components/pos/POS'));
@@ -291,50 +291,76 @@ function App() {
     </aside>
   );
 
+  const isAdminPanel = role === 'super_admin' && !isImpersonating;
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      <Sidebar />
+      {!isAdminPanel && <Sidebar />}
       
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
-        <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"
-              >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
-              <div>
-                <h1 className="text-xl font-bold text-white">
-                  {allModules.find(m => m.id === activeModule)?.label || 'LogisCore'}
-                </h1>
-                {role === 'super_admin' && !isImpersonating && (
-                  <p className="text-xs text-slate-400">Panel de Administración</p>
+      <div className={`transition-all duration-300 ${isAdminPanel ? '' : (sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60')}`}>
+        {!isAdminPanel && (
+          <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="lg:hidden p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"
+                >
+                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
+                <div>
+                  <h1 className="text-xl font-bold text-white">
+                    {allModules.find(m => m.id === activeModule)?.label || 'LogisCore'}
+                  </h1>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-blue-400 border border-blue-500/30">
+                  {role}
+                </span>
+                {isImpersonating && (
+                  <span className="px-2 py-1 bg-amber-500/10 text-amber-400 text-xs rounded border border-amber-500/30">
+                    Impersonando
+                  </span>
                 )}
               </div>
             </div>
+          </header>
+        )}
 
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-blue-400 border border-blue-500/30">
-                {role}
-              </span>
-              {isImpersonating && (
-                <span className="px-2 py-1 bg-amber-500/10 text-amber-400 text-xs rounded border border-amber-500/30">
-                  Impersonando
+        {isAdminPanel && (
+          <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <img src={Emblema} alt="LogisCore" className="w-8 h-8 rounded-lg" />
+                <div>
+                  <h1 className="text-xl font-bold text-white">Administración</h1>
+                  <p className="text-xs text-slate-400">Gestión de tenants y sistema</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-purple-400 border border-purple-500/30">
+                  {role}
                 </span>
-              )}
+                <button
+                  onClick={() => useTenantStore.getState().clear()}
+                  className="text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  Cerrar Sesión
+                </button>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         <main className="p-6">
           {renderModule()}
         </main>
-        <SyncStatus />
+        {!isAdminPanel && <SyncStatus />}
       </div>
 
-      {mobileMenuOpen && (
+      {mobileMenuOpen && !isAdminPanel && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}

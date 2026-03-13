@@ -2,17 +2,9 @@ import { useState, useEffect } from 'react';
 import { useTenantStore } from '../store/useTenantStore';
 import { db } from '../services/db';
 import { 
-  DollarSign, ShoppingBag, PackageX, TrendingUp, 
-  Package, ShoppingCart, ChefHat, BarChart3, ShoppingBasket,
+  DollarSign, ShoppingBag, PackageX, TrendingUp,
   ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
-
-interface ModuleCard {
-  id: string;
-  label: string;
-  icon: React.ElementType;
-  description: string;
-}
 
 export default function Dashboard() {
   const tenant = useTenantStore((state) => state.currentTenant);
@@ -90,14 +82,6 @@ export default function Dashboard() {
     },
   ];
 
-  const modules: ModuleCard[] = [
-    { id: 'inventory', label: 'Inventario', icon: Package, description: 'Gestiona tu stock y productos' },
-    { id: 'pos', label: 'Punto de Venta', icon: ShoppingCart, description: 'Realiza ventas y cobros' },
-    { id: 'recipes', label: 'Recetas', icon: ChefHat, description: 'Administra tus recetas' },
-    { id: 'reports', label: 'Reportes', icon: BarChart3, description: 'Ver métricas y analytics' },
-    { id: 'purchases', label: 'Compras', icon: ShoppingBasket, description: 'Gestiona proveedores' },
-  ];
-
   const colorClasses: Record<string, { bg: string; text: string; icon: string; border: string }> = {
     blue: { bg: 'bg-blue-500/10', text: 'text-blue-400', icon: 'bg-blue-500/20', border: 'border-blue-500/20' },
     green: { bg: 'bg-green-500/10', text: 'text-green-400', icon: 'bg-green-500/20', border: 'border-green-500/20' },
@@ -169,23 +153,6 @@ export default function Dashboard() {
         })}
       </div>
 
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4 px-1">Accesos Directos</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {modules.map((mod) => (
-            <button
-              key={mod.id}
-              className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg hover:shadow-xl hover:border-blue-500/50 hover:bg-slate-800/50 transition-all text-left group"
-            >
-              <div className={`p-2.5 rounded-lg bg-slate-800 group-hover:bg-blue-500/20 mb-3 transition-colors`}>
-                <mod.icon className="w-5 h-5 text-blue-400 group-hover:text-blue-300" />
-              </div>
-              <h4 className="font-semibold text-white mb-1">{mod.label}</h4>
-              <p className="text-xs text-slate-500 line-clamp-2">{mod.description}</p>
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
