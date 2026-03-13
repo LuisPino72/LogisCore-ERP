@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../services/supabase'
 import { useTenantStore } from '../store/useTenantStore'
 import { User, Lock, Loader2 } from 'lucide-react'
-import Emblema from '../assets/Emblema.png'
+import Emblema from '../assets/Emblema.ico'
 
 export default function Login() {
   const [email, setEmail] = useState('')

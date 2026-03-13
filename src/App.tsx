@@ -257,7 +257,7 @@ function App() {
                 }`}
                 title={sidebarCollapsed ? mod.label : undefined}
               >
-                <mod.icon className="w-5 h-5 flex-shrink-0" />
+                <mod.icon className="w-5 h-5 shrink-0" />
                 {!sidebarCollapsed && <span className="font-medium">{mod.label}</span>}
               </button>
             </li>
