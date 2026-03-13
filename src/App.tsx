@@ -6,16 +6,22 @@ import SyncStatus from './components/SyncStatus';
 import { initializeCatalogs } from './services/db';
 import { supabase } from './services/supabase';
 import { db } from './services/db';
-import { Package, ShoppingCart, ShoppingBasket, Menu, X, LayoutDashboard, ChefHat, BarChart3, Loader2 } from 'lucide-react';
+import { 
+  Package, ShoppingCart, ShoppingBasket, Menu, X, LayoutDashboard, 
+  ChefHat, BarChart3, Loader2, ChevronLeft, ChevronRight, LogOut,
+  Store, ShoppingBag
+} from 'lucide-react';
+import Emblema from './assets/Emblema.ico';
 
 const Inventory = lazy(() => import('./components/inventory/Inventory'));
 const POS = lazy(() => import('./components/pos/POS'));
 const Recipes = lazy(() => import('./components/recipes/Recipes'));
 const Reports = lazy(() => import('./components/reports/Reports'));
 const Purchases = lazy(() => import('./components/purchases/Purchases'));
+const Sales = lazy(() => import('./components/sales/Sales'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 
-type Module = 'dashboard' | 'inventory' | 'pos' | 'recipes' | 'reports' | 'purchases';
+type Module = 'dashboard' | 'inventory' | 'pos' | 'sales' | 'recipes' | 'reports' | 'purchases';
 
 function App() {
   const role = useTenantStore((state) => state.role);
@@ -24,6 +30,7 @@ function App() {
   const stopImpersonation = useTenantStore((state) => state.stopImpersonation);
   const [activeModule, setActiveModule] = useState<Module>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
 
   useEffect(() => {
@@ -100,8 +107,9 @@ function App() {
     return <Login />;
   }
 
-  const modules = [
+  const allModules = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'sales', label: 'Ventas', icon: ShoppingBag },
     { id: 'inventory', label: 'Inventario', icon: Package },
     { id: 'pos', label: 'Punto de Venta', icon: ShoppingCart },
     { id: 'recipes', label: 'Recetas', icon: ChefHat },
@@ -161,6 +169,12 @@ function App() {
             <Dashboard />
           </Suspense>
         );
+      case 'sales':
+        return (
+          <Suspense fallback={<div className="p-8 text-center text-slate-400">Cargando...</div>}>
+            <Sales />
+          </Suspense>
+        );
       case 'inventory':
         return (
           <Suspense fallback={<div className="p-8 text-center text-slate-400">Cargando...</div>}>
@@ -193,87 +207,184 @@ function App() {
         );
       default:
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {modules.filter(m => m.id !== 'dashboard').map((mod) => (
-              <button
-                key={mod.id}
-                onClick={() => setActiveModule(mod.id as Module)}
-                className="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:border-blue-500 hover:bg-slate-700/50 transition-all text-left"
-              >
-                <mod.icon className="w-8 h-8 text-blue-400 mb-3" />
-                <h3 className="text-lg font-semibold text-white">{mod.label}</h3>
-                <p className="text-sm text-slate-400">Acceder al módulo</p>
-              </button>
-            ))}
-          </div>
+          <Suspense fallback={<div className="p-8 text-center text-slate-400">Cargando...</div>}>
+            <Dashboard />
+          </Suspense>
         );
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold italic">
-                LogisCore <span className="text-blue-500">ERP</span>
-              </h1>
-              <p className="text-xs text-slate-400">
-                {role === 'super_admin' ? 'Administrador Global' : tenant?.name}
-              </p>
-            </div>
-
-            {role !== 'super_admin' || isImpersonating ? (
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 hover:bg-slate-800 rounded-lg"
-              >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
-            ) : null}
+  const Sidebar = () => (
+    <aside 
+      className={`fixed left-0 top-0 h-screen bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 z-50 ${
+        sidebarCollapsed ? 'w-16' : 'w-60'
+      } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+    >
+      <div className="p-4 flex items-center justify-between border-b border-slate-800">
+        {!sidebarCollapsed && (
+          <div className="flex items-center gap-3">
+            <img src={Emblema} alt="LogisCore" className="w-8 h-8 rounded-lg" />
+            <span className="font-bold text-white">LogisCore</span>
           </div>
+        )}
+        {sidebarCollapsed && (
+          <img src={Emblema} alt="LogisCore" className="w-8 h-8 rounded-lg mx-auto" />
+        )}
+        <button 
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className={`hidden lg:flex items-center justify-center w-6 h-6 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors ${sidebarCollapsed ? 'absolute -right-3 top-4' : ''}`}
+        >
+          {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+      </div>
 
-          {(role !== 'super_admin' || isImpersonating) && (
-            <nav className={`lg:flex items-center gap-1 mt-4 ${mobileMenuOpen ? 'flex flex-col absolute left-0 right-0 bg-slate-900 p-4 border-b border-slate-800' : 'hidden'}`}>
-              {modules.map((mod) => (
-                <button
-                  key={mod.id}
-                  onClick={() => {
-                    setActiveModule(mod.id as Module);
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    activeModule === mod.id
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <mod.icon className="w-4 h-4" />
-                  {mod.label}
-                </button>
-              ))}
-            </nav>
-          )}
-        </div>
+      <nav className="flex-1 py-4 overflow-y-auto">
+        <ul className="space-y-1 px-2">
+          {allModules.filter(mod => {
+            if (mod.id === 'dashboard' || mod.id === 'reports') return true;
+            const moduleMap: Record<string, string> = {
+              inventory: 'inventory',
+              sales: 'sales',
+              purchases: 'purchases',
+              recipes: 'recipes',
+            };
+            const tenantModule = moduleMap[mod.id];
+            const modules = tenant?.modules as Record<string, boolean> | undefined;
+            return tenantModule && modules?.[tenantModule];
+          }).map((mod) => (
+            <li key={mod.id}>
+              <button
+                onClick={() => {
+                  setActiveModule(mod.id as Module);
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                  activeModule === mod.id
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+                title={sidebarCollapsed ? mod.label : undefined}
+              >
+                <mod.icon className="w-5 h-5 shrink-0" />
+                {!sidebarCollapsed && <span className="font-medium">{mod.label}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-        <div className="px-6 py-2 flex items-center justify-between border-t border-slate-800">
-          <span className="px-2 py-1 bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-blue-400 border border-blue-500/30">
-            {role}
-          </span>
+      <div className="p-4 border-t border-slate-800">
+        {!sidebarCollapsed ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden">
+                {tenant?.config?.logoUrl ? (
+                  <img src={tenant.config.logoUrl} alt={tenant.name} className="w-full h-full object-cover" />
+                ) : (
+                  <Store className="w-4 h-4 text-slate-500" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white truncate">{tenant?.name}</p>
+                <p className="text-xs text-slate-500 capitalize">{role}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => useTenantStore.getState().clear()}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors text-sm"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar Sesión
+            </button>
+          </div>
+        ) : (
           <button
             onClick={() => useTenantStore.getState().clear()}
-            className="text-xs text-slate-400 hover:text-white transition-colors"
+            className="w-full flex items-center justify-center p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors"
+            title="Cerrar Sesión"
           >
-            Cerrar Sesión
+            <LogOut className="w-5 h-5" />
           </button>
-        </div>
-      </header>
+        )}
+      </div>
+    </aside>
+  );
 
-      <main className="p-6">
-        {renderModule()}
-      </main>
-      <SyncStatus />
+  const isAdminPanel = role === 'super_admin' && !isImpersonating;
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white">
+      {!isAdminPanel && <Sidebar />}
+      
+      <div className={`transition-all duration-300 ${isAdminPanel ? '' : (sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60')}`}>
+        {!isAdminPanel && (
+          <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="lg:hidden p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"
+                >
+                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
+                <div>
+                  <h1 className="text-xl font-bold text-white">
+                    {allModules.find(m => m.id === activeModule)?.label || 'LogisCore'}
+                  </h1>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-blue-400 border border-blue-500/30">
+                  {role}
+                </span>
+                {isImpersonating && (
+                  <span className="px-2 py-1 bg-amber-500/10 text-amber-400 text-xs rounded border border-amber-500/30">
+                    Impersonando
+                  </span>
+                )}
+              </div>
+            </div>
+          </header>
+        )}
+
+        {isAdminPanel && (
+          <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <img src={Emblema} alt="LogisCore" className="w-8 h-8 rounded-lg" />
+                <div>
+                  <h1 className="text-xl font-bold text-white">Administración</h1>
+                  <p className="text-xs text-slate-400">Gestión de tenants y sistema</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-purple-400 border border-purple-500/30">
+                  {role}
+                </span>
+                <button
+                  onClick={() => useTenantStore.getState().clear()}
+                  className="text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  Cerrar Sesión
+                </button>
+              </div>
+            </div>
+          </header>
+        )}
+
+        <main className="p-6">
+          {renderModule()}
+        </main>
+        {!isAdminPanel && <SyncStatus />}
+      </div>
+
+      {mobileMenuOpen && !isAdminPanel && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -100,6 +100,22 @@ export interface ProductionLog {
   syncedAt?: Date;
 }
 
+export interface Supplier {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  name: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  syncedAt?: Date;
+}
+
 class LogisCoreDB extends Dexie {
   syncQueue!: Table<SyncQueueItem>;
   products!: Table<Product>;
@@ -109,10 +125,11 @@ class LogisCoreDB extends Dexie {
   purchases!: Table<Purchase>;
   recipes!: Table<Recipe>;
   productionLogs!: Table<ProductionLog>;
+  suppliers!: Table<Supplier>;
 
   constructor() {
     super('LogisCoreERP');
-    this.version(2).stores({
+    this.version(3).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
       products: '++id, localId, tenantId, sku, categoryId',
       categories: '++id, localId, tenantId, name',
@@ -121,6 +138,7 @@ class LogisCoreDB extends Dexie {
       purchases: '++id, localId, tenantId, status, createdAt',
       recipes: '++id, localId, tenantId, isActive',
       productionLogs: '++id, localId, tenantId, recipeId, createdAt',
+      suppliers: '++id, localId, tenantId, name, isActive',
     });
   }
 }

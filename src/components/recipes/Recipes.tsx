@@ -5,13 +5,15 @@ import { SyncEngine } from '../../services/sync/SyncEngine';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import { ChefHat, Plus, Play, X } from 'lucide-react';
+import { ChefHat, Plus, Play, X, Search, Package, Scale, PackageX, Check } from 'lucide-react';
 
 type RecipeForm = Omit<Recipe, 'id' | 'localId' | 'tenantId' | 'createdAt' | 'syncedAt'>;
 
 export default function Recipes() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<RecipeForm>({ name: '', description: '', productId: '', ingredients: [], yield: 1, isActive: true });
   const [produceQty, setProduceQty] = useState(1);
@@ -30,6 +32,16 @@ export default function Recipes() {
     }
     loadData();
   }, [tenant?.slug]);
+
+  const filteredRecipes = recipes.filter(recipe => {
+    const matchesSearch = !search || 
+      recipe.name.toLowerCase().includes(search.toLowerCase()) ||
+      recipe.description?.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || 
+      (filterStatus === 'active' && recipe.isActive) ||
+      (filterStatus === 'inactive' && !recipe.isActive);
+    return matchesSearch && matchesStatus;
+  });
 
   const handleCreateRecipe = async () => {
     if (!tenant?.slug || !form.name || !form.productId) return;
@@ -104,6 +116,18 @@ export default function Recipes() {
     setForm({ ...form, ingredients: [...form.ingredients, { productId: '', quantity: 0, unit: 'kg' }] });
   };
 
+  const getIngredientStock = (productId: string) => {
+    const product = products.find(p => p.localId === productId);
+    return product?.stock || 0;
+  };
+
+  const canProduce = (recipe: Recipe, qty: number) => {
+    return recipe.ingredients.every(ing => {
+      const stock = getIngredientStock(ing.productId);
+      return stock >= ing.quantity * qty;
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -112,78 +136,185 @@ export default function Recipes() {
             <ChefHat className="w-6 h-6" />
             Recetas
           </h2>
-          <p className="text-slate-400">Gestión de producción</p>
+          <p className="text-slate-400">{filteredRecipes.length} recetas</p>
         </div>
-        <Button onClick={() => setShowModal(true)}>
+        <Button onClick={() => { setForm({ name: '', description: '', productId: '', ingredients: [], yield: 1, isActive: true }); setShowModal(true); }}>
           <Plus className="w-4 h-4 mr-2" />
           Nueva Receta
         </Button>
       </div>
 
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar recetas..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as any)}
+          className="px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        >
+          <option value="all">Todas</option>
+          <option value="active">Activas</option>
+          <option value="inactive">Inactivas</option>
+        </select>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {recipes.map((recipe) => (
-          <Card key={recipe.localId} className="hover:border-blue-500 transition-colors">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="text-lg font-semibold text-white">{recipe.name}</h3>
-                <p className="text-sm text-slate-400">{recipe.description}</p>
-              </div>
-              <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
-                Activa
-              </span>
-            </div>
-            <div className="mb-4">
-              <p className="text-xs text-slate-500 mb-2">Ingredientes:</p>
-              <div className="space-y-1">
-                {recipe.ingredients.map((ing, i) => {
-                  const prod = products.find(p => p.localId === ing.productId);
-                  return (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-slate-300">{prod?.name || 'Producto'}</span>
-                      <span className="text-slate-400">{ing.quantity} {ing.unit}</span>
+        {filteredRecipes.length === 0 ? (
+          <div className="col-span-full py-12 text-center text-slate-500">
+            <ChefHat className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>No hay recetas</p>
+          </div>
+        ) : (
+          filteredRecipes.map((recipe) => {
+            const resultProduct = products.find(p => p.localId === recipe.productId);
+            const canProd = canProduce(recipe, 1);
+            return (
+              <Card key={recipe.localId} className="hover:border-blue-500 transition-all">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center">
+                      <ChefHat className="w-6 h-6 text-slate-500" />
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-            <Button variant="secondary" className="w-full" onClick={() => setSelectedRecipe(recipe)}>
-              <Play className="w-4 h-4 mr-2" />
-              Producir
-            </Button>
-          </Card>
-        ))}
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">{recipe.name}</h3>
+                      <p className="text-xs text-slate-500">{resultProduct?.name || 'Sin producto'}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                    recipe.isActive 
+                      ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+                      : 'bg-slate-700 text-slate-400 border border-slate-600'
+                  }`}>
+                    {recipe.isActive ? 'Activa' : 'Inactiva'}
+                  </span>
+                </div>
+                
+                {recipe.description && (
+                  <p className="text-sm text-slate-400 mb-4 line-clamp-2">{recipe.description}</p>
+                )}
+                
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                    <Scale className="w-3.5 h-3.5" />
+                    <span>Ingredientes ({recipe.ingredients.length})</span>
+                  </div>
+                  <div className="space-y-1.5 bg-slate-950/50 p-2 rounded-lg">
+                    {recipe.ingredients.slice(0, 3).map((ing, i) => {
+                      const prod = products.find(p => p.localId === ing.productId);
+                      const stock = getIngredientStock(ing.productId);
+                      const needed = ing.quantity;
+                      const hasEnough = stock >= needed;
+                      return (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-300 truncate">{prod?.name || 'Producto'}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className={hasEnough ? 'text-slate-400' : 'text-red-400'}>
+                              {stock}/{needed}
+                            </span>
+                            {!hasEnough && <PackageX className="w-3 h-3 text-red-400" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {recipe.ingredients.length > 3 && (
+                      <p className="text-xs text-slate-500 text-center pt-1">
+                        +{recipe.ingredients.length - 3} más
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <Package className="w-3.5 h-3.5" />
+                    <span>Rinde: {recipe.yield}</span>
+                  </div>
+                  <Button 
+                    variant={canProd ? 'primary' : 'secondary'} 
+                    size="sm" 
+                    onClick={() => setSelectedRecipe(recipe)}
+                    disabled={!canProd}
+                  >
+                    <Play className="w-3.5 h-3.5 mr-1.5" />
+                    Producir
+                  </Button>
+                </div>
+              </Card>
+            );
+          })
+        )}
       </div>
 
       {selectedRecipe && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-              <h3 className="text-lg font-semibold text-white">Producir: {selectedRecipe.name}</h3>
-              <button onClick={() => setSelectedRecipe(null)} className="p-1 hover:bg-slate-700 rounded">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <ChefHat className="w-5 h-5 text-blue-400" />
+                Producir: {selectedRecipe.name}
+              </h3>
+              <button onClick={() => setSelectedRecipe(null)} className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors">
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-5">
               <Input
                 label="Cantidad a producir"
                 type="number"
                 min={1}
                 value={produceQty}
-                onChange={(e) => setProduceQty(Number(e.target.value))}
+                onChange={(e) => setProduceQty(Math.max(1, Number(e.target.value)))}
               />
-              <div className="bg-slate-800 p-4 rounded-lg">
-                <p className="text-sm text-slate-400 mb-2">Materiales necesarios:</p>
-                {selectedRecipe.ingredients.map((ing, i) => {
-                  const prod = products.find(p => p.localId === ing.productId);
-                  return (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-slate-300">{prod?.name || 'Producto'}</span>
-                      <span className="text-slate-400">{(ing.quantity * produceQty).toFixed(2)} {ing.unit}</span>
-                    </div>
-                  );
-                })}
+              
+              <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-2 text-sm text-slate-400 mb-3">
+                  <Package className="w-4 h-4" />
+                  <span>Materiales necesarios:</span>
+                </div>
+                <div className="space-y-2">
+                  {selectedRecipe.ingredients.map((ing, i) => {
+                    const prod = products.find(p => p.localId === ing.productId);
+                    const stock = getIngredientStock(ing.productId);
+                    const needed = ing.quantity * produceQty;
+                    const hasEnough = stock >= needed;
+                    return (
+                      <div key={i} className="flex items-center justify-between">
+                        <span className="text-slate-300 text-sm">{prod?.name || 'Producto'}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-medium ${hasEnough ? 'text-green-400' : 'text-red-400'}`}>
+                            {stock} → -{needed}
+                          </span>
+                          {hasEnough ? (
+                            <Check className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <PackageX className="w-4 h-4 text-red-400" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <Button className="w-full" onClick={handleProduce}>
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-400">Producción resultante:</span>
+                <span className="text-green-400 font-bold">+{produceQty * selectedRecipe.yield} unidades</span>
+              </div>
+
+              <Button 
+                className="w-full py-3" 
+                onClick={handleProduce}
+                disabled={!canProduce(selectedRecipe, produceQty)}
+              >
+                <Play className="w-4 h-4 mr-2" />
                 Iniciar Producción
               </Button>
             </div>
@@ -193,10 +324,13 @@ export default function Recipes() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-              <h3 className="text-lg font-semibold text-white">Nueva Receta</h3>
-              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-slate-700 rounded">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 sticky top-0 bg-slate-900">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Plus className="w-5 h-5 text-green-400" />
+                Nueva Receta
+              </h3>
+              <button onClick={() => setShowModal(false)} className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors">
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
@@ -206,6 +340,7 @@ export default function Recipes() {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Ej: Hamburguesa Especial"
+                required
               />
               <Input
                 label="Descripción"
@@ -213,26 +348,28 @@ export default function Recipes() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Descripción opcional"
               />
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Producto resultado</label>
-                <select
-                  value={form.productId}
-                  onChange={(e) => setForm({ ...form, productId: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
-                >
-                  <option value="">Seleccionar producto</option>
-                  {products.map((p) => (
-                    <option key={p.localId} value={p.localId}>{p.name}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1.5">Producto resultado</label>
+                  <select
+                    value={form.productId}
+                    onChange={(e) => setForm({ ...form, productId: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Seleccionar producto</option>
+                    {products.map((p) => (
+                      <option key={p.localId} value={p.localId}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <Input
+                  label="Rendimiento (unidades)"
+                  type="number"
+                  min={1}
+                  value={form.yield}
+                  onChange={(e) => setForm({ ...form, yield: Number(e.target.value) })}
+                />
               </div>
-              <Input
-                label="Rendimiento (unidades)"
-                type="number"
-                min={1}
-                value={form.yield}
-                onChange={(e) => setForm({ ...form, yield: Number(e.target.value) })}
-              />
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-slate-300">Ingredientes</label>
@@ -250,7 +387,7 @@ export default function Recipes() {
                           newIngs[i].productId = e.target.value;
                           setForm({ ...form, ingredients: newIngs });
                         }}
-                        className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                        className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Producto</option>
                         {products.map((p) => (
@@ -268,11 +405,12 @@ export default function Recipes() {
                           setForm({ ...form, ingredients: newIngs });
                         }}
                         className="w-24"
+                        placeholder="Cant"
                       />
                       <button
                         type="button"
                         onClick={() => setForm({ ...form, ingredients: form.ingredients.filter((_, idx) => idx !== i) })}
-                        className="p-2 text-red-400 hover:bg-slate-700 rounded"
+                        className="p-2 text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -280,7 +418,7 @@ export default function Recipes() {
                   ))}
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
                 <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
                   Cancelar
                 </Button>
