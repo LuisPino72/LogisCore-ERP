@@ -132,12 +132,12 @@ class LogisCoreDB extends Dexie {
     super('LogisCoreERP');
     this.version(4).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
-      products: '++id, localId, tenantId, sku, categoryId, isActive',
+      products: '++id, localId, tenantId, sku, categoryId, isActive, name',
       categories: '++id, localId, tenantId, name',
       settings: 'key, tenantId',
-      sales: '++id, localId, tenantId, status, createdAt',
-      purchases: '++id, localId, tenantId, status, createdAt',
-      recipes: '++id, localId, tenantId, isActive',
+      sales: '++id, localId, tenantId, status, createdAt, paymentMethod',
+      purchases: '++id, localId, tenantId, status, createdAt, supplier',
+      recipes: '++id, localId, tenantId, isActive, productId',
       productionLogs: '++id, localId, tenantId, recipeId, createdAt',
       suppliers: '++id, localId, tenantId, name, isActive',
     });

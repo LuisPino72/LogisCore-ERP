@@ -2,6 +2,7 @@ import { db, SyncQueueItem } from '../db';
 import { supabase } from '../supabase';
 import { EventBus, Events } from '../events/EventBus';
 import { useTenantStore } from '../../store/useTenantStore';
+import { logger, logCategories } from '../logger';
 
 export interface SyncResult {
   success: boolean;
@@ -16,10 +17,23 @@ interface RetryConfig {
   maxDelayMs: number;
 }
 
+interface CircuitBreakerState {
+  status: 'closed' | 'open' | 'half-open';
+  failures: number;
+  lastFailureTime: number;
+  successCount: number;
+}
+
 const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxRetries: 3,
   baseDelayMs: 1000,
   maxDelayMs: 10000,
+};
+
+const CIRCUIT_BREAKER_CONFIG = {
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeoutMs: 60000,
 };
 
 class SyncEngineClass {
@@ -27,6 +41,12 @@ class SyncEngineClass {
   private syncInterval: ReturnType<typeof setInterval> | null = null;
   private readonly SYNC_INTERVAL_MS = 30000;
   private retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG;
+  private circuitBreaker: CircuitBreakerState = {
+    status: 'closed',
+    failures: 0,
+    lastFailureTime: 0,
+    successCount: 0,
+  };
 
   async start(): Promise<void> {
     if (this.syncInterval) return;
@@ -45,7 +65,7 @@ class SyncEngineClass {
     }
   }
 
-  private async sleep(ms: number): Promise<void> {
+  private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -53,6 +73,51 @@ class SyncEngineClass {
     const delay = this.retryConfig.baseDelayMs * Math.pow(2, attempt);
     const jitter = Math.random() * 0.3 * delay;
     return Math.min(delay + jitter, this.retryConfig.maxDelayMs);
+  }
+
+  private isCircuitOpen(): boolean {
+    if (this.circuitBreaker.status === 'closed') return false;
+    
+    if (Date.now() - this.circuitBreaker.lastFailureTime > CIRCUIT_BREAKER_CONFIG.timeoutMs) {
+      this.circuitBreaker.status = 'half-open';
+      this.circuitBreaker.successCount = 0;
+      logger.info('Circuit breaker transitioning to half-open', { category: logCategories.SYNC });
+      return false;
+    }
+    
+    return true;
+  }
+
+  private recordSuccess(): void {
+    this.circuitBreaker.failures = 0;
+    
+    if (this.circuitBreaker.status === 'half-open') {
+      this.circuitBreaker.successCount++;
+      if (this.circuitBreaker.successCount >= CIRCUIT_BREAKER_CONFIG.successThreshold) {
+        this.circuitBreaker.status = 'closed';
+        logger.info('Circuit breaker closed', { category: logCategories.SYNC });
+      }
+    }
+  }
+
+  private recordFailure(): void {
+    this.circuitBreaker.failures++;
+    this.circuitBreaker.lastFailureTime = Date.now();
+    
+    if (this.circuitBreaker.status === 'half-open') {
+      this.circuitBreaker.status = 'open';
+      logger.warn('Circuit breaker opened after half-open failure', { category: logCategories.SYNC });
+    } else if (this.circuitBreaker.failures >= CIRCUIT_BREAKER_CONFIG.failureThreshold) {
+      this.circuitBreaker.status = 'open';
+      logger.warn('Circuit breaker opened', { 
+        failures: this.circuitBreaker.failures,
+        category: logCategories.SYNC 
+      });
+    }
+  }
+
+  getCircuitStatus(): CircuitBreakerState {
+    return { ...this.circuitBreaker };
   }
 
   private async retryOperation<T>(
@@ -74,7 +139,11 @@ class SyncEngineClass {
         }
         
         const delay = this.calculateDelay(attempt);
-        console.log(`SyncEngine: Retry ${operationName} in ${delay}ms (attempt ${attempt + 1}/${this.retryConfig.maxRetries})`);
+        logger.warn(`Retry ${operationName} in ${delay}ms`, { 
+          attempt: attempt + 1,
+          maxRetries: this.retryConfig.maxRetries,
+          category: logCategories.SYNC,
+        });
         await this.sleep(delay);
       }
     }
@@ -122,6 +191,11 @@ class SyncEngineClass {
       return { success: false, synced: 0, failed: 0, conflicts: [] };
     }
 
+    if (this.isCircuitOpen()) {
+      logger.warn('Circuit breaker open, skipping sync', { category: logCategories.SYNC });
+      return { success: false, synced: 0, failed: 0, conflicts: [] };
+    }
+
     this.isSyncing = true;
     const result: SyncResult = {
       success: true,
@@ -139,8 +213,10 @@ class SyncEngineClass {
       for (const item of pending) {
         try {
           await this.processItem(item);
+          this.recordSuccess();
           result.synced++;
         } catch (error) {
+          this.recordFailure();
           const isConflict = this.isConflictError(error);
           
           await db.syncQueue.update(item.id!, {
@@ -152,8 +228,18 @@ class SyncEngineClass {
           if (isConflict) {
             result.conflicts.push(item);
             EventBus.emit(Events.CONFLICT_DETECTED, item);
+            logger.warn('Sync conflict detected', { 
+              itemId: item.id,
+              tableName: item.tableName,
+              category: logCategories.SYNC,
+            });
           } else {
             result.failed++;
+            logger.error('Sync failed', error instanceof Error ? error : undefined, { 
+              itemId: item.id,
+              tableName: item.tableName,
+              category: logCategories.SYNC,
+            });
           }
         }
       }
@@ -169,17 +255,15 @@ class SyncEngineClass {
   }
 
   private async processItem(item: SyncQueueItem): Promise<void> {
-    const schema = `tenant_${item.tenantId}`;
-    
     await db.syncQueue.update(item.id!, { status: 'syncing' });
 
     const syncOperation = async () => {
       const { error } = await supabase.rpc('sync_table_item', {
-        p_schema: schema,
         p_table: item.tableName,
         p_operation: item.operation,
         p_data: item.data,
         p_local_id: item.localId,
+        p_tenant_slug: item.tenantId, // we store the slug in the queue
       });
 
       if (error) throw error;

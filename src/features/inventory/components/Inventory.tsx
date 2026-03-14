@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button, Input, Card } from '@/common';
 import { useToast } from '@/providers/ToastProvider';
 import { Plus, Search, Edit2, Trash2, Package, X, Cloud, CloudOff, LayoutGrid, List, Filter, PackageX, AlertTriangle } from 'lucide-react';
 import { useTenantStore } from '@/store/useTenantStore';
 import { createProduct, updateProduct, deleteProduct, getProducts } from '../services/products.service';
-import { db, Product, Category } from '@/lib/db';
+import { getCategories } from '../services/categories.service';
+import { Product, Category } from '@/lib/db';
 import { EventBus, Events } from '@/lib/events/EventBus';
 import { isOk } from '@/types/result';
+import { logger, logCategories } from '@/lib/logger';
 
 type ViewMode = 'table' | 'grid';
 type StockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
@@ -38,23 +40,23 @@ export default function Inventory() {
   const tenant = useTenantStore((state) => state.currentTenant);
   const { showError, showSuccess } = useToast();
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!tenant?.slug) return;
     setLoading(true);
     try {
       const [prodData, catData] = await Promise.all([
         getProducts(),
-        db.categories.where('tenantId').equals(tenant.slug).toArray()
+        getCategories()
       ]);
       setProducts(prodData);
       setCategories(catData);
     } catch (error) {
       showError('Error al cargar datos del inventario');
-      console.error('Error loading inventory data:', error);
+      logger.error('Error loading inventory data', error instanceof Error ? error : undefined, { category: logCategories.INVENTORY });
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.slug, showError]);
 
   useEffect(() => {
     loadData();
@@ -64,7 +66,7 @@ export default function Inventory() {
       unsubscribeInv();
       unsubscribeSync();
     };
-  }, [tenant?.slug]);
+  }, [loadData]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -100,7 +102,7 @@ export default function Inventory() {
         }
         showSuccess('Producto actualizado correctamente');
       } else {
-        const result = await createProduct(form as any);
+        const result = await createProduct(form as Parameters<typeof createProduct>[0]);
         if (!isOk(result)) {
           showError(result.error.message);
           return;
@@ -114,7 +116,7 @@ export default function Inventory() {
     }
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = useCallback((product: Product) => {
     setForm({
       name: product.name,
       sku: product.sku,
@@ -126,9 +128,9 @@ export default function Inventory() {
     });
     setEditingId(product.localId);
     setShowModal(true);
-  };
+  }, []);
 
-  const handleDelete = async (localId: string) => {
+  const handleDelete = useCallback(async (localId: string) => {
     if (confirm('¿Estás seguro de eliminar este producto?')) {
       const result = await deleteProduct(localId);
       if (!isOk(result)) {
@@ -137,12 +139,12 @@ export default function Inventory() {
       }
       showSuccess('Producto eliminado correctamente');
     }
-  };
+  }, [showError, showSuccess]);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setForm({ name: '', sku: '', price: 0, cost: 0, stock: 0, categoryId: undefined, isActive: true });
     setEditingId(null);
-  };
+  }, []);
 
   const getStockStatus = (stock: number) => {
     if (stock === 0) return { label: 'Sin Stock', color: 'text-red-400 bg-red-500/10', icon: PackageX };

@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
-import { supabase } from "../../../services/supabase";
+import { useState, useEffect, useCallback } from "react";
 import { useTenantStore } from "../../../store/useTenantStore";
+import { getEmployees, getInvitations, inviteEmployee, Employee, Invitation } from "../services/employees.service";
+import { isOk } from "../../../types/result";
+import { useToast } from "../../../providers/ToastProvider";
 import Card from "../../../common/Card";    
 import Button from "../../../common/Button";
 import {
@@ -15,14 +17,15 @@ import {
 } from "lucide-react";
 
 export default function Employees() {
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [invitations, setInvitations] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"employees" | "invitations">(
     "employees",
   );
   const tenant = useTenantStore((state) => state.currentTenant);
   const role = useTenantStore((state) => state.role);
+  const { showError, showSuccess } = useToast();
 
   const [email, setEmail] = useState("");
   const [perms, setPerms] = useState({
@@ -31,50 +34,41 @@ export default function Employees() {
   });
   const [loading, setLoading] = useState(false);
 
+  const fetchData = useCallback(async () => {
+    if (!tenant) return;
+
+    const empResult = await getEmployees();
+    if (isOk(empResult)) {
+      setEmployees(empResult.value);
+    } else {
+      showError(empResult.error.message);
+    }
+
+    const invResult = await getInvitations();
+    if (isOk(invResult)) {
+      setInvitations(invResult.value);
+    } else {
+      showError(invResult.error.message);
+    }
+  }, [tenant, showError]);
+
   useEffect(() => {
     if (tenant?.id) {
       fetchData();
     }
-  }, [tenant]);
-
-  const fetchData = async () => {
-    if (!tenant) return;
-
-    const { data: rolesData } = await supabase
-      .from("user_roles")
-      .select("user_id, role, permissions")
-      .eq("tenant_id", tenant.id)
-      .eq("role", "employee");
-
-    setEmployees(rolesData || []);
-
-    const { data: invsData } = await supabase
-      .from("invitations")
-      .select("*")
-      .eq("tenant_id", tenant.id)
-      .eq("role", "employee")
-      .order("created_at", { ascending: false });
-
-    setInvitations(invsData || []);
-  };
+  }, [tenant, fetchData]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenant || !email) return;
 
     setLoading(true);
-    const { error } = await supabase.from("invitations").insert([
-      {
-        tenant_id: tenant.id,
-        email,
-        role: "employee",
-        permissions: perms,
-      },
-    ]);
+    const result = await inviteEmployee(email, perms);
 
-    if (error) {
-      alert("Error: " + error.message);
+    if (!isOk(result)) {
+      showError(result.error.message);
     } else {
+      showSuccess("Invitación enviada correctamente");
       setEmail("");
       setPerms({ can_create_inventory: false, can_view_reports: false });
       fetchData();

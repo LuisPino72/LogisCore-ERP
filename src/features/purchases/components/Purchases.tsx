@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { db, Product, Purchase, Supplier } from "../../../services/db";
 import { useTenantStore } from "../../../store/useTenantStore";
 import { SyncEngine } from "../../../services/sync/SyncEngine";
@@ -63,24 +63,25 @@ export default function Purchases() {
 
   const tenant = useTenantStore((state) => state.currentTenant);
 
-  useEffect(() => {
-    async function loadData() {
-      if (!tenant?.slug) return;
-      const [prods, purcs, sups] = await Promise.all([
-        db.products.where("tenantId").equals(tenant.slug).toArray(),
-        db.purchases
-          .where("tenantId")
-          .equals(tenant.slug)
-          .reverse()
-          .sortBy("createdAt"),
-        db.suppliers.where("tenantId").equals(tenant.slug).toArray(),
-      ]);
-      setProducts(prods);
-      setPurchases(purcs);
-      setSuppliers(sups.filter((s) => s.isActive));
-    }
-    loadData();
+  const loadData = useCallback(async () => {
+    if (!tenant?.slug) return;
+    const [prods, purcs, sups] = await Promise.all([
+      db.products.where("tenantId").equals(tenant.slug).toArray(),
+      db.purchases
+        .where("tenantId")
+        .equals(tenant.slug)
+        .reverse()
+        .sortBy("createdAt"),
+      db.suppliers.where("tenantId").equals(tenant.slug).toArray(),
+    ]);
+    setProducts(prods);
+    setPurchases(purcs);
+    setSuppliers(sups.filter((s) => s.isActive));
   }, [tenant?.slug]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredPurchases = purchases.filter((p) => {
     const matchesSearch =

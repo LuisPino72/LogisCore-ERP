@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTenantStore } from "../../../store/useTenantStore";
 import { db, Sale } from "../../../services/db";
 import Card from "../../../common/Card";
@@ -29,18 +29,19 @@ export default function Sales() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const tenant = useTenantStore((state) => state.currentTenant);
 
-  useEffect(() => {
-    async function loadData() {
-      if (!tenant?.slug) return;
-      const salesData = await db.sales
-        .where("tenantId")
-        .equals(tenant.slug)
-        .reverse()
-        .sortBy("createdAt");
-      setSales(salesData);
-    }
-    loadData();
+  const loadData = useCallback(async () => {
+    if (!tenant?.slug) return;
+    const salesData = await db.sales
+      .where("tenantId")
+      .equals(tenant.slug)
+      .reverse()
+      .sortBy("createdAt");
+    setSales(salesData);
   }, [tenant?.slug]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
     const now = new Date();

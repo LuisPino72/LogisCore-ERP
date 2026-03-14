@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { db, Product, Recipe, ProductionLog } from "../../../services/db";
 import { useTenantStore } from "../../../store/useTenantStore";
 import { SyncEngine } from "../../../services/sync/SyncEngine";
@@ -42,18 +42,19 @@ export default function Recipes() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const tenant = useTenantStore((state) => state.currentTenant);
 
-  useEffect(() => {
-    async function loadData() {
-      if (!tenant?.slug) return;
-      const [prods, recs] = await Promise.all([
-        db.products.where("tenantId").equals(tenant.slug).toArray(),
-        db.recipes.where("tenantId").equals(tenant.slug).toArray(),
-      ]);
-      setProducts(prods);
-      setRecipes(recs);
-    }
-    loadData();
+  const loadData = useCallback(async () => {
+    if (!tenant?.slug) return;
+    const [prods, recs] = await Promise.all([
+      db.products.where("tenantId").equals(tenant.slug).toArray(),
+      db.recipes.where("tenantId").equals(tenant.slug).toArray(),
+    ]);
+    setProducts(prods);
+    setRecipes(recs);
   }, [tenant?.slug]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredRecipes = recipes.filter((recipe) => {
     const matchesSearch =

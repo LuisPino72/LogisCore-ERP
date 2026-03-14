@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
-import { db, Product, Sale, Category } from "../../../services/db";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Product, Category, db } from "../../../lib/db";
 import { useTenantStore } from "../../../store/useTenantStore";
-import { EventBus, Events } from "../../../services/events/EventBus";
-import { SyncEngine } from "../../../services/sync/SyncEngine";
+import { createSale } from "../../sales/services/sales.service";
+import { updateStock } from "../../inventory/services/products.service";
+import { isOk } from "../../../types/result";
 import { useToast } from "../../../providers/ToastProvider";
 import Card from "../../../common/Card";
 import Button from "../../../common/Button"; 
@@ -34,18 +35,19 @@ export default function POS() {
   const tenant = useTenantStore((state) => state.currentTenant);
   const { showError, showSuccess } = useToast();
 
-  useEffect(() => {
-    async function loadProducts() {
-      if (!tenant?.slug) return;
-      const [prods, cats] = await Promise.all([
-        db.products.where("tenantId").equals(tenant.slug).toArray(),
-        db.categories.where("tenantId").equals(tenant.slug).toArray(),
-      ]);
-      setProducts(prods);
-      setCategories(cats);
-    }
-    loadProducts();
+  const loadProducts = useCallback(async () => {
+    if (!tenant?.slug) return;
+    const [prods, cats] = await Promise.all([
+      db.products.where("tenantId").equals(tenant.slug).toArray(),
+      db.categories.where("tenantId").equals(tenant.slug).toArray(),
+    ]);
+    setProducts(prods);
+    setCategories(cats);
   }, [tenant?.slug]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -108,6 +110,8 @@ export default function POS() {
   );
 
   const handleCheckout = async () => {
+    if (!tenant) return;
+    
     try {
       const saleItems = cart.map((item) => ({
         productId: item.product.localId,
@@ -117,46 +121,35 @@ export default function POS() {
         total: item.product.price * item.quantity,
       }));
 
-      const newSale: Sale = {
-        localId: crypto.randomUUID(),
-        tenantId: tenant!.slug,
+      const saleResult = await createSale({
         items: saleItems,
         subtotal: cartTotal,
         tax: 0,
         total: cartTotal,
         paymentMethod,
-        status: "completed",
-        createdAt: new Date(),
-      };
-
-      await db.sales.add(newSale);
-      await SyncEngine.addToQueue(
-        "sales",
-        "create",
-        newSale as unknown as Record<string, unknown>,
-        newSale.localId,
-      );
-
-      await Promise.all(
-        cart.map((item) => {
-          const newStock = item.product.stock - item.quantity;
-          return db.products.update(item.product.localId, {
-            stock: newStock,
-            updatedAt: new Date(),
-          });
-        }),
-      );
-
-      EventBus.emit(Events.SALE_COMPLETED, {
-        items: cart,
-        total: cartTotal,
-        paymentMethod,
-        timestamp: new Date(),
       });
+
+      if (!isOk(saleResult)) {
+        showError(saleResult.error.message);
+        return;
+      }
+
+      // Actualizar stock de cada producto usando el servicio para asegurar sincronización
+      const stockUpdates = cart.map((item) => 
+        updateStock(item.product.localId, -item.quantity)
+      );
+      
+      const results = await Promise.all(stockUpdates);
+      const failed = results.filter(r => !isOk(r));
+      
+      if (failed.length > 0) {
+        console.warn(`[POS] ${failed.length} actualizaciones de stock fallaron tras la venta.`);
+      }
 
       setCart([]);
       setShowCheckout(false);
       showSuccess("Venta registrada exitosamente!");
+      await loadProducts(); // Recargar productos para ver stock actualizado
     } catch (_error) {
       showError("Error al registrar la venta");
     }
