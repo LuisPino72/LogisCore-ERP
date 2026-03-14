@@ -109,7 +109,7 @@ export default function Inventory() {
       }
       setShowModal(false);
       resetForm();
-    } catch (error) {
+    } catch (_error) {
       showError('Error al guardar producto');
     }
   };

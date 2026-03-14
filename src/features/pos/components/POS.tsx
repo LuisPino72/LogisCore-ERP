@@ -157,7 +157,7 @@ export default function POS() {
       setCart([]);
       setShowCheckout(false);
       showSuccess("Venta registrada exitosamente!");
-    } catch (error) {
+    } catch (_error) {
       showError("Error al registrar la venta");
     }
   };

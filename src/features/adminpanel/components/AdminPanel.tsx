@@ -242,7 +242,7 @@ export default function AdminPanel() {
           setConfirmPassword('')
         }
       }
-    } catch (error) {
+    } catch (_error) {
       showError('Error al crear usuario owner')
     }
     setOwnerLoading(false)

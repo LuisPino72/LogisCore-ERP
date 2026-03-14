@@ -3,24 +3,10 @@ import { useThemeStore, applyCssVariables } from '@/store/useThemeStore';
 
 describe('ThemeStore', () => {
   beforeEach(() => {
-    const state = useThemeStore.getState();
-    state.setTheme('light');
-    state.applyTenantTheme({
+    useThemeStore.getState().applyTenantTheme({
       themeColor: '#ea580c',
       mode: 'light',
       accentIntensity: 'normal',
-    });
-  });
-
-  describe('setTheme', () => {
-    it('debe establecer tema claro', () => {
-      useThemeStore.getState().setTheme('light');
-      expect(useThemeStore.getState().theme).toBe('light');
-    });
-
-    it('debe establecer tema oscuro', () => {
-      useThemeStore.getState().setTheme('dark');
-      expect(useThemeStore.getState().theme).toBe('dark');
     });
   });
 
@@ -48,10 +34,21 @@ describe('ThemeStore', () => {
       const state = useThemeStore.getState();
       expect(state.themeColorSecondary).toBe('#f97316');
     });
+
+    it('debe establecer modo según configuración', () => {
+      useThemeStore.getState().applyTenantTheme({
+        themeColor: '#ff0000',
+        mode: 'dark',
+        accentIntensity: 'normal',
+      });
+
+      const state = useThemeStore.getState();
+      expect(state.theme).toBe('dark');
+    });
   });
 
   describe('generateCssVariables', () => {
-    it('debe generar variables CSS válidas', () => {
+    it('debe generar variables CSS de marca', () => {
       const cssVars = useThemeStore.getState().generateCssVariables();
       
       expect(cssVars).toContain('--brand-50');
@@ -61,19 +58,26 @@ describe('ThemeStore', () => {
       expect(cssVars).toContain('--brand-bg');
     });
 
-    it('debe generar colores diferentes para tema oscuro', () => {
-      useThemeStore.getState().setTheme('dark');
-      const cssVars = useThemeStore.getState().generateCssVariables();
+    it('debe generar colores para tema claro', () => {
+      useThemeStore.getState().applyTenantTheme({
+        themeColor: '#ea580c',
+        mode: 'light',
+        accentIntensity: 'normal',
+      });
       
-      expect(cssVars).toContain('--bg-primary: rgb(');
-      expect(cssVars).toContain('--text-primary: #f8fafc');
+      const cssVars = useThemeStore.getState().generateCssVariables();
+      expect(cssVars).toContain('--bg-primary: #ffffff');
     });
 
-    it('debe contener colores de texto para tema claro', () => {
-      useThemeStore.getState().setTheme('light');
-      const cssVars = useThemeStore.getState().generateCssVariables();
+    it('debe generar colores para tema oscuro', () => {
+      useThemeStore.getState().applyTenantTheme({
+        themeColor: '#ea580c',
+        mode: 'dark',
+        accentIntensity: 'normal',
+      });
       
-      expect(cssVars).toContain('--text-primary: #0f172a');
+      const cssVars = useThemeStore.getState().generateCssVariables();
+      expect(cssVars).toContain('--text-primary: #f8fafc');
     });
   });
 
@@ -85,8 +89,12 @@ describe('ThemeStore', () => {
       expect(styleEl?.textContent).toContain('--brand-');
     });
 
-    it('debe agregar clase dark al documento en tema oscuro', () => {
-      useThemeStore.getState().setTheme('dark');
+    it('debe agregar clase dark al documento en modo oscuro', () => {
+      useThemeStore.getState().applyTenantTheme({
+        themeColor: '#ea580c',
+        mode: 'dark',
+        accentIntensity: 'normal',
+      });
       applyCssVariables();
       expect(document.documentElement.classList.contains('dark')).toBe(true);
     });

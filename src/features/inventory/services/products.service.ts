@@ -31,7 +31,7 @@ export async function getProductById(localId: string): Promise<Result<Product, A
     }
     
     return Ok(product);
-  } catch (error) {
+  } catch (_error) {
     return Err(new AppError('Error al obtener producto', 'GET_PRODUCT_ERROR', 500, { localId }));
   }
 }
