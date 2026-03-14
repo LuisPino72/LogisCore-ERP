@@ -108,10 +108,10 @@ export default function Dashboard() {
       border: "border-green-500/20",
     },
     amber: {
-      bg: "bg-amber-500/10",
-      text: "text-amber-400",
-      icon: "bg-amber-500/20",
-      border: "border-amber-500/20",
+      bg: "bg-(--brand-secondary-500,var(--brand-500))/10",
+      text: "text-(--brand-secondary-400,var(--brand-400))",
+      icon: "bg-(--brand-secondary-500,var(--brand-500))/20",
+      border: "border-(--brand-secondary-500,var(--brand-500))/20",
     },
     red: {
       bg: "bg-red-500/10",

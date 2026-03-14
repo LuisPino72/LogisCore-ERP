@@ -5,8 +5,16 @@ import { useToast } from '@/providers/ToastProvider'
 import {
   Search, LayoutGrid, List, ChevronDown, ChevronUp,
   Store, Hash, Users, Plus, Edit2, LogIn,
-  Building2, X, Check, Palette, Sun, Moon, Monitor
+  Building2, X, Check, Palette, KeyRound
 } from 'lucide-react'
+
+const ALL_MODULES = [
+  { id: 'sales', label: 'Ventas' },
+  { id: 'inventory', label: 'Inventario' },
+  { id: 'purchases', label: 'Compras' },
+  { id: 'recipes', label: 'Recetas' },
+  { id: 'pos', label: 'Punto de Venta' },
+] as const
 
 interface TenantModules {
   sales?: boolean
@@ -14,6 +22,8 @@ interface TenantModules {
   purchases?: boolean
   recipes?: boolean
   reports?: boolean
+  dashboard?: boolean
+  pos?: boolean
   [key: string]: boolean | undefined
 }
 
@@ -21,7 +31,7 @@ interface TenantConfig {
   logoUrl?: string
   maxEmployees?: number
   themeConfig?: TenantThemeConfig
-  [key: string]: unknown
+  ownerId?: string
 }
 
 interface Tenant {
@@ -45,10 +55,16 @@ export default function AdminPanel() {
   const [slug, setSlug] = useState('')
   const [loading, setLoading] = useState(false)
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteLoading, setInviteLoading] = useState(false)
+  const [ownerUsername, setOwnerUsername] = useState('')
+  const [ownerPassword, setOwnerPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [ownerLoading, setOwnerLoading] = useState(false)
   const { showError, showSuccess } = useToast()
   const startImpersonation = useTenantStore((state) => state.startImpersonation)
+
+  const getThemeConfig = (config: TenantConfig | undefined): TenantThemeConfig => {
+    return config?.themeConfig || { themeColor: '#ea580c', mode: 'dark', accentIntensity: 'normal' }
+  }
 
   useEffect(() => {
     fetchTenants()
@@ -77,7 +93,7 @@ export default function AdminPanel() {
       name: tenant.name,
       slug: tenant.slug,
       modules: tenant.modules,
-      config: tenant.config
+      config: tenant.config as unknown as Record<string, unknown>
     })
   }
 
@@ -139,27 +155,100 @@ export default function AdminPanel() {
     setLoading(false)
   }
 
-  const handleInviteOwner = async (tenantId: string) => {
-    if (!inviteEmail) {
-      showError('Ingresa un correo electrónico')
+  const handleCreateOwner = async () => {
+    if (!editingTenant) return
+    if (!ownerUsername.trim()) {
+      showError('El nombre de usuario es requerido')
       return
     }
-    setInviteLoading(true)
-    const { error } = await supabase.from('invitations').insert([{
-      tenant_id: tenantId,
-      email: inviteEmail,
-      role: 'owner'
-    }])
-    if (error) {
-      showError('Error invitando: ' + error.message)
-    } else {
-      showSuccess('Invitación enviada a ' + inviteEmail)
-      setInviteEmail('')
+    if (!ownerPassword || ownerPassword.length < 6) {
+      showError('La contraseña debe tener al menos 6 caracteres')
+      return
     }
-    setInviteLoading(false)
+    if (ownerPassword !== confirmPassword) {
+      showError('Las contraseñas no coinciden')
+      return
+    }
+
+    setOwnerLoading(true)
+    try {
+      const email = ownerUsername.trim()
+      
+      // Crear un cliente temporal que no persista la sesión para evitar que el admin actual sea desconectado
+      // Se utiliza un almacenamiento nulo para garantizar el aislamiento total
+      const tempClient = (await import('@supabase/supabase-js')).createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        { 
+          auth: { 
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+            storage: {
+              getItem: () => null,
+              setItem: () => {},
+              removeItem: () => {}
+            }
+          } 
+        }
+      )
+
+      const { data: authData, error: authError } = await tempClient.auth.signUp({
+        email,
+        password: ownerPassword,
+        options: {
+          data: {
+            username: ownerUsername,
+            tenant_id: editingTenant.id
+          }
+        }
+      })
+
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          showError('Ya existe un usuario con ese nombre')
+        } else {
+          showError('Error al crear usuario: ' + authError.message)
+        }
+        setOwnerLoading(false)
+        return
+      }
+
+      if (authData.user) {
+        const { error: roleError } = await supabase.from('user_roles').insert({
+          user_id: authData.user.id,
+          tenant_id: editingTenant.id,
+          role: 'owner'
+        })
+
+        if (roleError) {
+          showError('Error al asignar rol de dueño: ' + roleError.message)
+          setOwnerLoading(false)
+          return
+        }
+
+        const newConfig = { ...editingTenant.config, ownerId: authData.user.id }
+        const { error: updateError } = await supabase.from('tenants').update({
+          config: newConfig
+        }).eq('id', editingTenant.id)
+
+        if (updateError) {
+          showError('Error al actualizar tenant: ' + updateError.message)
+        } else {
+          setEditingTenant({ ...editingTenant, config: newConfig })
+          showSuccess(`Usuario "${ownerUsername}" creado exitosamente como dueño`)
+          setOwnerUsername('')
+          setOwnerPassword('')
+          setConfirmPassword('')
+        }
+      }
+    } catch (error) {
+      showError('Error al crear usuario owner')
+    }
+    setOwnerLoading(false)
   }
 
-  const getActiveModules = (tenant: Tenant) => Object.keys(tenant.modules || {}).filter(m => tenant.modules[m])
+
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('es-ES', {
@@ -170,12 +259,14 @@ export default function AdminPanel() {
   }
 
   const renderModuleBadges = (tenant: Tenant) => {
-    const modules = getActiveModules(tenant)
+    const activeModuleIds = Object.keys(tenant.modules || {}).filter(m => tenant.modules[m])
+    const modulesToShow = ALL_MODULES.filter(mod => activeModuleIds.includes(mod.id))
+    
     return (
       <div className="flex flex-wrap gap-1.5">
-        {modules.map(mod => (
-          <span key={mod} className="px-2 py-0.5 bg-(--brand-500)/10 text-(--brand-400) text-[10px] rounded-md uppercase tracking-wide border border-(--brand-500)/20 font-medium">
-            {mod}
+        {modulesToShow.map(mod => (
+          <span key={mod.id} className="px-2 py-0.5 bg-(--brand-500)/10 text-(--brand-400) text-[10px] rounded-md uppercase tracking-wide border border-(--brand-500)/20 font-medium">
+            {mod.label}
           </span>
         ))}
       </div>
@@ -245,7 +336,6 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Header con búsqueda y toggle */}
       {!editingTenant && (
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
           <div className="relative w-full sm:max-w-xs">
@@ -282,7 +372,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Formulario de Creación */}
       {!editingTenant ? (
         <section className="bg-(--bg-secondary) border border-(--border-color) rounded-2xl p-6 shadow-xl">
           <h3 className="text-lg font-semibold mb-5 text-(--brand-400) flex items-center gap-2">
@@ -398,29 +487,19 @@ export default function AdminPanel() {
                     <div className="flex gap-3">
                       <input
                         type="color"
-                        value={editingTenant.config?.themeConfig?.themeColor || '#ea580c'}
+                        value={getThemeConfig(editingTenant.config).themeColor}
                         onChange={(e) => {
-                          const newThemeConfig: TenantThemeConfig = {
-                            themeColor: e.target.value,
-                            mode: editingTenant.config?.themeConfig?.mode || 'dark',
-                            accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
-                            ...editingTenant.config?.themeConfig,
-                          };
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: newThemeConfig } });
+                          const tc = getThemeConfig(editingTenant.config)
+                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, themeColor: e.target.value } } })
                         }}
                         className="h-12 w-12 rounded-xl border-2 border-(--border-color) bg-(--bg-tertiary) cursor-pointer hover:scale-105 transition-transform"
                       />
                       <input
                         type="text"
-                        value={editingTenant.config?.themeConfig?.themeColor || '#ea580c'}
+                        value={getThemeConfig(editingTenant.config).themeColor}
                         onChange={(e) => {
-                          const newThemeConfig: TenantThemeConfig = {
-                            themeColor: e.target.value,
-                            mode: editingTenant.config?.themeConfig?.mode || 'dark',
-                            accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
-                            ...editingTenant.config?.themeConfig,
-                          };
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: newThemeConfig } });
+                          const tc = getThemeConfig(editingTenant.config)
+                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, themeColor: e.target.value } } })
                         }}
                         className="flex-1 bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) font-mono uppercase text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
                       />
@@ -431,99 +510,25 @@ export default function AdminPanel() {
                     <div className="flex gap-3">
                       <input
                         type="color"
-                        value={editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d'}
+                        value={getThemeConfig(editingTenant.config).themeColorSecondary || '#65a30d'}
                         onChange={(e) => {
-                          const newThemeConfig: TenantThemeConfig = {
-                            themeColor: editingTenant.config?.themeConfig?.themeColor || 'var(--brand-600)',
-                            themeColorSecondary: e.target.value,
-                            mode: editingTenant.config?.themeConfig?.mode || 'dark',
-                            accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
-                          };
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: newThemeConfig } });
+                          const tc = getThemeConfig(editingTenant.config)
+                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, themeColorSecondary: e.target.value } } })
                         }}
                         className="h-12 w-12 rounded-xl border-2 border-(--border-color) bg-(--bg-tertiary) cursor-pointer hover:scale-105 transition-transform"
                       />
                       <input
                         type="text"
-                        value={editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d'}
+                        value={getThemeConfig(editingTenant.config).themeColorSecondary || '#65a30d'}
                         onChange={(e) => {
-                          const newThemeConfig: TenantThemeConfig = {
-                            themeColor: editingTenant.config?.themeConfig?.themeColor || 'var(--brand-600)',
-                            themeColorSecondary: e.target.value,
-                            mode: editingTenant.config?.themeConfig?.mode || 'dark',
-                            accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
-                          };
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: newThemeConfig } });
+                          const tc = getThemeConfig(editingTenant.config)
+                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, themeColorSecondary: e.target.value } } })
                         }}
                         className="flex-1 bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) font-mono uppercase text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-(--text-muted) mb-2 font-medium">Modo</label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newThemeConfig: TenantThemeConfig = {
-                            themeColor: editingTenant.config?.themeConfig?.themeColor || '#ea580c',
-                            themeColorSecondary: editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d',
-                            mode: 'dark',
-                            accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
-                          };
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: newThemeConfig } });
-                        }}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                          (editingTenant.config?.themeConfig?.mode || 'dark') === 'dark'
-                            ? 'bg-linear-to-r from-(--brand-600) to-(--brand-500) text-white shadow-md'
-                            : 'bg-(--bg-tertiary) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
-                        }`}
-                      >
-                        <Moon className="w-4 h-4" />
-                        Oscuro
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newThemeConfig: TenantThemeConfig = {
-                            themeColor: editingTenant.config?.themeConfig?.themeColor || '#c2410c',
-                            themeColorSecondary: editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d',
-                            mode: 'light',
-                            accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
-                          };
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: newThemeConfig } });
-                        }}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                          editingTenant.config?.themeConfig?.mode === 'light'
-                            ? 'bg-linear-to-r from-(--brand-600) to-(--brand-500) text-white shadow-md'
-                            : 'bg-(--bg-tertiary) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
-                        }`}
-                      >
-                        <Sun className="w-4 h-4" />
-                        Claro
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newThemeConfig: TenantThemeConfig = {
-                            themeColor: editingTenant.config?.themeConfig?.themeColor || '#c2410c',
-                            themeColorSecondary: editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d',
-                            mode: 'system',
-                            accentIntensity: editingTenant.config?.themeConfig?.accentIntensity || 'normal',
-                          };
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: newThemeConfig } });
-                        }}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                          editingTenant.config?.themeConfig?.mode === 'system'
-                            ? 'bg-linear-to-r from-(--brand-600) to-(--brand-500) text-white shadow-md'
-                            : 'bg-(--bg-tertiary) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
-                        }`}
-                      >
-                        <Monitor className="w-4 h-4" />
-                        Sistema
-                      </button>
-                    </div>
-                  </div>
+
                   <div>
                     <label className="block text-xs text-(--text-muted) mb-2 font-medium">Intensidad del Color</label>
                     <div className="flex gap-2">
@@ -532,16 +537,11 @@ export default function AdminPanel() {
                           key={intensity}
                           type="button"
                           onClick={() => {
-                            const newThemeConfig: TenantThemeConfig = {
-                              themeColor: editingTenant.config?.themeConfig?.themeColor || '#ea580c',
-                              themeColorSecondary: editingTenant.config?.themeConfig?.themeColorSecondary || '#65a30d',
-                              mode: editingTenant.config?.themeConfig?.mode || 'dark',
-                              accentIntensity: intensity,
-                            };
-                            setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: newThemeConfig } });
+                            const tc = getThemeConfig(editingTenant.config)
+                            setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, accentIntensity: intensity } } })
                           }}
                           className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                            (editingTenant.config?.themeConfig?.accentIntensity || 'normal') === intensity
+                            getThemeConfig(editingTenant.config).accentIntensity === intensity
                               ? 'bg-linear-to-r from-(--brand-600) to-(--brand-500) text-white shadow-md'
                               : 'bg-(--bg-tertiary) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
                           }`}
@@ -557,7 +557,7 @@ export default function AdminPanel() {
                       <span
                         className="ml-2 px-3 py-1.5 rounded-lg font-medium inline-block"
                         style={{
-                          backgroundColor: editingTenant.config?.themeConfig?.themeColor || '#ea580c',
+                          backgroundColor: getThemeConfig(editingTenant.config).themeColor,
                           color: 'white'
                         }}
                       >
@@ -574,29 +574,29 @@ export default function AdminPanel() {
                 Módulos Activos
               </h4>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-(--bg-primary) p-5 rounded-xl border border-(--border-color)">
-                {['sales', 'inventory', 'purchases', 'recipes'].map(mod => (
+                {ALL_MODULES.map(mod => (
                   <label
-                    key={mod}
+                    key={mod.id}
                     className={`flex items-center gap-3 text-sm rounded-xl p-3 cursor-pointer transition-all ${
-                      editingTenant.modules?.[mod]
+                      editingTenant.modules?.[mod.id]
                         ? 'bg-(--brand-500)/10 text-(--brand-400) border border-(--brand-500)/30'
                         : 'text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-tertiary) border border-transparent'
                     }`}
                   >
                     <input
                       type="checkbox"
-                      checked={!!editingTenant.modules?.[mod]}
-                      onChange={(e) => setEditingTenant({ ...editingTenant, modules: { ...editingTenant.modules, [mod]: e.target.checked } })}
+                      checked={!!editingTenant.modules?.[mod.id]}
+                      onChange={(e) => setEditingTenant({ ...editingTenant, modules: { ...editingTenant.modules, [mod.id]: e.target.checked } })}
                       className="sr-only"
                     />
                     <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
-                      editingTenant.modules?.[mod]
+                      editingTenant.modules?.[mod.id]
                         ? 'bg-(--brand-500) border-(--brand-500)'
                         : 'border-(--border-color)'
                     }`}>
-                      {editingTenant.modules?.[mod] && <Check className="w-3 h-3 text-white" />}
+                      {editingTenant.modules?.[mod.id] && <Check className="w-3 h-3 text-white" />}
                     </div>
-                    <span className="capitalize font-medium">{mod}</span>
+                    <span className="capitalize font-medium">{mod.label}</span>
                   </label>
                 ))}
               </div>
@@ -611,32 +611,59 @@ export default function AdminPanel() {
           </form>
           <div className="pt-6 border-t border-(--border-color)">
             <h4 className="text-sm font-semibold text-(--text-primary) mb-4 flex items-center gap-2">
-              <Users className="w-4 h-4 text-(--text-muted)" />
-              Invitar Dueño (Owner)
+              <KeyRound className="w-4 h-4 text-(--text-muted)" />
+              Crear Usuario Owner
             </h4>
-            <div className="flex gap-3 max-w-md">
-              <input
-                type="email"
-                placeholder="correo@dueño.com"
-                className="flex-1 bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-              />
-              <button
-                disabled={inviteLoading}
-                onClick={() => handleInviteOwner(editingTenant.id)}
-                className="bg-(--bg-tertiary) hover:bg-(--bg-elevated) border border-(--border-color) text-(--text-primary) px-5 py-3 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 hover:border-(--brand-500)/30"
-              >
-                <Users className="w-4 h-4" />
-                Invitar
-              </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+              <div>
+                <label className="block text-xs text-(--text-muted) mb-1.5 font-medium">Nombre de Usuario</label>
+                <input
+                  type="text"
+                  placeholder="Ej: juan_admin"
+                  className="w-full bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
+                  value={ownerUsername}
+                  onChange={(e) => setOwnerUsername(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-(--text-muted) mb-1.5 font-medium">Contraseña</label>
+                <input
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
+                  value={ownerPassword}
+                  onChange={(e) => setOwnerPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-(--text-muted) mb-1.5 font-medium">Confirmar Contraseña</label>
+                <input
+                  type="password"
+                  placeholder="Repite la contraseña"
+                  className="w-full bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  disabled={ownerLoading || !!editingTenant.config?.ownerId}
+                  onClick={handleCreateOwner}
+                  className="w-full py-3 bg-(--brand-600) hover:bg-(--brand-500) disabled:bg-(--bg-tertiary) text-white rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:text-(--text-muted)"
+                >
+                  {ownerLoading ? 'Creando...' : editingTenant.config?.ownerId ? 'Owner ya creado' : <><KeyRound className="w-4 h-4" /> Crear Owner</>}
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-(--text-muted) mt-3">Solo puede registrarse un dueño por empresa. El usuario debe crear una cuenta usando el mismo correo para que el acceso se vincule automáticamente.</p>
+            <p className="text-xs text-(--text-muted) mt-3">
+              {editingTenant.config?.ownerId 
+                ? '✓ Ya existe un usuario owner para este negocio' 
+                : 'El usuario owner podrá iniciar sesión con las credenciales que proporciones. Solo puede haber un owner por empresa.'}
+            </p>
           </div>
         </section>
       )}
 
-      {/* Vista de Tenants */}
       {!editingTenant && (
         <>
           {filteredTenants.length === 0 ? (
@@ -724,9 +751,9 @@ export default function AdminPanel() {
                                 <div className="flex items-center gap-3">
                                   <div
                                     className="w-8 h-8 rounded-lg shadow-md"
-                                    style={{ backgroundColor: (t.config?.themeConfig as any)?.themeColor || '#c2410c' }}
+                                    style={{ backgroundColor: getThemeConfig(t.config).themeColor }}
                                   />
-                                  <span className="text-(--text-primary) font-mono text-sm">{(t.config?.themeConfig as any)?.themeColor || '#c2410c'}</span>
+                                  <span className="text-(--text-primary) font-mono text-sm">{getThemeConfig(t.config).themeColor}</span>
                                 </div>
                               </div>
                               <div>

@@ -170,7 +170,7 @@ export default function Reports() {
   const colorClasses: Record<string, string> = {
     green: "bg-green-500/10 text-green-400 border-green-500/20",
     blue: "bg-(--brand-500)/10 text-(--brand-400) border-(--brand-500)/20",
-    purple: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    purple: "bg-(--brand-secondary-500,var(--brand-500))/10 text-(--brand-secondary-400,var(--brand-400)) border-(--brand-secondary-500,var(--brand-500))/20",
     red: "bg-red-500/10 text-red-400 border-red-500/20",
   };
 
@@ -178,7 +178,7 @@ export default function Reports() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2">
             <BarChart3 className="w-6 h-6" />
             Reportes
           </h2>

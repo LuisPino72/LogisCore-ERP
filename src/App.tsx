@@ -12,20 +12,18 @@ import { db } from "@/lib/db";
 import {
   Package,
   ShoppingCart,
-  ShoppingBasket,
-  Menu,
-  X,
   LayoutDashboard,
+  ShoppingBag,
+  ShoppingBasket,
   ChefHat,
   BarChart3,
   Loader2,
+  Menu,
+  X,
+  LogOut,
   ChevronLeft,
   ChevronRight,
-  LogOut,
   Store,
-  ShoppingBag,
-  Sun,
-  Moon,
 } from "lucide-react";
 import Emblema from "@/assets/Emblema.ico";
 
@@ -64,12 +62,12 @@ function App() {
   const role = useTenantStore((state) => state.role);
   const tenant = useTenantStore((state) => state.currentTenant);
   const isImpersonating = useTenantStore((state) => state.isImpersonating);
+  const isAdminPanel = role === "super_admin" && !isImpersonating;
   const stopImpersonation = useTenantStore((state) => state.stopImpersonation);
   const theme = useThemeStore((state) => state.theme);
+  const setTheme = useThemeStore((state) => state.setTheme);
   const isTenantMode = useThemeStore((state) => state.isTenantMode);
-  const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const applyTenantTheme = useThemeStore((state) => state.applyTenantTheme);
-  const resetToSystem = useThemeStore((state) => state.resetToSystem);
   const [activeModule, setActiveModule] = useState<Module>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -82,16 +80,23 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (isImpersonating && tenant?.config?.themeConfig) {
+    // Aplicar tema del tenant si hay uno configurado
+    if (tenant?.config && typeof tenant.config === 'object' && 'themeConfig' in tenant.config) {
       applyTenantTheme(tenant.config.themeConfig as TenantThemeConfig);
-    } else if (!isImpersonating && isTenantMode) {
-      resetToSystem();
-    }
-  }, [isImpersonating, tenant, applyTenantTheme, resetToSystem, isTenantMode]);
+    } 
+  }, [isImpersonating, tenant, role, applyTenantTheme, isTenantMode]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-  }, [theme]);
+    // Solo aplicar clase .dark si NO es el panel administrativo y NO es el login
+    const isSystemView = isAdminPanel || !role;
+    
+    // Si estamos en vista de sistema y el tema está en dark, forzar light
+    if (isSystemView && theme === 'dark') {
+      setTheme('light');
+    }
+    
+    document.documentElement.classList.toggle("dark", theme === "dark" && !isSystemView);
+  }, [theme, isAdminPanel, role, setTheme]);
 
   const loadTenantData = useCallback(
     async (tenantSlug: string) => {
@@ -266,12 +271,12 @@ function App() {
               </span>
             </div>
           )}
-          <div className="flex items-center justify-between bg-(--brand-900)/20 border border-(--brand-500)/30 rounded-lg p-4">
+          <div className="flex items-center justify-between bg-(--brand-500)/10 border border-(--brand-500)/30 rounded-lg p-4">
             <div>
               <span className="text-(--brand-400) font-medium">
                 Gestionando:
               </span>
-              <span className="text-white ml-2 font-semibold">
+              <span className="text-(--text-primary) ml-2 font-semibold">
                 {tenant.name}
               </span>
             </div>
@@ -289,9 +294,9 @@ function App() {
     return (
       <>
         {isLoadingData && (
-          <div className="flex items-center gap-3 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-4">
-            <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-            <span className="text-blue-400">
+          <div className="flex items-center gap-3 bg-(--brand-500)/10 border border-(--brand-500)/30 rounded-lg p-4 mb-4">
+            <Loader2 className="w-5 h-5 text-(--brand-400) animate-spin" />
+            <span className="text-(--brand-400)">
               Cargando datos de {tenant?.name}...
             </span>
           </div>
@@ -378,18 +383,18 @@ function App() {
     }
   };
 
-  const isAdminPanel = role === "super_admin" && !isImpersonating;
+
 
   const Sidebar = () => (
     <aside
-      className={`fixed left-0 top-0 h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 z-50 ${
+      className={`fixed left-0 top-0 h-screen bg-(--bg-secondary) border-r border-(--border-color) flex flex-col transition-all duration-300 z-50 ${
         sidebarCollapsed ? "w-16" : "w-60"
       } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-      <div className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+      <div className="p-4 flex items-center justify-between border-b border-(--border-color)">
         {!sidebarCollapsed && (
           <div className="flex items-center gap-3">
             <img src={Emblema} alt="LogisCore" className="w-8 h-8 rounded-lg" />
-            <span className="font-bold text-slate-900 dark:text-white">
+            <span className="font-bold text-(--text-primary)">
               LogisCore
             </span>
           </div>
@@ -403,7 +408,7 @@ function App() {
         )}
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className={`hidden lg:flex items-center justify-center w-6 h-6 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors ${sidebarCollapsed ? "absolute -right-3 top-4" : ""}`}>
+          className={`hidden lg:flex items-center justify-center w-6 h-6 rounded-md bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors ${sidebarCollapsed ? "absolute -right-3 top-4" : ""}`}>
           {sidebarCollapsed ? (
             <ChevronRight className="w-4 h-4" />
           ) : (
@@ -416,18 +421,14 @@ function App() {
         <ul className="space-y-1 px-2">
           {allModules
             .filter((mod) => {
+              // Dashboard y Reportes siempre visibles (por defecto)
               if (mod.id === "dashboard" || mod.id === "reports") return true;
-              const moduleMap: Record<string, string> = {
-                inventory: "inventory",
-                sales: "sales",
-                purchases: "purchases",
-                recipes: "recipes",
-              };
-              const tenantModule = moduleMap[mod.id];
+              
+              // Para el resto, verificar si están activos en el tenant
               const modules = tenant?.modules as
                 | Record<string, boolean>
                 | undefined;
-              return tenantModule && modules?.[tenantModule];
+              return modules?.[mod.id] === true;
             })
             .map((mod) => (
               <li key={mod.id}>
@@ -438,8 +439,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                     activeModule === mod.id
-                      ? "bg-(--brand-600) text-white"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                      ? "bg-(--brand-600) text-white shadow-lg shadow-(--brand-600)/20"
+                      : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-tertiary)"
                   }`}
                   title={sidebarCollapsed ? mod.label : undefined}>
                   <mod.icon className="w-5 h-5 shrink-0" />
@@ -452,11 +453,11 @@ function App() {
         </ul>
       </nav>
 
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+      <div className="p-4 border-t border-(--border-color)">
         {!sidebarCollapsed ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden">
+              <div className="w-8 h-8 bg-(--bg-tertiary) rounded-lg flex items-center justify-center overflow-hidden">
                 {tenant?.config &&
                 typeof tenant.config === "object" &&
                 "logoUrl" in tenant.config &&
@@ -471,15 +472,15 @@ function App() {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                <p className="text-sm font-medium text-(--text-primary) truncate">
                   {tenant?.name}
                 </p>
-                <p className="text-xs text-slate-500 capitalize">{role}</p>
+                <p className="text-xs text-(--text-muted) capitalize">{role}</p>
               </div>
             </div>
             <button
               onClick={() => useTenantStore.getState().clear()}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors text-sm">
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) rounded-lg transition-colors text-sm">
               <LogOut className="w-4 h-4" />
               Cerrar Sesión
             </button>
@@ -487,7 +488,7 @@ function App() {
         ) : (
           <button
             onClick={() => useTenantStore.getState().clear()}
-            className="w-full flex items-center justify-center p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors"
+            className="w-full flex items-center justify-center p-2 bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) rounded-lg transition-colors"
             title="Cerrar Sesión">
             <LogOut className="w-5 h-5" />
           </button>
@@ -497,13 +498,13 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-white">
-      {!isAdminPanel && <Sidebar />}
+    <div className={`min-h-screen ${isAdminPanel || !role ? 'system-fixed-theme' : 'bg-(--bg-primary) text-(--text-primary)'}`}>
+      {!isAdminPanel && role && <Sidebar />}
 
       <div
         className={`transition-all duration-300 ${isAdminPanel ? "" : sidebarCollapsed ? "lg:ml-16" : "lg:ml-60"}`}>
         {!isAdminPanel && (
-          <header className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+          <header className="border-b border-(--border-color) bg-(--bg-secondary)/80 backdrop-blur-sm sticky top-0 z-40">
             <div className="px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <button
@@ -516,7 +517,7 @@ function App() {
                   )}
                 </button>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+                  <h1 className="text-xl font-bold text-(--text-primary)">
                     {allModules.find((m) => m.id === activeModule)?.label ||
                       "LogisCore"}
                   </h1>
@@ -524,17 +525,8 @@ function App() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button
-                  onClick={toggleTheme}
-                  className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                  title={theme === "dark" ? "Modo claro" : "Modo oscuro"}>
-                  {theme === "dark" ? (
-                    <Sun className="w-5 h-5" />
-                  ) : (
-                    <Moon className="w-5 h-5" />
-                  )}
-                </button>
-                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-blue-500 dark:text-blue-400 border border-slate-200 dark:border-blue-500/30">
+
+                <span className="px-3 py-1 bg-(--brand-500)/10 rounded-full text-xs font-medium uppercase tracking-wider text-(--brand-400) border border-(--brand-500)/30">
                   {role}
                 </span>
                 {isImpersonating && (
@@ -548,7 +540,7 @@ function App() {
         )}
 
         {isAdminPanel && (
-          <header className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+          <header className="border-b border-(--border-color) bg-(--bg-secondary)/80 backdrop-blur-sm sticky top-0 z-40">
             <div className="px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <img
@@ -557,31 +549,22 @@ function App() {
                   className="w-8 h-8 rounded-lg"
                 />
                 <div>
-                  <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+                  <h1 className="text-xl font-bold text-(--text-primary)">
                     Administración
                   </h1>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-(--text-muted)">
                     Gestión de tenants y sistema
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={toggleTheme}
-                  className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                  title={theme === "dark" ? "Modo claro" : "Modo oscuro"}>
-                  {theme === "dark" ? (
-                    <Sun className="w-5 h-5" />
-                  ) : (
-                    <Moon className="w-5 h-5" />
-                  )}
-                </button>
-                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-medium uppercase tracking-wider text-purple-500 dark:text-purple-400 border border-slate-200 dark:border-purple-500/30">
+
+                <span className="px-3 py-1 bg-(--brand-500)/10 rounded-full text-xs font-medium uppercase tracking-wider text-(--brand-400) border border-(--brand-500)/30">
                   {role}
                 </span>
                 <button
                   onClick={() => useTenantStore.getState().clear()}
-                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                  className="text-xs text-(--text-muted) hover:text-(--text-primary) transition-colors">
                   Cerrar Sesión
                 </button>
               </div>

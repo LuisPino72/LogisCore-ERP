@@ -1,29 +1,9 @@
 import { useState } from "react";
 import { supabase } from "../../../services/supabase";
-import { useTenantStore } from "../../../store/useTenantStore";
+import { useTenantStore, TenantConfig } from "../../../store/useTenantStore";
 import { useToast } from "../../../providers/ToastProvider";
 import { User, Lock, Loader2, ArrowLeft } from "lucide-react";
 import Emblema from "../../../assets/Emblema.ico";
-
-interface TenantData {
-  id: string;
-  name: string;
-  slug: string;
-  modules: {
-    sales: boolean;
-    inventory: boolean;
-    purchases: boolean;
-    recipes: boolean;
-    reports: boolean;
-  };
-  config?: Record<string, unknown>;
-}
-
-interface RoleData {
-  role: "super_admin" | "owner" | "employee";
-  tenants: TenantData;
-}
-
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -82,21 +62,47 @@ export default function Login() {
     }
 
     if (data.user) {
-      const { data: roleData } = (await supabase
+      const { data: roles } = await supabase
         .from("user_roles")
-        .select("role, tenants(*)")
-        .eq("user_id", data.user.id)
-        .single()) as { data: RoleData | null };
+        .select(`
+          role,
+          tenants (
+            id,
+            name,
+            slug,
+            modules,
+            config
+          )
+        `)
+        .eq("user_id", data.user.id);
 
-      if (roleData) {
-        setRole(roleData.role);
-        if (roleData.tenants) {
-          setTenant(roleData.tenants);
+      if (roles && roles.length > 0) {
+        // Prioridad: 1. super_admin, 2. owner, 3. primero encontrado
+        const preferredRole = 
+          roles.find((r) => r.role === "super_admin") || 
+          roles.find((r) => r.role === "owner") || 
+          roles[0];
+        
+        setRole(preferredRole.role as any);
+        
+        if (preferredRole.role === 'super_admin') {
+          setTenant(null);
+          showSuccess("Panel de Administración de LogisCore");
+        } else {
+          // Manejar que 'tenants' puede venir como objeto o array
+          const rawTenant = preferredRole.tenants;
+          const tenantData = Array.isArray(rawTenant) ? rawTenant[0] : rawTenant;
+          
+          if (tenantData) {
+            setTenant(tenantData as unknown as TenantConfig);
+            showSuccess(`¡Bienvenido a ${tenantData.name}!`);
+          } else {
+            showError("No se encontró información de la empresa.");
+          }
         }
-        showSuccess("¡Bienvenido a LogisCore!");
       } else {
         showError(
-          "Tu usuario no tiene un tenant asignado. Contacta al administrador.",
+          "Tu usuario no tiene un rol o empresa asignada. Contacta al administrador.",
         );
         await supabase.auth.signOut();
       }

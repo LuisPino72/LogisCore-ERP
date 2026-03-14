@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-interface TenantModules {
+export interface TenantModules {
   sales?: boolean
   inventory?: boolean
   purchases?: boolean
   recipes?: boolean
   reports?: boolean
+  pos?: boolean
   [key: string]: boolean | undefined
 }
 
@@ -17,7 +18,7 @@ export interface TenantThemeConfig {
   accentIntensity: 'subtle' | 'normal' | 'bold'
 }
 
-interface TenantConfig {
+export interface TenantConfig {
   id: string
   name: string
   slug: string

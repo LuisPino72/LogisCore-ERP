@@ -9,21 +9,16 @@ interface ThemeState {
   theme: Theme;
   themeColor: string;
   themeColorSecondary: string;
-  mode: 'dark' | 'light' | 'system';
   accentIntensity: AccentIntensity;
   isTenantMode: boolean;
-  systemTheme: Theme;
   
-  toggleTheme: () => void;
-  setTheme: (theme: Theme) => void;
   applyTenantTheme: (config: TenantThemeConfig) => void;
-  resetToSystem: () => void;
+  setTheme: (theme: Theme) => void;
   generateCssVariables: () => string;
-  getEffectiveTheme: () => Theme;
 }
 
-const DEFAULT_THEME_COLOR = '#3b82f6';
-const DEFAULT_SECONDARY_COLOR = '#8b5cf6';
+const DEFAULT_THEME_COLOR = '#ea580c';
+const DEFAULT_SECONDARY_COLOR = '#f97316';
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -75,50 +70,32 @@ function generateColorPalette(baseColor: string, intensity: AccentIntensity): Re
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      theme: 'dark',
+      theme: 'light',
       themeColor: DEFAULT_THEME_COLOR,
       themeColorSecondary: DEFAULT_SECONDARY_COLOR,
-      mode: 'dark',
       accentIntensity: 'normal',
       isTenantMode: false,
-      systemTheme: 'dark',
 
-      toggleTheme: () => set((state) => ({ 
-        theme: state.theme === 'dark' ? 'light' : 'dark' 
-      })),
+      setTheme: (theme: Theme) => {
+        set({ theme });
+        applyCssVariables();
+      },
 
-      setTheme: (theme) => set({ theme }),
+
 
       applyTenantTheme: (config: TenantThemeConfig) => {
-        const state = get();
-        const effectiveTheme = config.mode === 'system' 
-          ? state.systemTheme 
-          : config.mode;
-
         set({
           themeColor: config.themeColor || DEFAULT_THEME_COLOR,
           themeColorSecondary: config.themeColorSecondary || DEFAULT_SECONDARY_COLOR,
-          mode: config.mode,
           accentIntensity: config.accentIntensity || 'normal',
-          theme: effectiveTheme,
+          theme: config.mode === 'dark' ? 'dark' : 'light',
           isTenantMode: true,
         });
 
         applyCssVariables();
       },
 
-      resetToSystem: () => {
-        set({
-          themeColor: DEFAULT_THEME_COLOR,
-          themeColorSecondary: DEFAULT_SECONDARY_COLOR,
-          mode: 'dark',
-          accentIntensity: 'normal',
-          theme: 'dark',
-          isTenantMode: false,
-        });
 
-        applyCssVariables();
-      },
 
       generateCssVariables: () => {
         const state = get();
@@ -126,22 +103,20 @@ export const useThemeStore = create<ThemeState>()(
         const secondaryPalette = generateColorPalette(state.themeColorSecondary, state.accentIntensity);
         const isDark = state.theme === 'dark';
 
-        // Base background calculation - Optimized for professional dark mode
-        // Instead of pure brand-derived black, we use a very deep slate tinted with the brand color
-        const baseDark = { r: 15, g: 23, b: 42 }; // deep slate base
-        const brandRgb = hexToRgb(state.themeColor) || { r: 59, g: 130, b: 246 };
+        // Base dark background calculation
+        const baseDark = { r: 9, g: 9, b: 11 }; // Zinc-950 base
+        const brandRgb = hexToRgb(state.themeColor) || { r: 234, g: 88, b: 12 };
         
-        // Blend function: (base * 0.9 + brand * 0.1)
         const blend = (c1: number, c2: number, factor: number) => Math.round(c1 * (1 - factor) + c2 * factor);
         
-        const tintedR = blend(baseDark.r, brandRgb.r, 0.08);
-        const tintedG = blend(baseDark.g, brandRgb.g, 0.08);
-        const tintedB = blend(baseDark.b, brandRgb.b, 0.12);
+        const tintedR = blend(baseDark.r, brandRgb.r, 0.05);
+        const tintedG = blend(baseDark.g, brandRgb.g, 0.05);
+        const tintedB = blend(baseDark.b, brandRgb.b, 0.05);
         
         const darkBgPrimary = `rgb(${tintedR}, ${tintedG}, ${tintedB})`;
-        const darkBgSecondary = `rgb(${tintedR + 5}, ${tintedG + 7}, ${tintedB + 10})`;
-        const darkBgTertiary = `rgb(${tintedR + 10}, ${tintedG + 15}, ${tintedB + 20})`;
-        const darkBgElevated = `rgb(${tintedR + 15}, ${tintedG + 22}, ${tintedB + 30})`;
+        const darkBgSecondary = `rgb(${tintedR + 10}, ${tintedG + 10}, ${tintedB + 10})`;
+        const darkBgTertiary = `rgb(${tintedR + 20}, ${tintedG + 20}, ${tintedB + 20})`;
+        const darkBgElevated = `rgb(${tintedR + 30}, ${tintedG + 30}, ${tintedB + 30})`;
 
         return `
           --brand-50: ${palette['50']};
@@ -181,14 +156,6 @@ export const useThemeStore = create<ThemeState>()(
           --border-subtle: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)'};
         `.trim();
       },
-
-      getEffectiveTheme: () => {
-        const state = get();
-        if (state.mode === 'system') {
-          return state.systemTheme;
-        }
-        return state.theme;
-      },
     }),
     {
       name: 'logiscore-theme',
@@ -196,7 +163,6 @@ export const useThemeStore = create<ThemeState>()(
         theme: state.theme,
         themeColor: state.themeColor,
         themeColorSecondary: state.themeColorSecondary,
-        mode: state.mode,
         accentIntensity: state.accentIntensity,
         isTenantMode: state.isTenantMode,
       }),
@@ -217,7 +183,7 @@ export function applyCssVariables() {
   
   styleEl.textContent = `:root { ${cssVars} }`;
   
-  const isDark = state.getEffectiveTheme() === 'dark';
+  const isDark = state.theme === 'dark';
   document.documentElement.classList.toggle('dark', isDark);
 }
 

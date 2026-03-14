@@ -35,6 +35,50 @@
   --brand-950: #431407;
 }
 
+.dark {
+  --bg-primary: #09090b;
+  --bg-secondary: #18181b;
+  --bg-tertiary: #27272a;
+  --bg-elevated: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Fixed Theme for System Components (Login & AdminPanel) */
+.system-fixed-theme {
+  color-scheme: light !important;
+  --bg-primary: #fdfcfb !important;
+  --bg-secondary: #ffffff !important;
+  --bg-tertiary: #f9f8f6 !important;
+  --bg-elevated: #ffffff !important;
+  --text-primary: #1c1917 !important;
+  --text-secondary: #57534e !important;
+  --text-muted: #a8a29e !important;
+  --border-color: #e7e5e4 !important;
+  
+  --brand-50: #fff7ed !important;
+  --brand-100: #ffedd5 !important;
+  --brand-200: #fed7aa !important;
+  --brand-300: #fdba74 !important;
+  --brand-400: #fb923c !important;
+  --brand-500: #ea580c !important; 
+  --brand-600: #c2410c !important;
+  --brand-700: #9a3412 !important;
+  --brand-800: #7c2d12 !important;
+  --brand-900: #7c2d12 !important;
+  --brand-950: #431407 !important;
+
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.system-fixed-theme .dark, 
+.system-fixed-theme [class*="dark:"] {
+  /* Intentional override to disable dark variants inside system fixed theme */
+}
+
 body {
   font-family: var(--font-inter);
   background-color: var(--bg-primary);

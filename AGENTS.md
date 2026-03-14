@@ -56,20 +56,40 @@ src/
 │   ├── Card.tsx
 │   └── index.ts
 │
-├── features/                  # Feature-based modules (domain logic)
+├── features/                  # Feature-based modules
+│   ├── adminpanel/
+│   │   ├── components/AdminPanel.tsx
+│   │   └── index.ts
 │   ├── auth/
 │   │   ├── components/Login.tsx
+│   │   ├── components/UpdatePassword.tsx
+│   │   ├── components/SyncStatus.tsx
+│   │   └── index.ts
+│   ├── dashboard/
+│   │   ├── components/Dashboard.tsx
 │   │   └── index.ts
 │   ├── inventory/
 │   │   ├── components/Inventory.tsx
 │   │   ├── services/products.service.ts
 │   │   └── index.ts
 │   ├── pos/
+│   │   ├── components/POS.tsx
+│   │   └── index.ts
 │   ├── sales/
+│   │   ├── components/Sales.tsx
+│   │   └── index.ts
 │   ├── purchases/
+│   │   ├── components/Purchases.tsx
+│   │   └── index.ts
 │   ├── recipes/
+│   │   ├── components/Recipes.tsx
+│   │   └── index.ts
 │   ├── reports/
+│   │   ├── components/Reports.tsx
+│   │   └── index.ts
 │   └── employees/
+│       ├── components/Employees.tsx
+│       └── index.ts
 │
 ├── lib/                       # Infrastructure
 │   ├── supabase.ts           # Supabase client
@@ -90,23 +110,26 @@ src/
 ├── types/                    # Global types
 │   └── result.ts             # Result<T>, AppError, etc.
 │
-├── components/               # Standalone components (non-features)
-│   ├── AdminPanel.tsx
-│   ├── Dashboard.tsx
-│   ├── SyncStatus.tsx
-│   ├── pos/POS.tsx
-│   ├── sales/Sales.tsx
-│   ├── purchases/Purchases.tsx
-│   ├── recipes/Recipes.tsx
-│   ├── reports/Reports.tsx
-│   ├── employees/Employees.tsx
-│   └── inventory/Inventory.tsx
+├── services/                 # Legacy services (being migrated)
+│   ├── products.service.ts
+│   ├── supabase.ts
+│   ├── sync/
+│   │   └── SyncEngine.ts
+│   └── events/
+│       └── EventBus.ts
 │
-└── test/                     # Test files
-    ├── setup.ts
-    ├── components.test.tsx
-    ├── business-logic.test.ts
-    └── EventBus.test.ts
+├── assets/                   # Static assets
+│   └── Emblema.ico
+│
+├── test/                     # Test files
+│   ├── setup.ts
+│   ├── components.test.tsx
+│   ├── business-logic.test.ts
+│   └── EventBus.test.ts
+│
+├── App.tsx                  # Main app component
+├── main.tsx                 # Entry point
+└── index.css               # Global styles
 ```
 
 ## Modules
