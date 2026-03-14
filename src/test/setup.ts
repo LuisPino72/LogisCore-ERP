@@ -16,3 +16,11 @@ Object.defineProperty(window, 'crypto', {
     randomUUID: () => Math.random().toString(36).substring(2, 15),
   },
 });
+
+const localStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+};
+Object.defineProperty(window, 'localStorage', { value: localStorageMock });
