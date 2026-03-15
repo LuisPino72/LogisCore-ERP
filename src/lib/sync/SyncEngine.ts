@@ -254,19 +254,39 @@ class SyncEngineClass {
     return result;
   }
 
+  private toSnakeCase(obj: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const key in obj) {
+      const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      if (obj[key] instanceof Date) {
+        result[snakeKey] = (obj[key] as Date).toISOString();
+      } else if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+        result[snakeKey] = this.toSnakeCase(obj[key] as Record<string, unknown>);
+      } else {
+        result[snakeKey] = obj[key];
+      }
+    }
+    return result;
+  }
+
   private async processItem(item: SyncQueueItem): Promise<void> {
     await db.syncQueue.update(item.id!, { status: 'syncing' });
+
+    const snakeCaseData = this.toSnakeCase(item.data);
 
     const syncOperation = async () => {
       const { error } = await supabase.rpc('sync_table_item', {
         p_table: item.tableName,
         p_operation: item.operation,
-        p_data: item.data,
+        p_data: snakeCaseData,
         p_local_id: item.localId,
-        p_tenant_slug: item.tenantId, // we store the slug in the queue
+        p_tenant_slug: item.tenantId,
       });
 
-      if (error) throw error;
+      if (error) {
+        logger.error('Sync RPC error', error, { category: logCategories.SYNC });
+        throw error;
+      }
     };
 
     await this.retryOperation(syncOperation, `sync ${item.tableName}:${item.operation}`);

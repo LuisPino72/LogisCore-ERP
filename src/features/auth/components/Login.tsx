@@ -77,7 +77,6 @@ export default function Login() {
         .eq("user_id", data.user.id);
 
       if (roles && roles.length > 0) {
-        // Prioridad: 1. super_admin, 2. owner, 3. primero encontrado
         const preferredRole = 
           roles.find((r) => r.role === "super_admin") || 
           roles.find((r) => r.role === "owner") || 
@@ -89,11 +88,20 @@ export default function Login() {
           setTenant(null);
           showSuccess("Panel de Administración de LogisCore");
         } else {
-          // Manejar que 'tenants' puede venir como objeto o array
           const rawTenant = preferredRole.tenants;
-          const tenantData = Array.isArray(rawTenant) ? rawTenant[0] : rawTenant;
+          let tenantData = Array.isArray(rawTenant) ? rawTenant[0] : rawTenant;
           
           if (tenantData) {
+            const { data: tenantRows } = await supabase
+              .from("tenants")
+              .select("id")
+              .eq("slug", tenantData.slug)
+              .single();
+            
+            if (tenantRows) {
+              tenantData = { ...tenantData, id: tenantRows.id };
+            }
+            
             setTenant(tenantData as unknown as TenantConfig);
             showSuccess(`¡Bienvenido a ${tenantData.name}!`);
           } else {

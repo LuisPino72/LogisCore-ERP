@@ -3,6 +3,7 @@ import { Product, Category, db } from "../../../lib/db";
 import { useTenantStore } from "../../../store/useTenantStore";
 import { createSale } from "../../sales/services/sales.service";
 import { updateStock } from "../../inventory/services/products.service";
+import { getExchangeRate, formatBs } from "../../exchange-rate/services/exchangeRate.service";
 import { isOk } from "../../../types/result";
 import { useToast } from "../../../providers/ToastProvider";
 import Card from "../../../common/Card";
@@ -17,6 +18,7 @@ import {
   Banknote,
   Package,
   Search,
+  Star,
 } from "lucide-react";
 
 interface CartItem {
@@ -32,8 +34,19 @@ export default function POS() {
   const [selectedCategory, setSelectedCategory] = useState<number | string>("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
   const [showCheckout, setShowCheckout] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState<number>(0);
   const tenant = useTenantStore((state) => state.currentTenant);
   const { showError, showSuccess } = useToast();
+
+  useEffect(() => {
+    const loadExchangeRate = async () => {
+      const rate = await getExchangeRate();
+      if (rate) {
+        setExchangeRate(rate.rate);
+      }
+    };
+    loadExchangeRate();
+  }, []);
 
   const loadProducts = useCallback(async () => {
     if (!tenant?.slug) return;
@@ -50,7 +63,7 @@ export default function POS() {
   }, [loadProducts]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    const filtered = products.filter((p) => {
       const matchesSearch =
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.sku.toLowerCase().includes(search.toLowerCase());
@@ -58,7 +71,24 @@ export default function POS() {
         !selectedCategory || p.categoryId === Number(selectedCategory);
       return matchesSearch && matchesCategory && p.isActive && p.stock > 0;
     });
+    
+    return filtered.sort((a, b) => {
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      return a.name.localeCompare(b.name);
+    });
   }, [products, search, selectedCategory]);
+
+  const toggleFavorite = async (e: React.MouseEvent, product: Product) => {
+    e.stopPropagation();
+    const newFavorite = !product.isFavorite;
+    await db.products.update(product.localId, { isFavorite: newFavorite });
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.localId === product.localId ? { ...p, isFavorite: newFavorite } : p
+      )
+    );
+  };
 
   const addToCart = (product: Product) => {
     setCart((prev) => {
@@ -127,6 +157,8 @@ export default function POS() {
         tax: 0,
         total: cartTotal,
         paymentMethod,
+        exchangeRate: exchangeRate > 0 ? exchangeRate : undefined,
+        exchangeRateSource: exchangeRate > 0 ? 'api' : undefined,
       });
 
       if (!isOk(saleResult)) {
@@ -159,7 +191,7 @@ export default function POS() {
     if (stock === 0) return "text-red-400";
     if (stock <= 5) return "text-red-400";
     if (stock <= 10) return "text-amber-400";
-    return "text-(--text-muted)";
+    return "text-slate-500";
   };
 
   return (
@@ -203,29 +235,45 @@ export default function POS() {
             </div>
           ) : (
             filteredProducts.map((product) => (
-              <button
+              <div
                 key={product.localId}
                 onClick={() => addToCart(product)}
-                disabled={product.stock === 0}
-                className="bg-(--bg-secondary) border border-(--border-color) rounded-xl p-4 text-left hover:border-(--brand-500) hover:bg-(--bg-tertiary)/50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed">
-                <div className="h-16 bg-(--bg-tertiary) rounded-lg mb-3 flex items-center justify-center">
-                  <Package className="w-8 h-8 text-(--text-muted)" />
+                className="bg-(--bg-secondary) border border-(--border-color) rounded-xl overflow-hidden text-left hover:border-(--brand-500) hover:bg-(--bg-tertiary)/50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed aspect-square flex flex-col cursor-pointer">
+                <div className="relative h-[60%] bg-(--bg-tertiary) flex items-center justify-center overflow-hidden">
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Package className="w-10 h-10 text-(--text-muted)" />
+                  )}
+                  <button
+                    onClick={(e) => toggleFavorite(e, product)}
+                    className={`absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-sm transition-colors ${
+                      product.isFavorite ? 'text-amber-400' : 'text-slate-400 hover:text-amber-200'
+                    }`}>
+                    <Star className={`w-4 h-4 ${product.isFavorite ? 'fill-current' : ''}`} />
+                  </button>
                 </div>
-                <h3 className="font-medium text-(--text-primary) truncate text-sm">
-                  {product.name}
-                </h3>
-                <p className="text-xs text-(--text-muted) mb-2 font-mono">
-                  {product.sku}
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-green-400 font-bold">
-                    ${product.price.toFixed(2)}
-                  </span>
-                  <span className={`text-xs ${getStockStatus(product.stock)}`}>
-                    {product.stock}
-                  </span>
+                <div className="flex-1 p-3 flex flex-col justify-between">
+                  <h3 className="font-semibold text-(--text-primary) truncate text-sm leading-tight">
+                    {product.name}
+                  </h3>
+                  <div className="flex items-end justify-between mt-2">
+                    <div>
+                      <span className="text-green-400 font-bold text-base">
+                        ${product.price.toFixed(2)}
+                      </span>
+                      {exchangeRate > 0 && (
+                        <span className="block text-xs text-blue-400">
+                          {formatBs(product.price * exchangeRate)}
+                        </span>
+                      )}
+                    </div>
+                    <span className={`text-xs ${getStockStatus(product.stock)}`}>
+                      Stock: {product.stock}
+                    </span>
+                  </div>
                 </div>
-              </button>
+              </div>
             ))
           )}
         </div>
@@ -276,6 +324,11 @@ export default function POS() {
                     <p className="text-green-400 text-xs">
                       ${item.product.price.toFixed(2)} c/u
                     </p>
+                    {exchangeRate > 0 && (
+                      <p className="text-blue-400 text-xs">
+                        {formatBs(item.product.price * exchangeRate)} c/u
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -312,6 +365,12 @@ export default function POS() {
               <span>Subtotal</span>
               <span>${cartTotal.toFixed(2)}</span>
             </div>
+            {exchangeRate > 0 && (
+              <div className="flex justify-between text-blue-400 text-sm">
+                <span>En Bs.</span>
+                <span>{formatBs(cartTotal * exchangeRate)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-lg font-bold text-white">
               <span>Total</span>
               <span className="text-green-400">${cartTotal.toFixed(2)}</span>
@@ -347,6 +406,11 @@ export default function POS() {
                 <p className="text-4xl font-bold text-green-400">
                   ${cartTotal.toFixed(2)}
                 </p>
+                {exchangeRate > 0 && (
+                  <p className="text-blue-400 text-lg mt-1">
+                    {formatBs(cartTotal * exchangeRate)}
+                  </p>
+                )}
                 <p className="text-slate-500 text-sm mt-1">
                   {cartCount} productos
                 </p>

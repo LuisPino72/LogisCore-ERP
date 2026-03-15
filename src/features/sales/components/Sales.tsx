@@ -1,6 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTenantStore } from "../../../store/useTenantStore";
-import { db, Sale } from "../../../services/db";
+import { db, Sale } from "../../../lib/db";
+import { cancelSale } from "../services/sales.service";
+import { formatBs } from "../../exchange-rate/services/exchangeRate.service";
+import { isOk } from "../../../types/result";
+import { useToast } from "../../../providers/ToastProvider";
+import { logger, logCategories } from "../../../lib/logger";
 import Card from "../../../common/Card";
 import {
   ShoppingBag,
@@ -15,6 +20,10 @@ import {
   Eye,
   TrendingUp,
   Receipt,
+  ChevronLeft,
+  ChevronRight,
+  Ban,
+  Loader2,
 } from "lucide-react";
 
 type DateRange = "today" | "week" | "month" | "all";
@@ -22,28 +31,40 @@ type PaymentFilter = "all" | "cash" | "card";
 
 export default function Sales() {
   const [sales, setSales] = useState<Sale[]>([]);
-  const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>("month");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const ITEMS_PER_PAGE = 25;
+  
   const tenant = useTenantStore((state) => state.currentTenant);
+  const { showError, showSuccess } = useToast();
 
   const loadData = useCallback(async () => {
     if (!tenant?.slug) return;
-    const salesData = await db.sales
-      .where("tenantId")
-      .equals(tenant.slug)
-      .reverse()
-      .sortBy("createdAt");
-    setSales(salesData);
+    setLoading(true);
+    try {
+      const salesData = await db.sales
+        .where("tenantId")
+        .equals(tenant.slug)
+        .reverse()
+        .sortBy("createdAt");
+      setSales(salesData);
+    } catch (error) {
+      logger.error("Error loading sales", error instanceof Error ? error : undefined, { category: logCategories.SALES });
+    } finally {
+      setLoading(false);
+    }
   }, [tenant?.slug]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  useEffect(() => {
+  const filteredSales = useMemo(() => {
     const now = new Date();
     let startDate: Date | null = null;
 
@@ -81,8 +102,40 @@ export default function Sales() {
       );
     }
 
-    setFilteredSales(filtered);
+    return filtered;
   }, [sales, dateRange, paymentFilter, search]);
+
+  const paginatedSales = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredSales.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredSales, currentPage]);
+
+  const totalPages = Math.ceil(filteredSales.length / ITEMS_PER_PAGE);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateRange, paymentFilter, search]);
+
+  const handleCancelSale = async (localId: string) => {
+    if (!confirm("¿Estás seguro de cancelar esta venta?")) return;
+    
+    setCancellingId(localId);
+    try {
+      const result = await cancelSale(localId);
+      if (!isOk(result)) {
+        showError(result.error.message);
+        return;
+      }
+      
+      setSales(prev => prev.map(s => 
+        s.localId === localId ? { ...s, status: 'cancelled' as const } : s
+      ));
+      showSuccess("Venta cancelada correctamente");
+    } catch (_error) {
+      showError("Error al cancelar la venta");
+      setCancellingId(null);
+    }
+  };
 
   const totalRevenue = filteredSales
     .filter((s) => s.status === "completed")
@@ -215,122 +268,180 @@ export default function Sales() {
       </div>
 
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-(--border-color)">
-                <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                  ID
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                  Fecha
-                </th>
-                <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                  Items
-                </th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                  Total
-                </th>
-                <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                  Método
-                </th>
-                <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                  Estado
-                </th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                  Acción
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSales.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="py-12 text-center text-(--text-muted)">
-                    <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No hay ventas</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredSales.map((sale) => (
-                  <tr
-                    key={sale.localId}
-                    className="border-b border-(--border-color)/50 hover:bg-(--bg-tertiary)">
-                    <td className="py-4 px-4 text-right">
-                      <span className="text-(--text-muted) font-mono text-xs">
-                        {sale.localId.slice(0, 8)}...
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="text-(--text-primary) text-sm">
-                        {new Date(sale.createdAt).toLocaleDateString("es-ES", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-(--bg-tertiary) rounded-lg border border-(--border-color)">
-                        <Package className="w-3.5 h-3.5 text-(--text-muted)" />
-                        <span className="text-(--text-secondary) text-sm">
-                          {sale.items.length}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      <span className="text-green-400 font-bold text-lg">
-                        ${sale.total.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
-                          sale.paymentMethod === "cash"
-                            ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                            : "bg-(--brand-500)/10 text-(--brand-400) border border-(--brand-500)/20"
-                        }`}>
-                        {sale.paymentMethod === "cash" ? (
-                          <>
-                            <Banknote className="w-3.5 h-3.5" /> Efectivo
-                          </>
-                        ) : (
-                          <>
-                            <CreditCard className="w-3.5 h-3.5" /> Tarjeta
-                          </>
-                        )}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      {sale.status === "completed" ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-400 text-xs rounded-full border border-green-500/20">
-                          <Check className="w-3 h-3" /> Completada
-                        </span>
-                      ) : sale.status === "cancelled" ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/10 text-red-400 text-xs rounded-full border border-red-500/20">
-                          <X className="w-3 h-3" /> Cancelada
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-500/10 text-amber-400 text-xs rounded-full border border-amber-500/20">
-                          <Clock className="w-3 h-3" /> Pendiente
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      <button
-                        onClick={() => setSelectedSale(sale)}
-                        className="p-2 hover:bg-(--bg-tertiary) rounded-lg text-(--text-secondary) hover:text-(--text-primary) transition-colors">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </td>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-(--brand-400) animate-spin" />
+            <span className="ml-3 text-slate-400">Cargando ventas...</span>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-(--border-color)">
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                      ID
+                    </th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                      Fecha
+                    </th>
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                      Items
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                      Total
+                    </th>
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                      Método
+                    </th>
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                      Estado
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                      Acción
+                    </th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {paginatedSales.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="py-12 text-center text-(--text-muted)">
+                        <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>No hay ventas</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedSales.map((sale) => (
+                      <tr
+                        key={sale.localId}
+                        className="border-b border-(--border-color)/50 hover:bg-(--bg-tertiary)">
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-(--text-muted) font-mono text-xs">
+                            {sale.localId.slice(0, 8)}...
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-(--text-primary) text-sm">
+                            {new Date(sale.createdAt).toLocaleDateString("es-ES", {
+                              day: "2-digit",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-(--bg-tertiary) rounded-lg border border-(--border-color)">
+                            <Package className="w-3.5 h-3.5 text-(--text-muted)" />
+                            <span className="text-(--text-secondary) text-sm">
+                              {sale.items.length}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-green-400 font-bold text-lg">
+                            ${sale.total.toFixed(2)}
+                          </span>
+                          {sale.exchangeRate && sale.exchangeRate > 0 && (
+                            <span className="block text-xs text-blue-400">
+                              {formatBs(sale.total * sale.exchangeRate)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
+                              sale.paymentMethod === "cash"
+                                ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                                : "bg-(--brand-500)/10 text-(--brand-400) border border-(--brand-500)/20"
+                            }`}>
+                            {sale.paymentMethod === "cash" ? (
+                              <>
+                                <Banknote className="w-3.5 h-3.5" /> Efectivo
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="w-3.5 h-3.5" /> Tarjeta
+                              </>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          {sale.status === "completed" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-400 text-xs rounded-full border border-green-500/20">
+                              <Check className="w-3 h-3" /> Completada
+                            </span>
+                          ) : sale.status === "cancelled" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/10 text-red-400 text-xs rounded-full border border-red-500/20">
+                              <X className="w-3 h-3" /> Cancelada
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-500/10 text-amber-400 text-xs rounded-full border border-amber-500/20">
+                              <Clock className="w-3 h-3" /> Pendiente
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {sale.status === "completed" && (
+                              <button
+                                onClick={() => handleCancelSale(sale.localId)}
+                                disabled={cancellingId === sale.localId}
+                                className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                                title="Cancelar venta"
+                              >
+                                {cancellingId === sale.localId ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Ban className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setSelectedSale(sale)}
+                              className="p-2 hover:bg-(--bg-tertiary) rounded-lg text-(--text-secondary) hover:text-(--text-primary) transition-colors"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-(--border-color)">
+                <p className="text-sm text-(--text-muted)">
+                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredSales.length)} de {filteredSales.length}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 hover:bg-(--bg-tertiary) rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-(--text-secondary)" />
+                  </button>
+                  <span className="text-sm text-(--text-secondary)">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 hover:bg-(--bg-tertiary) rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4 text-(--text-secondary)" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </Card>
 
       {selectedSale && (
@@ -441,6 +552,24 @@ export default function Sales() {
                   </span>
                 </div>
               </div>
+
+              {selectedSale.exchangeRate && selectedSale.exchangeRate > 0 && (
+                <div className="pt-4 border-t border-(--border-color)">
+                  <div className="flex items-center justify-between">
+                    <span className="text-(--text-secondary) text-sm">
+                      Tasa BCV
+                    </span>
+                    <div className="text-right">
+                      <span className="text-blue-400 font-medium">
+                        {formatBs(selectedSale.exchangeRate)}
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        Total: {formatBs(selectedSale.total * selectedSale.exchangeRate)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

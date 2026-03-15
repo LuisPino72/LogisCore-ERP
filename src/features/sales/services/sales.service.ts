@@ -27,6 +27,8 @@ export interface CreateSaleInput {
   tax: number;
   total: number;
   paymentMethod: 'cash' | 'card';
+  exchangeRate?: number;
+  exchangeRateSource?: 'api' | 'manual';
 }
 
 function validateSaleInput(data: CreateSaleInput): string[] {
@@ -104,6 +106,8 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
       paymentMethod: data.paymentMethod,
       status: 'completed',
       createdAt: new Date(),
+      exchangeRate: data.exchangeRate || 0,
+      exchangeRateSource: data.exchangeRateSource || 'manual',
     };
 
     await db.sales.add(sale);

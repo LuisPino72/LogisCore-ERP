@@ -36,7 +36,7 @@ export async function getProductById(localId: string): Promise<Result<Product, A
   }
 }
 
-export async function createProduct(data: Omit<Product, 'id' | 'localId' | 'createdAt' | 'updatedAt' | 'syncedAt'>): Promise<Result<string, AppError>> {
+export async function createProduct(data: Omit<Product, 'id' | 'localId' | 'tenantId' | 'createdAt' | 'updatedAt' | 'syncedAt'>): Promise<Result<string, AppError>> {
   try {
     const tenantId = getCurrentTenantId();
 
@@ -109,7 +109,7 @@ export async function deleteProduct(localId: string): Promise<Result<void, AppEr
       return Err(productResult.error);
     }
 
-    await db.products.delete(localId);
+    await db.products.where('localId').equals(localId).delete();
     await SyncEngine.addToQueue('products', 'delete', { localId }, localId);
     
     EventBus.emit(Events.INVENTORY_UPDATED, { action: 'delete', localId });

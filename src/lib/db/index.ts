@@ -24,6 +24,8 @@ export interface Product {
   cost: number;
   stock: number;
   categoryId?: number;
+  imageUrl?: string;
+  isFavorite?: boolean;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -54,6 +56,8 @@ export interface Sale {
   subtotal: number;
   tax: number;
   total: number;
+  exchangeRate: number;
+  exchangeRateSource: 'api' | 'manual';
   paymentMethod: 'cash' | 'card';
   status: 'completed' | 'cancelled' | 'refunded';
   createdAt: Date;
@@ -141,6 +145,25 @@ class LogisCoreDB extends Dexie {
       productionLogs: '++id, localId, tenantId, recipeId, createdAt',
       suppliers: '++id, localId, tenantId, name, isActive',
     });
+    // Version 5: fix settings to use compound index [tenantId+key]
+    // Must delete and recreate table as Dexie doesn't support changing primary key
+    this.version(5)
+      .stores({
+        syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
+        products: '++id, localId, tenantId, sku, categoryId, isActive, name',
+        categories: '++id, localId, tenantId, name',
+        settings: '[tenantId+key]',
+        sales: '++id, localId, tenantId, status, createdAt, paymentMethod',
+        purchases: '++id, localId, tenantId, status, createdAt, supplier',
+        recipes: '++id, localId, tenantId, isActive, productId',
+        productionLogs: '++id, localId, tenantId, recipeId, createdAt',
+        suppliers: '++id, localId, tenantId, name, isActive',
+      })
+      .upgrade(async (trans) => {
+        // Migrate existing settings: ensure every record has a tenantId.
+        // First delete the old table and recreate with new schema
+        await trans.table('settings').clear();
+      });
   }
 }
 

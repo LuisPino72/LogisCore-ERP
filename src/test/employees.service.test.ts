@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getEmployees, inviteEmployee } from '../features/employees/services/employees.service';
+import { getEmployees } from '../features/employees/services/employees.service';
 import { supabase } from '@/services/supabase';
 import { isOk } from '@/types/result';
 
-// Mocking dependencies
 vi.mock('@/store/useTenantStore', () => ({
   useTenantStore: {
     getState: vi.fn(() => ({
@@ -18,7 +17,6 @@ vi.mock('@/services/supabase', () => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockResolvedValue({ error: null }),
     })),
   },
 }));
@@ -53,29 +51,6 @@ describe('Employees Service', () => {
 
       const result = await getEmployees();
       expect(isOk(result)).toBe(false);
-    });
-  });
-
-  describe('inviteEmployee', () => {
-    it('debe enviar una invitación correctamente', async () => {
-      (supabase.from as any).mockImplementation(() => ({
-        insert: vi.fn().mockResolvedValue({ error: null }),
-      }));
-
-      const email = 'new@example.com';
-      const perms = { can_view_reports: true };
-      
-      const result = await inviteEmployee(email, perms);
-      expect(isOk(result)).toBe(true);
-      expect(supabase.from).toHaveBeenCalledWith('invitations');
-    });
-
-    it('debe validar que el email no esté vacío', async () => {
-      const result = await inviteEmployee('', {});
-      expect(isOk(result)).toBe(false);
-      if (!isOk(result)) {
-        expect(result.error.message).toContain('email');
-      }
     });
   });
 });

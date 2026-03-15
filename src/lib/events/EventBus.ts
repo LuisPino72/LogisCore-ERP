@@ -54,4 +54,5 @@ export const Events = {
   SYNC_STATUS_CHANGED: 'sync.status.changed',
   CONFLICT_DETECTED: 'conflict.detected',
   TENANT_CHANGED: 'tenant.changed',
+  EXCHANGE_RATE_UPDATED: 'exchange.rate.updated',
 } as const;

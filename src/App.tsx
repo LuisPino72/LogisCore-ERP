@@ -9,6 +9,7 @@ import { ToastProvider } from "@/providers/ToastProvider";
 import { initializeCatalogs } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { db } from "@/lib/db";
+import { SyncEngine } from "@/lib/sync/SyncEngine";
 import {
   Package,
   ShoppingCart,
@@ -24,6 +25,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Store,
+  DollarSign,
+  RefreshCw,
 } from "lucide-react";
 import Emblema from "@/assets/Emblema.ico";
 
@@ -72,6 +75,8 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState<{ rate: number; updatedAt: Date; source: string } | null>(null);
+  const [isUpdatingRate, setIsUpdatingRate] = useState(false);
 
   const isUpdatePasswordPage = window.location.pathname === "/update-password";
 
@@ -99,17 +104,35 @@ function App() {
   }, [theme, isAdminPanel, role, setTheme]);
 
   const loadTenantData = useCallback(
-    async (tenantSlug: string) => {
+    async (tenantSlug: string, _tenantUuid?: string) => {
+      const tenantFilter = tenantSlug;
+      
+      const [localProducts, localSales, localCategories] = await Promise.all([
+        db.products.where('tenantId').equals(tenantFilter).count(),
+        db.sales.where('tenantId').equals(tenantFilter).count(),
+        db.categories.where('tenantId').equals(tenantFilter).count(),
+      ]);
+
+      if (localProducts > 0 || localSales > 0 || localCategories > 0) {
+        setIsLoadingData(false);
+        return;
+      }
+
       setIsLoadingData(true);
       try {
-        const [productsRes, categoriesRes, salesRes, recipesRes, purchasesRes] =
-          await Promise.all([
-            supabase.from("products").select("*").eq("tenant_id", tenantSlug),
-            supabase.from("categories").select("*").eq("tenant_id", tenantSlug),
-            supabase.from("sales").select("*").eq("tenant_id", tenantSlug),
-            supabase.from("recipes").select("*").eq("tenant_id", tenantSlug),
-            supabase.from("purchases").select("*").eq("tenant_id", tenantSlug),
-          ]);
+        const [productsRes, categoriesRes, salesRes, recipesRes, purchasesRes] = await Promise.all([
+          supabase.from("products").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
+          supabase.from("categories").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
+          supabase.from("sales").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
+          supabase.from("recipes").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
+          supabase.from("purchases").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
+        ]);
+
+        const productsData = productsRes.data || [];
+        const categoriesData = categoriesRes.data || [];
+        const salesData = salesRes.data || [];
+        const recipesData = recipesRes.data || [];
+        const purchasesData = purchasesRes.data || [];
 
         const sanitizeCategory = (c: Record<string, unknown>) => ({
           localId: String(c.id ?? ""),
@@ -131,6 +154,8 @@ function App() {
           cost: Number(p.cost) || 0,
           stock: Number(p.stock) || 0,
           categoryId: p.category_id ? Number(p.category_id) : undefined,
+          imageUrl: p.image_url ? String(p.image_url) : undefined,
+          isFavorite: Boolean(p.is_favorite ?? false),
           isActive: Boolean(p.is_active ?? true),
           createdAt: p.created_at
             ? new Date(p.created_at as string)
@@ -200,25 +225,25 @@ function App() {
           syncedAt: p.created_at ? new Date(p.created_at as string) : undefined,
         });
 
-        if (categoriesRes.data) {
-          await db.categories.bulkPut(categoriesRes.data.map(sanitizeCategory));
+        if (categoriesData) {
+          await db.categories.bulkPut(categoriesData.map(sanitizeCategory));
         }
 
-        if (productsRes.data) {
-          await db.products.bulkPut(productsRes.data.map(sanitizeProduct));
+        if (productsData) {
+          await db.products.bulkPut(productsData.map(sanitizeProduct));
         }
 
-        if (salesRes.data) {
-          await db.sales.bulkPut(salesRes.data.map(sanitizeSale) as any);
+        if (salesData) {
+          await db.sales.bulkPut(salesData.map(sanitizeSale) as any);
         }
 
-        if (recipesRes.data) {
-          await db.recipes.bulkPut(recipesRes.data.map(sanitizeRecipe) as any);
+        if (recipesData) {
+          await db.recipes.bulkPut(recipesData.map(sanitizeRecipe) as any);
         }
 
-        if (purchasesRes.data) {
+        if (purchasesData) {
           await db.purchases.bulkPut(
-            purchasesRes.data.map(sanitizePurchase) as any,
+            purchasesData.map(sanitizePurchase) as any,
           );
         }
       } catch (error) {
@@ -227,13 +252,23 @@ function App() {
         setIsLoadingData(false);
       }
     },
-    [db, supabase],
+    [db, supabase]
   );
 
   useEffect(() => {
     if (tenant?.slug) {
       initializeCatalogs(tenant.slug);
-      loadTenantData(tenant.slug);
+      loadTenantData(tenant.slug, tenant.id);
+      SyncEngine.start();
+      
+      (async () => {
+        const { getExchangeRate, autoUpdateIfNeeded } = await import('@/features/exchange-rate/services/exchangeRate.service');
+        await autoUpdateIfNeeded();
+        const rate = await getExchangeRate();
+        if (rate) {
+          setExchangeRate({ rate: rate.rate, updatedAt: rate.updatedAt, source: rate.source });
+        }
+      })();
     }
   }, [tenant, initializeCatalogs, loadTenantData]);
 
@@ -314,7 +349,7 @@ function App() {
             fallback={
               <div className="p-8 text-center text-slate-400">Cargando...</div>
             }>
-            <Dashboard />
+            <Dashboard isLoadingData={isLoadingData} />
           </Suspense>
         );
       case "sales":
@@ -452,6 +487,62 @@ function App() {
             ))}
         </ul>
       </nav>
+
+      {!sidebarCollapsed && (
+        <div className="p-4 border-t border-(--border-color)">
+          <div className="bg-(--bg-tertiary)/50 rounded-xl p-3 border border-(--border-color)">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="w-4 h-4 text-green-400" />
+              <span className="text-xs font-medium text-slate-400 uppercase">Tasa BCV</span>
+            </div>
+            {exchangeRate ? (
+              <>
+                <p className="text-lg font-bold text-green-400">
+                  Bs. {exchangeRate.rate.toFixed(2)}
+                </p>
+                <p className="text-xs text-slate-500 mb-2">
+                  por $1 • {exchangeRate.source === 'api' ? '🟢 Automático' : '🟡 Manual'}
+                </p>
+                <button
+                  onClick={async () => {
+                    setIsUpdatingRate(true);
+                    const { updateExchangeRate, getExchangeRate } = await import('@/features/exchange-rate/services/exchangeRate.service');
+                    await updateExchangeRate();
+                    const rate = await getExchangeRate();
+                    if (rate) {
+                      setExchangeRate({ rate: rate.rate, updatedAt: rate.updatedAt, source: rate.source });
+                    }
+                    setIsUpdatingRate(false);
+                  }}
+                  disabled={isUpdatingRate}
+                  className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-(--brand-500)/20 hover:bg-(--brand-500)/30 text-(--brand-400) text-xs rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isUpdatingRate ? 'animate-spin' : ''}`} />
+                  {isUpdatingRate ? 'Actualizando...' : 'Actualizar'}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={async () => {
+                  setIsUpdatingRate(true);
+                  const { updateExchangeRate, getExchangeRate } = await import('@/features/exchange-rate/services/exchangeRate.service');
+                  await updateExchangeRate();
+                  const rate = await getExchangeRate();
+                  if (rate) {
+                    setExchangeRate({ rate: rate.rate, updatedAt: rate.updatedAt, source: rate.source });
+                  }
+                  setIsUpdatingRate(false);
+                }}
+                disabled={isUpdatingRate}
+                className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-(--brand-500)/20 hover:bg-(--brand-500)/30 text-(--brand-400) text-xs rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3 h-3 ${isUpdatingRate ? 'animate-spin' : ''}`} />
+                {isUpdatingRate ? 'Cargando...' : 'Configurar Tasa'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="p-4 border-t border-(--border-color)">
         {!sidebarCollapsed ? (

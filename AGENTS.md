@@ -100,18 +100,34 @@ EventBus.emit(Events.INVENTORY_UPDATED, { action: 'create', product });
 ## 1.4 Multi-Tenencia
 
 ```typescript
-// Dexie (local): filtrar por slug
+// Dexie (local): filtrar por slug (tenantId = tenant.slug)
 db.products.where('tenantId').equals(tenant.slug).toArray()
 
-// Supabase (remoto): filtrar por UUID
-supabase.from('products').eq('tenant_id', tenant.id)
+// Supabase (remoto): filtrar por tenant_slug (texto)
+supabase.from('products').eq('tenant_slug', tenant.slug)
 ```
 
-> **tenant_id en Supabase debe ser UUID con FK a tenants.id**
+> **CRÍTICO: El campo `tenantId` en Dexie debe almacenar el `slug` del tenant, NO el UUID.**
+> **En Supabase, usar la columna `tenant_slug` para filtrar, no `tenant_id`.**
 
 ---
 
-## 1.5 RLS (Row Level Security)
+## 1.5 Sincronización con Supabase
+
+La sincronización usa `tenant_slug` para identificar el tenant:
+
+```typescript
+// Al encolar para sync
+await SyncEngine.addToQueue('products', 'create', product, localId);
+// El SyncEngine usa automatically tenantId (slug) del store
+
+// Función RPC en Supabase: sync_table_item(p_table, p_operation, p_data, p_local_id, p_tenant_slug)
+// Convierte p_tenant_slug a UUID internamente para las foreign keys
+```
+
+---
+
+## 1.6 RLS (Row Level Security)
 
 > **Toda tabla nueva DEBE tener RLS activado.**
 
@@ -137,7 +153,39 @@ CREATE POLICY tenant_scoped_access ON public.nueva_tabla
 
 ---
 
-## 1.6 Notificaciones — SOLO ToastProvider
+## 1.6 RLS (Row Level Security)
+
+> **Toda tabla nueva DEBE tener RLS activado.**
+
+```sql
+-- Primero: crear función auxiliar si no existe
+CREATE OR REPLACE FUNCTION check_tenant_access(target_tenant_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE tenant_id = target_tenant_id
+    AND user_id = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Aplicar a la tabla (usando tenant_slug para filtrar)
+ALTER TABLE public.nueva_tabla ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_scoped_access ON public.nueva_tabla
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM tenants
+      WHERE tenants.id = nueva_tabla.tenant_id
+      AND tenants.slug = auth.jwt()->>'tenant_slug'
+    )
+  );
+```
+
+---
+
+## 1.7 Notificaciones — SOLO ToastProvider
 
 ```typescript
 // ✅ Correcto
@@ -335,7 +383,7 @@ Events.TENANT_CHANGED      // 'tenant.changed'
 - [ ] ¿Las escrituras siguen: Validar → Dexie → SyncEngine → EventBus?
 - [ ] ¿Se usa `useToast()` en lugar de `alert()`?
 - [ ] ¿Nueva tabla tiene RLS con `check_tenant_access`?
-- [ ] ¿`tenant_id` en Supabase es UUID?
+- [ ] ¿Se usa `tenant.slug` para filtrar en Dexie y `tenant_slug` en Supabase?
 - [ ] ¿Hay test para el servicio?
 - [ ] ¿`npm run lint` pasa (0 errores)?
 - [ ] ¿`npm run test` pasa?
