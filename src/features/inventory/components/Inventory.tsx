@@ -4,7 +4,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { Plus, Search, Edit2, Trash2, Package, X, Cloud, CloudOff, LayoutGrid, List, Filter, PackageX, AlertTriangle, Image as ImageIcon, Loader2, Star } from 'lucide-react';
 import { useTenantStore } from '@/store/useTenantStore';
 import { createProduct, updateProduct, deleteProduct, getProducts } from '../services/products.service';
-import { getCategories } from '../services/categories.service';
+import { getCategories, createCategory } from '../services/categories.service';
 import { uploadProductImage } from '../services/images.service';
 import { Product, Category } from '@/lib/db';
 import { EventBus, Events } from '@/lib/events/EventBus';
@@ -42,6 +42,8 @@ export default function Inventory() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   const tenant = useTenantStore((state) => state.currentTenant);
   const { showError, showSuccess } = useToast();
@@ -177,11 +179,32 @@ export default function Inventory() {
     }
   }, [showError, showSuccess]);
 
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      showError('El nombre de la categoría es requerido');
+      return;
+    }
+    
+    const result = await createCategory({ name: newCategoryName.trim(), description: '' });
+    if (!isOk(result)) {
+      showError(result.error.message);
+      return;
+    }
+    
+    showSuccess('Categoría creada correctamente');
+    const catData = await getCategories();
+    setCategories(catData);
+    setShowNewCategory(false);
+    setNewCategoryName('');
+  };
+
   const resetForm = useCallback(() => {
     setForm({ name: '', sku: '', price: '0', cost: '0', stock: '0', categoryId: undefined, imageUrl: undefined, isFavorite: false, isActive: true });
     setImageFile(null);
     setImagePreview(null);
     setEditingId(null);
+    setShowNewCategory(false);
+    setNewCategoryName('');
   }, []);
 
   const getStockStatus = (stock: number) => {
@@ -567,16 +590,53 @@ export default function Inventory() {
                   />
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-slate-400">Categoría</label>
-                    <select 
-                      value={form.categoryId || ''}
-                      onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : undefined })}
-                      className="w-full px-4 py-2.5 bg-(--bg-primary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
-                    >
-                      <option value="">Seleccionar Categoría</option>
-                      {categories.map(cat => (
-                        <option key={cat.localId} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
+                    {showNewCategory ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="Nueva categoría..."
+                          className="flex-1 px-4 py-2.5 bg-(--bg-primary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCreateCategory}
+                          className="px-3 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors"
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowNewCategory(false); setNewCategoryName(''); }}
+                          className="px-3 py-2 bg-slate-700 text-slate-400 rounded-lg hover:bg-slate-600 transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <select 
+                          value={form.categoryId || ''}
+                          onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : undefined })}
+                          className="flex-1 px-4 py-2.5 bg-(--bg-primary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
+                        >
+                          <option value="">Seleccionar Categoría</option>
+                          {categories.map(cat => (
+                            <option key={cat.localId} value={cat.id}>{cat.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setShowNewCategory(true)}
+                          className="px-3 py-2 bg-(--brand-500)/20 text-(--brand-400) rounded-lg hover:bg-(--brand-500)/30 transition-colors"
+                          title="Crear nueva categoría"
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
