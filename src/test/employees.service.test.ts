@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getEmployees, addEmployee } from '../features/employees/services/employees.service';
+import { getEmployees, createEmployee, deleteEmployee, DEFAULT_EMPLOYEE_PERMISSIONS } from '../features/employees/services/employees.service';
 import { isOk, isErr } from '@/types/result';
 
 vi.mock('@/store/useTenantStore', () => ({
@@ -18,10 +18,18 @@ vi.mock('@/lib/sync/SyncEngine', () => ({
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
+    auth: {
+      signUp: vi.fn().mockResolvedValue({ data: { user: { id: 'user-123' } }, error: null }),
+    },
     from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: [], error: null }),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      update: vi.fn(() => ({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      })),
+      delete: vi.fn(() => ({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      })),
     })),
   },
 }));
@@ -37,6 +45,7 @@ vi.mock('@/lib/db', () => ({
       bulkPut: vi.fn().mockResolvedValue(undefined),
       filter: vi.fn().mockReturnThis(),
       first: vi.fn(),
+      put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     },
   },
@@ -78,16 +87,32 @@ describe('Employees Service', () => {
     });
   });
 
-  describe('addEmployee', () => {
-    it('debe agregar un empleado correctamente', async () => {
-      const result = await addEmployee('user-123', 'employee', { canSale: true });
+  describe('createEmployee', () => {
+    it('debe crear un empleado correctamente', async () => {
+      const result = await createEmployee('test@test.com', 'password123', DEFAULT_EMPLOYEE_PERMISSIONS);
       
       expect(isOk(result)).toBe(true);
       expect(mockDb.employees.add).toHaveBeenCalled();
     });
 
-    it('debe fallar si falta userId', async () => {
-      const result = await addEmployee('', 'employee');
+    it('debe fallar si el email es inválido', async () => {
+      const result = await createEmployee('', 'password123', DEFAULT_EMPLOYEE_PERMISSIONS);
+      
+      expect(isErr(result)).toBe(true);
+    });
+
+    it('debe fallar si la contraseña es muy corta', async () => {
+      const result = await createEmployee('test@test.com', '123', DEFAULT_EMPLOYEE_PERMISSIONS);
+      
+      expect(isErr(result)).toBe(true);
+    });
+  });
+
+  describe('deleteEmployee', () => {
+    it('debe fallar si el empleado no existe', async () => {
+      mockDb.employees.first.mockResolvedValue(null);
+      
+      const result = await deleteEmployee('non-existent');
       
       expect(isErr(result)).toBe(true);
     });

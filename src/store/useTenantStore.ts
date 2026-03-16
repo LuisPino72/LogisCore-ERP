@@ -8,6 +8,7 @@ export interface TenantModules {
   recipes?: boolean
   reports?: boolean
   pos?: boolean
+  employees?: boolean
   [key: string]: boolean | undefined
 }
 

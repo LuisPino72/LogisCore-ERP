@@ -14,6 +14,7 @@ const ALL_MODULES = [
   { id: 'purchases', label: 'Compras' },
   { id: 'recipes', label: 'Recetas' },
   { id: 'pos', label: 'Punto de Venta' },
+  { id: 'employees', label: 'Empleados' },
 ] as const
 
 interface TenantModules {

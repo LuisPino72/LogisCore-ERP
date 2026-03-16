@@ -66,6 +66,7 @@ export default function Login() {
         .from("user_roles")
         .select(`
           role,
+          permissions,
           tenants (
             id,
             name,
@@ -82,7 +83,8 @@ export default function Login() {
           roles.find((r) => r.role === "owner") || 
           roles[0];
         
-        setRole(preferredRole.role as any);
+        const employeePermissions = preferredRole.role === 'employee' ? (preferredRole.permissions || {}) : {};
+        setRole(preferredRole.role as any, employeePermissions);
         
         if (preferredRole.role === 'super_admin') {
           setTenant(null);

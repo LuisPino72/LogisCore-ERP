@@ -28,6 +28,7 @@ import {
   Store,
   DollarSign,
   RefreshCw,
+  Users,
 } from "lucide-react";
 import Emblema from "@/assets/Emblema.ico";
 
@@ -52,6 +53,9 @@ const Sales = lazy(() =>
 const Dashboard = lazy(
   () => import("@/features/dashboard/components/Dashboard"),
 );
+const Employees = lazy(
+  () => import("@/features/employees/components/Employees"),
+);
 
 type Module =
   | "dashboard"
@@ -60,11 +64,13 @@ type Module =
   | "pos"
   | "recipes"
   | "reports"
-  | "purchases";
+  | "purchases"
+  | "employees";
 
 function App() {
   const role = useTenantStore((state) => state.role);
   const tenant = useTenantStore((state) => state.currentTenant);
+  const permissions = useTenantStore((state) => state.permissions);
   const isImpersonating = useTenantStore((state) => state.isImpersonating);
   const isAdminPanel = role === "super_admin" && !isImpersonating;
   const stopImpersonation = useTenantStore((state) => state.stopImpersonation);
@@ -303,6 +309,7 @@ function App() {
     { id: "purchases", label: "Compras", icon: ShoppingBasket },
     { id: "pos", label: "Punto de Venta", icon: ShoppingCart },
     { id: "recipes", label: "Recetas", icon: ChefHat },
+    { id: "employees", label: "Empleados", icon: Users },
     { id: "reports", label: "Reportes", icon: BarChart3 },
   ] as const;
 
@@ -422,6 +429,15 @@ function App() {
             <Purchases />
           </Suspense>
         );
+      case "employees":
+        return (
+          <Suspense
+            fallback={
+              <div className="p-8 text-center text-slate-400">Cargando...</div>
+            }>
+            <Employees />
+          </Suspense>
+        );
       default:
         return (
           <Suspense
@@ -475,7 +491,17 @@ function App() {
               // Dashboard y Reportes siempre visibles (por defecto)
               if (mod.id === "dashboard" || mod.id === "reports") return true;
               
-              // Para el resto, verificar si están activos en el tenant
+              // Si es employee, verificar permisos
+              if (role === "employee") {
+                const permissionKey = `can_access_${mod.id}` as keyof typeof permissions;
+                if (mod.id === "pos") {
+                  return permissions.can_access_pos === true;
+                }
+                const viewPermissionKey = `can_view_${mod.id}` as keyof typeof permissions;
+                return permissions[viewPermissionKey] === true || permissions[permissionKey] === true;
+              }
+              
+              // Para owners y super_admins, verificar si están activos en el tenant
               const modules = tenant?.modules as
                 | Record<string, boolean>
                 | undefined;
