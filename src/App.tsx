@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense, useCallback } from "react";
+import { useEffect, useState, lazy, Suspense, useCallback, useRef } from "react";
 import { useTenantStore, TenantThemeConfig } from "@/store/useTenantStore";
 import { useThemeStore, applyCssVariables } from "@/store/useThemeStore";
 import { Login } from "@/features/auth";
@@ -72,7 +72,10 @@ function App() {
   const setTheme = useThemeStore((state) => state.setTheme);
   const isTenantMode = useThemeStore((state) => state.isTenantMode);
   const applyTenantTheme = useThemeStore((state) => state.applyTenantTheme);
-  const [activeModule, setActiveModule] = useState<Module>("dashboard");
+  const [activeModule, setActiveModule] = useState<Module>(() => {
+    const saved = localStorage.getItem('lastActiveModule');
+    return (saved as Module) || 'dashboard';
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -84,6 +87,18 @@ function App() {
   useEffect(() => {
     applyCssVariables();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('lastActiveModule', activeModule);
+  }, [activeModule]);
+
+  const previousRole = useRef(role);
+  useEffect(() => {
+    if (!previousRole.current && role) {
+      setActiveModule('dashboard');
+    }
+    previousRole.current = role;
+  }, [role]);
 
   useEffect(() => {
     // Aplicar tema del tenant si hay uno configurado
@@ -283,12 +298,12 @@ function App() {
 
   const allModules = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "sales", label: "Ventas", icon: ShoppingBag },
     { id: "inventory", label: "Inventario", icon: Package },
+    { id: "sales", label: "Ventas", icon: ShoppingBag },
+    { id: "purchases", label: "Compras", icon: ShoppingBasket },
     { id: "pos", label: "Punto de Venta", icon: ShoppingCart },
     { id: "recipes", label: "Recetas", icon: ChefHat },
     { id: "reports", label: "Reportes", icon: BarChart3 },
-    { id: "purchases", label: "Compras", icon: ShoppingBasket },
   ] as const;
 
   const renderModule = () => {
