@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTenantStore } from "../../../store/useTenantStore";
-import { getEmployees, Employee } from "../services/employees.service";
+import { getEmployees } from "../services/employees.service";
+import { Employee } from "../../../lib/db";
 import { isOk } from "../../../types/result";
 import { useToast } from "../../../providers/ToastProvider";
 import Card from "../../../common/Card";    
@@ -35,7 +36,7 @@ export default function Employees() {
   }, [tenant, fetchData]);
 
   const filteredEmployees = employees.filter((emp) =>
-    emp.user_id.toLowerCase().includes(search.toLowerCase()),
+    emp.userId.toLowerCase().includes(search.toLowerCase()),
   );
 
   if (role !== "owner" && role !== "super_admin") {
@@ -100,7 +101,7 @@ export default function Employees() {
               ) : (
                 filteredEmployees.map((emp) => (
                   <tr
-                    key={emp.user_id}
+                    key={emp.userId}
                     className="border-b border-(--border-color)/50 hover:bg-(--bg-tertiary)">
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
@@ -108,7 +109,7 @@ export default function Employees() {
                           <UserCheck className="w-5 h-5 text-(--text-muted)" />
                         </div>
                         <span className="text-(--text-primary) font-mono text-sm">
-                          {emp.user_id.slice(0, 8)}...
+                          {emp.userId.slice(0, 8)}...
                         </span>
                       </div>
                     </td>

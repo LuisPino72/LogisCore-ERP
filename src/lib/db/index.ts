@@ -121,12 +121,25 @@ export interface Supplier {
   syncedAt?: Date;
 }
 
+export interface Employee {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  userId: string;
+  role: string;
+  permissions: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt?: Date;
+  syncedAt?: Date;
+}
+
 class LogisCoreDB extends Dexie {
   syncQueue!: Table<SyncQueueItem>;
   products!: Table<Product>;
   categories!: Table<Category>;
   settings!: Table<TenantSetting>;
   sales!: Table<Sale>;
+  employees!: Table<Employee>;
   purchases!: Table<Purchase>;
   recipes!: Table<Recipe>;
   productionLogs!: Table<ProductionLog>;
@@ -158,6 +171,7 @@ class LogisCoreDB extends Dexie {
         recipes: '++id, localId, tenantId, isActive, productId',
         productionLogs: '++id, localId, tenantId, recipeId, createdAt',
         suppliers: '++id, localId, tenantId, name, isActive',
+        employees: '++id, localId, tenantId, role',
       })
       .upgrade(async (trans) => {
         // Migrate existing settings: ensure every record has a tenantId.

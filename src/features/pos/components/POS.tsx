@@ -40,9 +40,9 @@ export default function POS() {
 
   useEffect(() => {
     const loadExchangeRate = async () => {
-      const rate = await getExchangeRate();
-      if (rate) {
-        setExchangeRate(rate.rate);
+      const result = await getExchangeRate();
+      if (isOk(result) && result.value) {
+        setExchangeRate(result.value.rate);
       }
     };
     loadExchangeRate();

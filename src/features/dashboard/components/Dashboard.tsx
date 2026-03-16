@@ -4,6 +4,7 @@ import { db, Product } from "../../../lib/db";
 import { logger, logCategories } from "../../../lib/logger";
 import { EventBus, Events } from "../../../lib/events/EventBus";
 import { getExchangeRate, updateExchangeRate, formatBs } from "../../exchange-rate/services/exchangeRate.service";
+import { isOk } from "../../../types/result";
 import { useToast } from "../../../providers/ToastProvider";
 import Button from "../../../common/Button";
 import {
@@ -246,9 +247,9 @@ export default function Dashboard({ isLoadingData = false }: { isLoadingData?: b
 
   useEffect(() => {
     const loadExchangeRate = async () => {
-      const rate = await getExchangeRate();
-      if (rate) {
-        setExchangeRate(rate);
+      const result = await getExchangeRate();
+      if (isOk(result) && result.value) {
+        setExchangeRate({ rate: result.value.rate, updatedAt: result.value.updatedAt, source: result.value.source });
       } else {
         handleUpdateRate();
       }

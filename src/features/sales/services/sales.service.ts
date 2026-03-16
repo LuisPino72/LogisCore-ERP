@@ -110,7 +110,32 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
       exchangeRateSource: data.exchangeRateSource || 'manual',
     };
 
-    await db.sales.add(sale);
+    await db.transaction('rw', db.sales, db.products, async () => {
+      for (const item of data.items) {
+        const product = await db.products
+          .where('localId')
+          .equals(item.productId)
+          .filter(p => p.tenantId === tenantId)
+          .first();
+        
+        if (!product) {
+          throw new AppError(`Producto no encontrado: ${item.productName}`, 'PRODUCT_NOT_FOUND', 404);
+        }
+        
+        if (product.stock < item.quantity) {
+          throw new ValidationError(`Stock insuficiente para ${item.productName}. Disponible: ${product.stock}`);
+        }
+        
+        await db.products.put({
+          ...product,
+          stock: product.stock - item.quantity,
+          updatedAt: new Date(),
+        });
+      }
+      
+      await db.sales.add(sale);
+    });
+    
     await SyncEngine.addToQueue('sales', 'create', sale as unknown as Record<string, unknown>, localId);
     
     EventBus.emit(Events.SALE_COMPLETED, { sale });

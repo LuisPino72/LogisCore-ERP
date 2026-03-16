@@ -112,39 +112,50 @@ supabase.from('products').eq('tenant_slug', tenant.slug)
 
 ---
 
-## 1.5 Sincronización con Supabase
+## 1.5 Transacciones en Dexie
 
-La sincronización usa `tenant_slug` para identificar el tenant:
+> **Para operaciones que modifican múltiples tablas, usar transacciones.**
 
 ```typescript
-// Al encolar para sync
-await SyncEngine.addToQueue('products', 'create', product, localId);
-// El SyncEngine usa automatically tenantId (slug) del store
-
-// Función RPC en Supabase: sync_table_item(p_table, p_operation, p_data, p_local_id, p_tenant_slug)
-// Convierte p_tenant_slug a UUID internamente para las foreign keys
+await db.transaction('rw', db.sales, db.products, async () => {
+  for (const item of data.items) {
+    const product = await db.products.where('localId').equals(item.productId).first();
+    if (!product || product.stock < item.quantity) {
+      throw new ValidationError(`Stock insuficiente para ${item.productName}`);
+    }
+    await db.products.put({ ...product, stock: product.stock - item.quantity });
+  }
+  await db.sales.add(sale);
+});
 ```
 
 ---
 
-## 1.6 RLS (Row Level Security)
+## 1.6 Sincronización con Supabase
+
+```typescript
+// Al encolar para sync
+await SyncEngine.addToQueue('products', 'create', product, localId);
+
+// Función RPC: sync_table_item(p_table, p_operation, p_data, p_local_id, p_tenant_slug)
+```
+
+---
+
+## 1.7 RLS (Row Level Security)
 
 > **Toda tabla nueva DEBE tener RLS activado.**
 
 ```sql
--- Primero: crear función auxiliar si no existe
 CREATE OR REPLACE FUNCTION check_tenant_access(target_tenant_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
-    SELECT 1 FROM user_roles
-    WHERE tenant_id = target_tenant_id
-    AND user_id = auth.uid()
+    SELECT 1 FROM user_roles WHERE tenant_id = target_tenant_id AND user_id = auth.uid()
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Aplicar a la tabla
 ALTER TABLE public.nueva_tabla ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_scoped_access ON public.nueva_tabla
   FOR ALL TO authenticated
@@ -153,39 +164,7 @@ CREATE POLICY tenant_scoped_access ON public.nueva_tabla
 
 ---
 
-## 1.6 RLS (Row Level Security)
-
-> **Toda tabla nueva DEBE tener RLS activado.**
-
-```sql
--- Primero: crear función auxiliar si no existe
-CREATE OR REPLACE FUNCTION check_tenant_access(target_tenant_id UUID)
-RETURNS BOOLEAN AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM user_roles
-    WHERE tenant_id = target_tenant_id
-    AND user_id = auth.uid()
-  );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Aplicar a la tabla (usando tenant_slug para filtrar)
-ALTER TABLE public.nueva_tabla ENABLE ROW LEVEL SECURITY;
-CREATE POLICY tenant_scoped_access ON public.nueva_tabla
-  FOR ALL TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM tenants
-      WHERE tenants.id = nueva_tabla.tenant_id
-      AND tenants.slug = auth.jwt()->>'tenant_slug'
-    )
-  );
-```
-
----
-
-## 1.7 Notificaciones — SOLO ToastProvider
+## 1.8 Notificaciones — SOLO ToastProvider
 
 ```typescript
 // ✅ Correcto
@@ -194,18 +173,16 @@ showError('Error al guardar');
 
 // ❌ PROHIBIDO
 alert('Error al guardar');
-confirm('¿Estás seguro?');
 ```
 
 ---
 
-## 1.7 Imports — Usar alias `@/`
+## 1.9 Imports — Usar alias `@/`
 
 ```typescript
 // ✅ Correcto
 import { db } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
-import { useTenantStore } from '@/store/useTenantStore';
 
 // ❌ Evitar
 import { db } from '../../../lib/db';
@@ -217,46 +194,33 @@ import { db } from '../../../lib/db';
 
 ## 2.1 Logger Estructurado
 
-> Usar el logger en lugar de `console.log/error`.
-
 ```typescript
 import { logger, logCategories } from '@/lib/logger';
 
 logger.info('Venta creada', { saleId: localId, total });
 logger.error('Error sync', error, { category: logCategories.SYNC });
-logger.warn('Retry attempt', { attempt: n, category: logCategories.SYNC });
 ```
 
-**Categorías disponibles:** `SYNC`, `AUTH`, `INVENTORY`, `SALES`, `DATABASE`, `UI`
+**Categorías:** `SYNC`, `AUTH`, `INVENTORY`, `SALES`, `DATABASE`, `UI`
 
 ---
 
 ## 2.2 Circuit Breaker en SyncEngine
 
-El SyncEngine incluye protección contra fallos en cascada:
-
-- **closed**: Operación normal
-- **open**: Fallos excesivos - rechaza operaciones
-- **half-open**: Prueba de recuperación
-
 ```typescript
-// Estado del circuit breaker
 const state = SyncEngine.getCircuitStatus();
 // { status: 'closed' | 'open' | 'half-open', failures: number, ... }
 ```
 
 ---
 
-## 2.3 Validación de Inputs en Servicios
-
-> **Todo servicio debe validar inputs antes de procesar.**
+## 2.3 Validación de Inputs
 
 ```typescript
 function validateSaleInput(data: CreateSaleInput): string[] {
   const errors: string[] = [];
   if (!data.items?.length) errors.push('La venta debe tener productos');
   if (data.total < 0) errors.push('Total no puede ser negativo');
-  // ...
   return errors;
 }
 ```
@@ -265,12 +229,11 @@ function validateSaleInput(data: CreateSaleInput): string[] {
 
 ## 2.4 Índices en Dexie
 
-Los índices se definen en el schema de Dexie:
-
 ```typescript
-this.version(4).stores({
+this.version(5).stores({
   products: '++id, localId, tenantId, sku, categoryId, isActive, name',
   sales: '++id, localId, tenantId, status, createdAt, paymentMethod',
+  employees: '++id, localId, tenantId, role',
   // ...
 });
 ```
@@ -281,8 +244,6 @@ this.version(4).stores({
 
 ## 3.1 useCallback y useMemo
 
-> **Funciones usadas en useEffect DEBEN estar en useCallback.**
-
 ```typescript
 // ✅ Correcto
 const loadData = useCallback(async () => {
@@ -291,36 +252,14 @@ const loadData = useCallback(async () => {
 
 useEffect(() => {
   loadData();
-}, [loadData]);  // carga cuando cambia loadData
+}, [loadData]);
 
-// ❌ Incorrecto - función inline en useEffect
+// ❌ Incorrecto
 useEffect(() => {
   async function loadData() { ... }
   loadData();
 }, [tenant?.slug]);
 ```
-
-> **Filters/derivados usar useMemo:**
-
-```typescript
-const filteredProducts = useMemo(() => {
-  return products.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
-}, [products, search]);
-```
-
----
-
-## 3.2 Componentes Optimizados
-
-Los siguientes componentes ya tienen las optimizaciones aplicadas:
-- Inventory.tsx
-- POS.tsx
-- Employees.tsx
-- Purchases.tsx
-- Recipes.tsx
-- Sales.tsx
 
 ---
 
@@ -330,27 +269,19 @@ Los siguientes componentes ya tienen las optimizaciones aplicadas:
 
 ```bash
 src/test/
-├── result-types.test.ts      # Tipos Result<T,E>
-├── logger.test.ts           # Logger estructurado
-├── circuit-breaker.test.ts  # Circuit breaker
-├── service-validation.test.ts # Validaciones
-├── tenant-store.test.ts    # Zustand stores
-├── theme-store.test.ts      # Tema
-├── pos-sales.test.ts       # Lógica POS
-├── purchases.test.ts       # Compras
-├── recipes-production.test.ts # Recetas
-└── reports.test.ts         # Reportes
+├── products.service.test.ts    # Productos
+├── images.service.test.ts      # Imágenes
+├── employees.service.test.ts  # Empleados
+├── circuit-breaker.test.ts    # Circuit breaker
+├── pos-sales.test.ts          # Lógica POS
+└── ...
 ```
 
 ## 4.2 Mocks Estándar
 
 ```typescript
 vi.mock('@/store/useTenantStore', () => ({
-  useTenantStore: {
-    getState: vi.fn(() => ({
-      currentTenant: { id: 'uuid', slug: 'test-tenant' },
-    })),
-  },
+  useTenantStore: { getState: vi.fn(() => ({ currentTenant: { slug: 'test' } })) },
 }));
 
 vi.mock('@/lib/sync/SyncEngine', () => ({
@@ -363,15 +294,12 @@ vi.mock('@/lib/sync/SyncEngine', () => ({
 # SECCIÓN 5: Eventos del Sistema
 
 ```typescript
-import { EventBus, Events } from '@/lib/events/EventBus';
-
-Events.SALE_COMPLETED      // 'sale.completed'
-Events.SALE_CANCELLED       // 'sale.cancelled'
-Events.INVENTORY_UPDATED    // 'inventory.updated'
-Events.STOCK_LOW            // 'stock.low'
+Events.SALE_COMPLETED     // 'sale.completed'
+Events.SALE_CANCELLED     // 'sale.cancelled'
+Events.INVENTORY_UPDATED  // 'inventory.updated'
+Events.STOCK_LOW          // 'stock.low'
 Events.SYNC_STATUS_CHANGED // 'sync.status.changed'
-Events.CONFLICT_DETECTED   // 'conflict.detected'
-Events.TENANT_CHANGED      // 'tenant.changed'
+Events.CONFLICT_DETECTED // 'conflict.detected'
 ```
 
 ---
@@ -380,10 +308,10 @@ Events.TENANT_CHANGED      // 'tenant.changed'
 
 - [ ] ¿La lógica está en un servicio, no en el componente?
 - [ ] ¿El servicio retorna `Result<T, AppError>`?
-- [ ] ¿Las escrituras siguen: Validar → Dexie → SyncEngine → EventBus?
+- [ ] ¿Las escrituras usan transacción si modifican múltiples tablas?
 - [ ] ¿Se usa `useToast()` en lugar de `alert()`?
-- [ ] ¿Nueva tabla tiene RLS con `check_tenant_access`?
-- [ ] ¿Se usa `tenant.slug` para filtrar en Dexie y `tenant_slug` en Supabase?
+- [ ] ¿Nueva tabla tiene RLS?
+- [ ] ¿Se usa `tenant.slug` para filtrar en Dexie?
 - [ ] ¿Hay test para el servicio?
 - [ ] ¿`npm run lint` pasa (0 errores)?
 - [ ] ¿`npm run test` pasa?
@@ -398,13 +326,13 @@ Events.TENANT_CHANGED      // 'tenant.changed'
 | `src/lib/db/index.ts` | Schema Dexie |
 | `src/types/result.ts` | Result<T>, AppError |
 | `src/lib/sync/SyncEngine.ts` | Sincronización offline |
-| `src/lib/logger.ts` | Logging estructurado |
-| `src/store/useTenantStore.ts` | Tenant + rol |
-| `src/store/useThemeStore.ts` | Tema dinámico |
 | `src/features/*/services/*.service.ts` | Servicios por módulo |
 
 ---
 
-## Módulos
+## Errores Comunes a Evitar
 
-- Login, AdminPanel, Inventory, POS, Sales, Purchases, Recipes, Reports, Employees
+1. **delete() en Dexie**: Usar `db.table.delete(localId)` ❌ → `db.table.where('localId').equals(localId).delete()` ✅
+2. **Sin transacción**: Modificar múltiples tablas sin `db.transaction()` ❌
+3. **No deducir stock**: En ventas, siempre deducir inventario ✅
+4. **Acceso directo a Supabase**: Desde servicios, siempre pasar por Dexie + SyncEngine

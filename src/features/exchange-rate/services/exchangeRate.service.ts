@@ -2,6 +2,7 @@ import { db, TenantSetting } from '@/lib/db';
 import { useTenantStore } from '@/store/useTenantStore';
 import { logger, logCategories } from '@/lib/logger';
 import { EventBus, Events } from '@/lib/events/EventBus';
+import { Ok, Err, Result, AppError, isOk } from '@/types/result';
 
 export interface ExchangeRate {
   rate: number;
@@ -16,31 +17,31 @@ const SETTING_SOURCE_KEY = 'bcv_rate_source';
 function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
-    throw new Error('No hay tenant activo');
+    throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
   }
   return currentTenant.slug;
 }
 
-export async function getExchangeRate(): Promise<ExchangeRate | null> {
+export async function getExchangeRate(): Promise<Result<ExchangeRate | null, AppError>> {
   try {
     const tenantSlug = getCurrentTenantSlug();
     const settings = await db.settings.where({ tenantId: tenantSlug, key: SETTING_KEY }).first();
     
     if (!settings) {
-      return null;
+      return Ok(null);
     }
 
     const updatedSetting = await db.settings.where({ tenantId: tenantSlug, key: SETTING_UPDATED_KEY }).first();
     const sourceSetting = await db.settings.where({ tenantId: tenantSlug, key: SETTING_SOURCE_KEY }).first();
 
-    return {
+    return Ok({
       rate: Number(settings.value) || 0,
       updatedAt: updatedSetting ? new Date(updatedSetting.value as string) : new Date(),
       source: (sourceSetting?.value as 'api' | 'manual') || 'manual',
-    };
+    });
   } catch (error) {
     logger.warn('Error getting exchange rate', { error: error instanceof Error ? error.message : 'Unknown', category: logCategories.SALES });
-    return null;
+    return Err(new AppError('Error al obtener tasa de cambio', 'GET_EXCHANGE_RATE_ERROR', 500));
   }
 }
 
@@ -118,9 +119,9 @@ export async function updateExchangeRate(manualRate?: number): Promise<{ success
       const fetchedRate = await fetchBCVRate();
       
       if (!fetchedRate) {
-        const cached = await getExchangeRate();
-        if (cached) {
-          return { success: false, error: 'API no disponible. Usando tasa cacheada: ' + cached.rate };
+        const cachedResult = await getExchangeRate();
+        if (isOk(cachedResult) && cachedResult.value) {
+          return { success: false, error: 'API no disponible. Usando tasa cacheada: ' + cachedResult.value.rate };
         }
         return { success: false, error: 'No hay tasa disponible. Configure manualmente.' };
       }
@@ -160,9 +161,9 @@ export function shouldUpdateRate(lastUpdated: Date | null): boolean {
 }
 
 export async function autoUpdateIfNeeded(): Promise<void> {
-  const current = await getExchangeRate();
+  const result = await getExchangeRate();
   
-  if (!current || shouldUpdateRate(current.updatedAt)) {
+  if (isOk(result) && result.value && shouldUpdateRate(result.value.updatedAt)) {
     await updateExchangeRate();
   }
 }

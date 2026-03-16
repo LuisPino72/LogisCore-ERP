@@ -10,6 +10,7 @@ import { initializeCatalogs } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { db } from "@/lib/db";
 import { SyncEngine } from "@/lib/sync/SyncEngine";
+import { isOk } from "@/types/result";
 import {
   Package,
   ShoppingCart,
@@ -264,9 +265,9 @@ function App() {
       (async () => {
         const { getExchangeRate, autoUpdateIfNeeded } = await import('@/features/exchange-rate/services/exchangeRate.service');
         await autoUpdateIfNeeded();
-        const rate = await getExchangeRate();
-        if (rate) {
-          setExchangeRate({ rate: rate.rate, updatedAt: rate.updatedAt, source: rate.source });
+        const result = await getExchangeRate();
+        if (isOk(result) && result.value) {
+          setExchangeRate({ rate: result.value.rate, updatedAt: result.value.updatedAt, source: result.value.source });
         }
       })();
     }
@@ -508,9 +509,9 @@ function App() {
                     setIsUpdatingRate(true);
                     const { updateExchangeRate, getExchangeRate } = await import('@/features/exchange-rate/services/exchangeRate.service');
                     await updateExchangeRate();
-                    const rate = await getExchangeRate();
-                    if (rate) {
-                      setExchangeRate({ rate: rate.rate, updatedAt: rate.updatedAt, source: rate.source });
+                    const result = await getExchangeRate();
+                    if (isOk(result) && result.value) {
+                      setExchangeRate({ rate: result.value.rate, updatedAt: result.value.updatedAt, source: result.value.source });
                     }
                     setIsUpdatingRate(false);
                   }}
@@ -527,9 +528,9 @@ function App() {
                   setIsUpdatingRate(true);
                   const { updateExchangeRate, getExchangeRate } = await import('@/features/exchange-rate/services/exchangeRate.service');
                   await updateExchangeRate();
-                  const rate = await getExchangeRate();
-                  if (rate) {
-                    setExchangeRate({ rate: rate.rate, updatedAt: rate.updatedAt, source: rate.source });
+                  const result = await getExchangeRate();
+                  if (isOk(result) && result.value) {
+                    setExchangeRate({ rate: result.value.rate, updatedAt: result.value.updatedAt, source: result.value.source });
                   }
                   setIsUpdatingRate(false);
                 }}

@@ -4,7 +4,6 @@ import { EventBus, Events } from '@/lib/events/EventBus';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, ValidationError, AppError, isOk } from '@/types/result';
 import { logger, logCategories } from '@/lib/logger';
-import { updateStock } from '@/features/inventory/services/products.service';
 
 function getCurrentTenantId(): string {
   const { currentTenant } = useTenantStore.getState();
@@ -157,7 +156,7 @@ export async function deleteRecipe(localId: string): Promise<Result<void, AppErr
       return Err(recipeResult.error);
     }
 
-    await db.recipes.delete(localId);
+    await db.recipes.where('localId').equals(localId).delete();
     await SyncEngine.addToQueue('recipes', 'delete', { localId }, localId);
     
     logger.info('Receta eliminada', { recipeId: localId, category: logCategories.DATABASE });
@@ -210,28 +209,41 @@ export async function produce(localId: string, quantity: number): Promise<Result
     
     const ingredientsUsed: { productId: string; quantity: number }[] = [];
     
-    for (const ing of recipe.ingredients) {
-      const usedQuantity = (ing.quantity * quantity) / recipe.yield;
-      const updateResult = await updateStock(ing.productId, -usedQuantity);
-      
-      if (!isOk(updateResult)) {
-        return Err(updateResult.error);
+    await db.transaction('rw', db.products, db.productionLogs, async () => {
+      for (const ing of recipe.ingredients) {
+        const usedQuantity = (ing.quantity * quantity) / recipe.yield;
+        
+        const product = await db.products
+          .where('localId')
+          .equals(ing.productId)
+          .filter(p => p.tenantId === getCurrentTenantId())
+          .first();
+        
+        if (!product || product.stock < usedQuantity) {
+          throw new ValidationError(`Stock insuficiente para ${ing.productId}`);
+        }
+        
+        await db.products.put({
+          ...product,
+          stock: product.stock - usedQuantity,
+          updatedAt: new Date(),
+        });
+        
+        ingredientsUsed.push({ productId: ing.productId, quantity: usedQuantity });
       }
       
-      ingredientsUsed.push({ productId: ing.productId, quantity: usedQuantity });
-    }
-    
-    const productionLog: ProductionLog = {
-      localId: crypto.randomUUID(),
-      tenantId: getCurrentTenantId(),
-      recipeId: localId,
-      quantity,
-      ingredientsUsed,
-      createdAt: new Date(),
-    };
-    
-    await db.productionLogs.add(productionLog);
-    await SyncEngine.addToQueue('production_logs', 'create', productionLog as unknown as Record<string, unknown>, productionLog.localId);
+      const productionLog: ProductionLog = {
+        localId: crypto.randomUUID(),
+        tenantId: getCurrentTenantId(),
+        recipeId: localId,
+        quantity,
+        ingredientsUsed,
+        createdAt: new Date(),
+      };
+      
+      await db.productionLogs.add(productionLog);
+      await SyncEngine.addToQueue('production_logs', 'create', productionLog as unknown as Record<string, unknown>, productionLog.localId);
+    });
     
     logger.info('Producción registrada', { 
       recipeId: localId, 
