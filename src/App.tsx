@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { SyncEngine } from "@/lib/sync/SyncEngine";
 import { isOk } from "@/lib/types/result";
 import { logger, logCategories } from "@/lib/logger";
+import { verifySession } from "@/features/auth/services/auth.service";
 import {
   Package,
   ShoppingCart,
@@ -88,11 +89,24 @@ function App() {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<{ rate: number; updatedAt: Date; source: string } | null>(null);
   const [isUpdatingRate, setIsUpdatingRate] = useState(false);
+  const [isVerifyingSession, setIsVerifyingSession] = useState(true);
 
   const isUpdatePasswordPage = window.location.pathname === "/update-password";
 
   useEffect(() => {
     applyCssVariables();
+  }, []);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      setIsVerifyingSession(true);
+      const result = await verifySession();
+      if (!isOk(result) || !result.value) {
+        useTenantStore.getState().clear();
+      }
+      setIsVerifyingSession(false);
+    };
+    checkAuth();
   }, []);
 
   useEffect(() => {
@@ -106,6 +120,11 @@ function App() {
     }
     previousRole.current = role;
   }, [role]);
+
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    useTenantStore.getState().clear();
+  }, []);
 
   useEffect(() => {
     // Aplicar tema del tenant si hay uno configurado
@@ -297,6 +316,17 @@ function App() {
 
   if (isUpdatePasswordPage) {
     return <UpdatePassword />;
+  }
+
+  if (isVerifyingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-(--bg-primary)">
+        <div className="flex items-center gap-3">
+          <Loader2 className="w-6 h-6 text-(--brand-500) animate-spin" />
+          <span className="text-(--text-secondary)">Verificando sesión...</span>
+        </div>
+      </div>
+    );
   }
 
   if (!role) {
@@ -613,7 +643,7 @@ function App() {
               </div>
             </div>
             <button
-              onClick={() => useTenantStore.getState().clear()}
+              onClick={handleSignOut}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) rounded-lg transition-colors text-sm">
               <LogOut className="w-4 h-4" />
               Cerrar Sesión
@@ -621,7 +651,7 @@ function App() {
           </div>
         ) : (
           <button
-            onClick={() => useTenantStore.getState().clear()}
+            onClick={handleSignOut}
             className="w-full flex items-center justify-center p-2 bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) rounded-lg transition-colors"
             title="Cerrar Sesión">
             <LogOut className="w-5 h-5" />
@@ -697,7 +727,7 @@ function App() {
                   {role}
                 </span>
                 <button
-                  onClick={() => useTenantStore.getState().clear()}
+                  onClick={handleSignOut}
                   className="text-xs text-(--text-muted) hover:text-(--text-primary) transition-colors">
                   Cerrar Sesión
                 </button>
