@@ -1,280 +1,42 @@
-import { useState, useEffect, Fragment } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useTenantStore, TenantThemeConfig } from '@/store/useTenantStore'
-import { useToast } from '@/providers/ToastProvider'
+import { useState, Fragment } from 'react'
+import { useAdmin } from '../hooks/useAdmin'
 import {
   Search, LayoutGrid, List, ChevronDown, ChevronUp,
   Store, Hash, Users, Plus, Edit2, LogIn,
   Building2, X, Check, Palette, KeyRound
 } from 'lucide-react'
+import { ALL_MODULES, DEFAULT_THEME_CONFIG } from '../types/admin.types'
+import type { Tenant, TenantConfig, TenantThemeConfig } from '../types/admin.types'
 
-const ALL_MODULES = [
-  { id: 'sales', label: 'Ventas' },
-  { id: 'inventory', label: 'Inventario' },
-  { id: 'purchases', label: 'Compras' },
-  { id: 'recipes', label: 'Recetas' },
-  { id: 'pos', label: 'Punto de Venta' },
-  { id: 'employees', label: 'Empleados' },
-] as const
-
-interface TenantModules {
-  sales?: boolean
-  inventory?: boolean
-  purchases?: boolean
-  recipes?: boolean
-  reports?: boolean
-  dashboard?: boolean
-  pos?: boolean
-  [key: string]: boolean | undefined
+function getThemeConfig(config: TenantConfig | undefined): TenantThemeConfig {
+  return config?.themeConfig || DEFAULT_THEME_CONFIG
 }
 
-interface TenantConfig {
-  logoUrl?: string
-  maxEmployees?: number
-  themeConfig?: TenantThemeConfig
-  ownerId?: string
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  })
 }
 
-interface Tenant {
-  id: string
-  name: string
-  slug: string
-  modules: TenantModules
-  config: TenantConfig
-  created_at: string
+function renderModuleBadges(tenant: Tenant) {
+  const activeModuleIds = Object.keys(tenant.modules || {}).filter(m => tenant.modules[m])
+  const modulesToShow = ALL_MODULES.filter(mod => activeModuleIds.includes(mod.id))
+  
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {modulesToShow.map(mod => (
+        <span key={mod.id} className="px-2 py-0.5 bg-(--brand-500)/10 text-(--brand-400) text-[10px] rounded-md uppercase tracking-wide border border-(--brand-500)/20 font-medium">
+          {mod.label}
+        </span>
+      ))}
+    </div>
+  )
 }
 
-type ViewMode = 'table' | 'grid' | 'expandable'
-
-export default function AdminPanel() {
-  const [tenants, setTenants] = useState<Tenant[]>([])
-  const [filteredTenants, setFilteredTenants] = useState<Tenant[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<ViewMode>('table')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [slug, setSlug] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
-  const [ownerUsername, setOwnerUsername] = useState('')
-  const [ownerPassword, setOwnerPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [ownerLoading, setOwnerLoading] = useState(false)
-  const { showError, showSuccess } = useToast()
-  const startImpersonation = useTenantStore((state) => state.startImpersonation)
-
-  const getThemeConfig = (config: TenantConfig | undefined): TenantThemeConfig => {
-    return config?.themeConfig || { themeColor: '#ea580c', mode: 'dark', accentIntensity: 'normal' }
-  }
-
-  useEffect(() => {
-    fetchTenants()
-  }, [])
-
-  useEffect(() => {
-    const query = searchQuery.toLowerCase()
-    const filtered = tenants.filter(t =>
-      t.name.toLowerCase().includes(query) ||
-      t.slug.toLowerCase().includes(query)
-    )
-    setFilteredTenants(filtered)
-  }, [searchQuery, tenants])
-
-  const fetchTenants = async () => {
-    const { data } = await supabase.from('tenants').select('*').order('created_at', { ascending: false })
-    if (data) {
-      setTenants(data)
-      setFilteredTenants(data)
-    }
-  }
-
-  const handleImpersonate = (tenant: Tenant) => {
-    startImpersonation({
-      id: tenant.id,
-      name: tenant.name,
-      slug: tenant.slug,
-      modules: tenant.modules,
-      config: tenant.config as unknown as Record<string, unknown>
-    })
-  }
-
-  const handleCreateTenant = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    const { error } = await supabase.from('tenants').insert([
-      { name, slug: slug.toLowerCase().replace(/\s+/g, '-') }
-    ])
-    if (error) {
-      showError('Error al crear tenant: ' + error.message)
-    } else {
-      showSuccess('Tenant creado correctamente')
-      setName('')
-      setSlug('')
-      fetchTenants()
-    }
-    setLoading(false)
-  }
-
-  const handleUpdateTenant = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingTenant) return
-    setLoading(true)
-    const { error } = await supabase.from('tenants').update({
-      name: editingTenant.name,
-      modules: editingTenant.modules,
-      config: editingTenant.config
-    }).eq('id', editingTenant.id)
-    if (error) {
-      showError('Error al actualizar: ' + error.message)
-    } else {
-      showSuccess('Cambios guardados correctamente')
-      setEditingTenant(null)
-      fetchTenants()
-    }
-    setLoading(false)
-  }
-
-  const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!editingTenant || !e.target.files || e.target.files.length === 0) return
-    const file = e.target.files[0]
-    setLoading(true)
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${editingTenant.id}-logo-${Date.now()}.${fileExt}`
-    const { error: uploadError } = await supabase.storage
-      .from('tenant_assets')
-      .upload(fileName, file, { upsert: true })
-    if (uploadError) {
-      showError('Error subiendo logo: ' + uploadError.message)
-    } else {
-      const { data } = supabase.storage.from('tenant_assets').getPublicUrl(fileName)
-      setEditingTenant({
-        ...editingTenant,
-        config: { ...editingTenant.config, logoUrl: data.publicUrl }
-      })
-      showSuccess('Logo actualizado')
-    }
-    setLoading(false)
-  }
-
-  const handleCreateOwner = async () => {
-    if (!editingTenant) return
-    if (!ownerUsername.trim()) {
-      showError('El nombre de usuario es requerido')
-      return
-    }
-    if (!ownerPassword || ownerPassword.length < 6) {
-      showError('La contraseña debe tener al menos 6 caracteres')
-      return
-    }
-    if (ownerPassword !== confirmPassword) {
-      showError('Las contraseñas no coinciden')
-      return
-    }
-
-    setOwnerLoading(true)
-    try {
-      const email = ownerUsername.trim()
-      
-      // Crear un cliente temporal que no persista la sesión para evitar que el admin actual sea desconectado
-      // Se utiliza un almacenamiento nulo para garantizar el aislamiento total
-      const tempClient = (await import('@supabase/supabase-js')).createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-        { 
-          auth: { 
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-            storage: {
-              getItem: () => null,
-              setItem: () => {},
-              removeItem: () => {}
-            }
-          } 
-        }
-      )
-
-      const { data: authData, error: authError } = await tempClient.auth.signUp({
-        email,
-        password: ownerPassword,
-        options: {
-          data: {
-            username: ownerUsername,
-            tenant_id: editingTenant.id
-          }
-        }
-      })
-
-      if (authError) {
-        if (authError.message.includes('already registered')) {
-          showError('Ya existe un usuario con ese nombre')
-        } else {
-          showError('Error al crear usuario: ' + authError.message)
-        }
-        setOwnerLoading(false)
-        return
-      }
-
-      if (authData.user) {
-        const { error: roleError } = await supabase.from('user_roles').insert({
-          user_id: authData.user.id,
-          tenant_id: editingTenant.id,
-          role: 'owner'
-        })
-
-        if (roleError) {
-          showError('Error al asignar rol de dueño: ' + roleError.message)
-          setOwnerLoading(false)
-          return
-        }
-
-        const newConfig = { ...editingTenant.config, ownerId: authData.user.id }
-        const { error: updateError } = await supabase.from('tenants').update({
-          config: newConfig
-        }).eq('id', editingTenant.id)
-
-        if (updateError) {
-          showError('Error al actualizar tenant: ' + updateError.message)
-        } else {
-          setEditingTenant({ ...editingTenant, config: newConfig })
-          showSuccess(`Usuario "${ownerUsername}" creado exitosamente como dueño`)
-          setOwnerUsername('')
-          setOwnerPassword('')
-          setConfirmPassword('')
-        }
-      }
-    } catch (_error) {
-      showError('Error al crear usuario owner')
-    }
-    setOwnerLoading(false)
-  }
-
-
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    })
-  }
-
-  const renderModuleBadges = (tenant: Tenant) => {
-    const activeModuleIds = Object.keys(tenant.modules || {}).filter(m => tenant.modules[m])
-    const modulesToShow = ALL_MODULES.filter(mod => activeModuleIds.includes(mod.id))
-    
-    return (
-      <div className="flex flex-wrap gap-1.5">
-        {modulesToShow.map(mod => (
-          <span key={mod.id} className="px-2 py-0.5 bg-(--brand-500)/10 text-(--brand-400) text-[10px] rounded-md uppercase tracking-wide border border-(--brand-500)/20 font-medium">
-            {mod.label}
-          </span>
-        ))}
-      </div>
-    )
-  }
-
-  const renderEmptyState = () => (
+function renderEmptyState(onCreate: () => void) {
+  return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="w-24 h-24 bg-(--bg-tertiary) rounded-full flex items-center justify-center mb-6 ring-4 ring-(--border-color)/50">
         <Building2 className="w-12 h-12 text-(--text-muted)" />
@@ -282,7 +44,7 @@ export default function AdminPanel() {
       <h3 className="text-xl font-semibold text-(--text-primary) mb-2">No hay negocios registrados</h3>
       <p className="text-(--text-secondary) mb-8 max-w-sm">Comienza creando tu primer negocio para gestionar tus tenants.</p>
       <button
-        onClick={() => setEditingTenant(null)}
+        onClick={onCreate}
         className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-(--brand-600) to-(--brand-500) hover:from-(--brand-500) hover:to-(--brand-400) text-white rounded-xl transition-all duration-200 shadow-lg shadow-(--brand-900)/20 hover:shadow-(--brand-500)/30 hover:scale-105 active:scale-95"
       >
         <Plus className="w-5 h-5" />
@@ -290,8 +52,10 @@ export default function AdminPanel() {
       </button>
     </div>
   )
+}
 
-  const renderTenantCard = (tenant: Tenant) => (
+function renderTenantCard(tenant: Tenant, onImpersonate: (t: Tenant) => void, onEdit: (t: Tenant) => void) {
+  return (
     <div key={tenant.id} className="bg-(--bg-secondary) border border-(--border-color) rounded-2xl p-5 shadow-lg hover:shadow-xl hover:border-(--brand-500)/30 transition-all duration-300 group">
       <div className="flex items-start gap-4 mb-4">
         <div className="w-14 h-14 bg-(--bg-tertiary) rounded-xl flex items-center justify-center overflow-hidden shrink-0 ring-4 ring-(--border-subtle) group-hover:ring-(--brand-500)/30 transition-all">
@@ -318,14 +82,14 @@ export default function AdminPanel() {
       </div>
       <div className="flex gap-2 pt-4 border-t border-(--border-color)">
         <button
-          onClick={() => handleImpersonate(tenant)}
+          onClick={() => onImpersonate(tenant)}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-linear-to-r from-(--brand-600) to-(--brand-500) hover:from-(--brand-500) hover:to-(--brand-400) text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-md shadow-(--brand-900)/20 hover:shadow-(--brand-500)/30"
         >
           <LogIn className="w-4 h-4" />
           Entrar
         </button>
         <button
-          onClick={() => setEditingTenant(tenant)}
+          onClick={() => onEdit(tenant)}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-secondary) rounded-xl text-sm font-medium transition-all duration-200 border border-(--border-color) hover:border-(--brand-500)/30"
         >
           <Edit2 className="w-4 h-4" />
@@ -334,6 +98,72 @@ export default function AdminPanel() {
       </div>
     </div>
   )
+}
+
+export default function AdminPanel() {
+  const {
+    filteredTenants,
+    loading,
+    searchQuery,
+    viewMode,
+    expandedId,
+    editingTenant,
+    setSearchQuery,
+    setViewMode,
+    setExpandedId,
+    setEditingTenant,
+    createTenant,
+    updateTenant,
+    uploadLogo,
+    createOwner,
+    handleImpersonate,
+  } = useAdmin()
+
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [ownerUsername, setOwnerUsername] = useState('')
+  const [ownerPassword, setOwnerPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [ownerLoading, setOwnerLoading] = useState(false)
+
+  const handleCreateTenant = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const success = await createTenant(name, slug)
+    if (success) {
+      setName('')
+      setSlug('')
+    }
+  }
+
+  const handleUpdateTenant = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingTenant) return
+    await updateTenant(editingTenant.id, {
+      name: editingTenant.name,
+      modules: editingTenant.modules,
+      config: editingTenant.config,
+    })
+  }
+
+  const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!editingTenant || !e.target.files || e.target.files.length === 0) return
+    const file = e.target.files[0]
+    await uploadLogo(editingTenant.id, file)
+  }
+
+  const handleCreateOwner = async () => {
+    if (!editingTenant) return
+    if (!ownerUsername.trim()) return
+    if (!ownerPassword || ownerPassword.length < 6) return
+    if (ownerPassword !== confirmPassword) return
+
+    setOwnerLoading(true)
+    await createOwner(editingTenant.id, ownerUsername, ownerPassword)
+    setOwnerUsername('')
+    setOwnerPassword('')
+    setConfirmPassword('')
+    setOwnerLoading(false)
+  }
 
   return (
     <div className="space-y-6">
@@ -507,33 +337,9 @@ export default function AdminPanel() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-(--text-muted) mb-2 font-medium">Color Secundario (opcional)</label>
-                    <div className="flex gap-3">
-                      <input
-                        type="color"
-                        value={getThemeConfig(editingTenant.config).themeColorSecondary || '#65a30d'}
-                        onChange={(e) => {
-                          const tc = getThemeConfig(editingTenant.config)
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, themeColorSecondary: e.target.value } } })
-                        }}
-                        className="h-12 w-12 rounded-xl border-2 border-(--border-color) bg-(--bg-tertiary) cursor-pointer hover:scale-105 transition-transform"
-                      />
-                      <input
-                        type="text"
-                        value={getThemeConfig(editingTenant.config).themeColorSecondary || '#65a30d'}
-                        onChange={(e) => {
-                          const tc = getThemeConfig(editingTenant.config)
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, themeColorSecondary: e.target.value } } })
-                        }}
-                        className="flex-1 bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) font-mono uppercase text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
                     <label className="block text-xs text-(--text-muted) mb-2 font-medium">Intensidad del Color</label>
                     <div className="flex gap-2">
-                      {(['subtle', 'normal', 'bold'] as const).map((intensity) => (
+                      {(['subtle', 'normal', 'intense'] as const).map((intensity) => (
                         <button
                           key={intensity}
                           type="button"
@@ -551,20 +357,6 @@ export default function AdminPanel() {
                         </button>
                       ))}
                     </div>
-                  </div>
-                  <div className="pt-3 border-t border-(--border-color)">
-                    <p className="text-xs text-(--text-muted)">
-                      Vista previa:
-                      <span
-                        className="ml-2 px-3 py-1.5 rounded-lg font-medium inline-block"
-                        style={{
-                          backgroundColor: getThemeConfig(editingTenant.config).themeColor,
-                          color: 'white'
-                        }}
-                      >
-                        Botón
-                      </span>
-                    </p>
                   </div>
                 </div>
               </div>
@@ -668,10 +460,10 @@ export default function AdminPanel() {
       {!editingTenant && (
         <>
           {filteredTenants.length === 0 ? (
-            renderEmptyState()
+            renderEmptyState(() => setEditingTenant(null))
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredTenants.map(renderTenantCard)}
+              {filteredTenants.map((t) => renderTenantCard(t, handleImpersonate, setEditingTenant))}
             </div>
           ) : (
             <section className="bg-(--bg-secondary) border border-(--border-color) rounded-2xl overflow-hidden shadow-xl">

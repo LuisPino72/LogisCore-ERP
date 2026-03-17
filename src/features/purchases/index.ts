@@ -1,1 +1,5 @@
-export { default as Purchases } from "@/features/purchases/components/Purchases";
+export { default as Purchases } from './components/Purchases'
+export { usePurchases } from './hooks/usePurchases'
+export type { PurchaseItem, CreatePurchaseInput, PurchaseStatus, SupplierFormData } from './types/purchases.types'
+export * as purchasesService from './services/purchases.service'
+export * as suppliersService from './services/suppliers.service'

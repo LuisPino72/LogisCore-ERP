@@ -1,76 +1,86 @@
-import { useState, useEffect } from "react";
-import { supabase } from "../../../lib/supabase";
-import { useToast } from "../../../providers/ToastProvider";
-import { Lock, Loader2, Check, ArrowLeft } from "lucide-react";
-import Emblema from "../../../assets/Emblema.ico";
+import { useState, useEffect } from 'react';
+import { Lock, Loader2, Check, ArrowLeft } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import Emblema from '../../../assets/Emblema.ico';
 
 export default function UpdatePassword() {
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { showError, showSuccess } = useToast();
+  const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
+  const { updatePassword, verifyRecoveryToken, isLoading } = useAuth();
 
   useEffect(() => {
-    const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        const hashParams = new URLSearchParams(
-          window.location.hash.substring(1),
-        );
-        const accessToken = hashParams.get("access_token");
-        const type = hashParams.get("type");
-
-        if (!accessToken || type !== "recovery") {
-          setError("Enlace de recuperación inválido o expirado");
-        }
-      }
+    const checkToken = async () => {
+      const valid = await verifyRecoveryToken();
+      setIsValidToken(valid);
     };
-    checkSession();
-  }, []);
+    checkToken();
+  }, [verifyRecoveryToken]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!password.trim()) {
-      setError("Por favor ingresa una contraseña");
+      setError('Por favor ingresa una contraseña');
       return;
     }
 
     if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres");
+      setError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden");
+      setError('Las contraseñas no coinciden');
       return;
     }
 
-    setLoading(true);
-
-    const { error: updateError } = await supabase.auth.updateUser({
-      password,
-    });
-
-    if (updateError) {
-      setError(updateError.message);
-      showError("Error al actualizar contraseña");
-    } else {
+    const result = await updatePassword(password);
+    if (result) {
       setSuccess(true);
-      showSuccess("Contraseña actualizada correctamente");
+    } else {
+      setError('Error al actualizar la contraseña');
     }
-
-    setLoading(false);
   };
 
   const handleGoToLogin = () => {
-    window.location.href = "/";
+    window.location.href = '/';
   };
+
+  if (isValidToken === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-(--bg-primary)">
+        <Loader2 className="w-8 h-8 animate-spin text-(--brand-500)" />
+      </div>
+    );
+  }
+
+  if (isValidToken === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-(--bg-primary) relative overflow-hidden">
+        <div className="w-full max-w-md bg-(--bg-secondary)/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-(--border-color) mx-4">
+          <div className="text-center">
+            <div className="flex justify-center mb-6">
+              <img src={Emblema} alt="LogisCore" className="w-20 h-20 rounded-2xl" />
+            </div>
+            <h2 className="text-2xl font-bold text-(--text-primary)">Enlace inválido</h2>
+            <p className="mt-2 text-(--text-secondary)">
+              El enlace de recuperación ha expirado o es inválido.
+            </p>
+            <button
+              onClick={handleGoToLogin}
+              className="mt-6 flex items-center justify-center gap-2 py-3 px-6 bg-(--brand-600) hover:bg-(--brand-700) text-white rounded-xl transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+              Volver al Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-(--bg-primary) relative overflow-hidden transition-colors duration-500">
@@ -78,13 +88,13 @@ export default function UpdatePassword() {
       <div className="absolute top-1/4 -left-32 w-96 h-96 bg-(--brand-500)/5 rounded-full blur-[100px] pointer-events-none animate-pulse" />
       <div
         className="absolute bottom-1/4 -right-32 w-96 h-96 bg-(--brand-secondary-500,var(--brand-500))/5 rounded-full blur-[100px] pointer-events-none animate-pulse"
-        style={{ animationDelay: "1s" }}
+        style={{ animationDelay: '1s' }}
       />
       <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
           backgroundImage: `radial-gradient(var(--text-muted) 0.5px, transparent 0.5px)`,
-          backgroundSize: "32px 32px",
+          backgroundSize: '32px 32px',
         }}
       />
 
@@ -175,15 +185,15 @@ export default function UpdatePassword() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className="w-full flex items-center justify-center py-4 px-4 bg-linear-to-r from-(--brand-700) to-(--brand-600) hover:from-(--brand-600) hover:to-(--brand-500) text-white text-lg font-bold rounded-2xl shadow-xl shadow-(--brand-900)/20 hover:shadow-(--brand-500)/30 transition-all duration-300 hover:scale-[0.98] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
-              {loading ? (
+              {isLoading ? (
                 <>
                   <Loader2 className="animate-spin h-5 w-5 mr-3" />
                   Actualizando...
                 </>
               ) : (
-                "Actualizar Contraseña"
+                'Actualizar Contraseña'
               )}
             </button>
           </form>

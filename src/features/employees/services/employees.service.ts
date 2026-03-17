@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, AppError, ValidationError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
+import type { EmployeePermissions } from '../types/employees.types';
+import { DEFAULT_EMPLOYEE_PERMISSIONS } from '../types/employees.types';
 
 function getCurrentTenantId(): string {
   const { currentTenant } = useTenantStore.getState();
@@ -12,35 +14,6 @@ function getCurrentTenantId(): string {
   }
   return currentTenant.slug;
 }
-
-export interface EmployeePermissions {
-  can_view_inventory?: boolean;
-  can_create_product?: boolean;
-  can_edit_product?: boolean;
-  can_delete_product?: boolean;
-  can_manage_categories?: boolean;
-  can_view_sales?: boolean;
-  can_cancel_sales?: boolean;
-  can_access_pos?: boolean;
-  can_view_recipes?: boolean;
-  can_create_recipe?: boolean;
-  can_produce?: boolean;
-  [key: string]: boolean | undefined;
-}
-
-export const DEFAULT_EMPLOYEE_PERMISSIONS: EmployeePermissions = {
-  can_view_inventory: false,
-  can_create_product: false,
-  can_edit_product: false,
-  can_delete_product: false,
-  can_manage_categories: false,
-  can_view_sales: false,
-  can_cancel_sales: false,
-  can_access_pos: false,
-  can_view_recipes: false,
-  can_create_recipe: false,
-  can_produce: false,
-};
 
 export async function getEmployees(): Promise<Result<Employee[], AppError>> {
   try {

@@ -1,164 +1,111 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Button, Input, Card } from '@/common';
-import { useToast } from '@/providers/ToastProvider';
-import { Plus, Search, Edit2, Trash2, Package, X, Cloud, CloudOff, LayoutGrid, List, Filter, PackageX, AlertTriangle, Image as ImageIcon, Loader2, Star } from 'lucide-react';
-import { useTenantStore } from '@/store/useTenantStore';
-import { createProduct, updateProduct, deleteProduct, getProducts } from '../services/products.service';
-import { getCategories, createCategory } from '../services/categories.service';
-import { uploadProductImage } from '../services/images.service';
-import { Product, Category } from '@/lib/db';
-import { EventBus, Events } from '@/lib/events/EventBus';
-import { isOk } from '@/lib/types/result';
-import { logger, logCategories } from '@/lib/logger';
-
-type ViewMode = 'table' | 'grid';
-type StockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
-type StatusFilter = 'all' | 'active' | 'inactive';
+import { useEffect, useCallback } from 'react'
+import { Button, Input, Card } from '@/common'
+import { Plus, Search, Edit2, Trash2, Package, X, Cloud, CloudOff, LayoutGrid, List, Filter, Image as ImageIcon, Loader2, Star } from 'lucide-react'
+import { useInventory } from '../hooks/useInventory'
+import { EventBus, Events } from '@/lib/events/EventBus'
+import { logger, logCategories } from '@/lib/logger'
+import type { Product } from '@/lib/db'
 
 export default function Inventory() {
-  const [search, setSearch] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<number | string>('');
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
-  const [stockFilter, setStockFilter] = useState<StockFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [priceRange, setPriceRange] = useState({ min: '', max: '' });
-  const [form, setForm] = useState({
-    name: '',
-    sku: '',
-    price: '0',
-    cost: '0',
-    stock: '0',
-    categoryId: undefined as number | undefined,
-    imageUrl: undefined as string | undefined,
-    isFavorite: false,
-    isActive: true,
-  });
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [showNewCategory, setShowNewCategory] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-
-  const tenant = useTenantStore((state) => state.currentTenant);
-  const { showError, showSuccess } = useToast();
-
-  const loadData = useCallback(async () => {
-    if (!tenant?.slug) return;
-    setLoading(true);
-    try {
-      const [prodData, catData] = await Promise.all([
-        getProducts(),
-        getCategories()
-      ]);
-      setProducts(prodData);
-      setCategories(catData);
-    } catch (error) {
-      showError('Error al cargar datos del inventario');
-      logger.error('Error loading inventory data', error instanceof Error ? error : undefined, { category: logCategories.INVENTORY });
-    } finally {
-      setLoading(false);
-    }
-  }, [tenant?.slug, showError]);
+  const {
+    categories,
+    loading,
+    filters,
+    filteredProducts,
+    form,
+    imageFile,
+    imagePreview,
+    uploadingImage,
+    showModal,
+    showFilters,
+    editingId,
+    showNewCategory,
+    newCategoryName,
+    setSearch,
+    setSelectedCategory,
+    setViewMode,
+    setStockFilter,
+    setStatusFilter,
+    setPriceRange,
+    setForm,
+    setImageFile,
+    setImagePreview,
+    setUploadingImage,
+    setShowModal,
+    setShowFilters,
+    setEditingId,
+    setShowNewCategory,
+    setNewCategoryName,
+    loadData,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    createCategory,
+    uploadImage,
+    resetForm,
+    getStockStatus,
+    hasActiveFilters,
+  } = useInventory()
 
   useEffect(() => {
-    loadData();
-    const unsubscribeInv = EventBus.on(Events.INVENTORY_UPDATED, loadData);
-    const unsubscribeSync = EventBus.on(Events.SYNC_STATUS_CHANGED, loadData);
+    loadData()
+    const unsubscribeInv = EventBus.on(Events.INVENTORY_UPDATED, loadData)
+    const unsubscribeSync = EventBus.on(Events.SYNC_STATUS_CHANGED, loadData)
     return () => {
-      unsubscribeInv();
-      unsubscribeSync();
-    };
-  }, [loadData]);
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-                           p.sku.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = !selectedCategory || p.categoryId === Number(selectedCategory);
-      
-      let matchesStock = true;
-      if (stockFilter === 'in_stock') matchesStock = p.stock > 10;
-      else if (stockFilter === 'low_stock') matchesStock = p.stock > 0 && p.stock <= 10;
-      else if (stockFilter === 'out_of_stock') matchesStock = p.stock === 0;
-      
-      let matchesStatus = true;
-      if (statusFilter === 'active') matchesStatus = p.isActive;
-      else if (statusFilter === 'inactive') matchesStatus = !p.isActive;
-      
-      let matchesPrice = true;
-      if (priceRange.min) matchesPrice = p.price >= Number(priceRange.min);
-      if (priceRange.max) matchesPrice = matchesPrice && p.price <= Number(priceRange.max);
-      
-      return matchesSearch && matchesCategory && matchesStock && matchesStatus && matchesPrice;
-    });
-  }, [products, search, selectedCategory, stockFilter, statusFilter, priceRange.min, priceRange.max]);
-
-  const resetForm = useCallback(() => {
-    setForm({ name: '', sku: '', price: '0', cost: '0', stock: '0', categoryId: undefined, imageUrl: undefined, isFavorite: false, isActive: true });
-    setImageFile(null);
-    setImagePreview(null);
-    setEditingId(null);
-    setShowNewCategory(false);
-    setNewCategoryName('');
-  }, []);
+      unsubscribeInv()
+      unsubscribeSync()
+    }
+  }, [loadData])
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
-      let imageUrl = form.imageUrl;
+      let imageUrl = form.imageUrl
       
       if (imageFile) {
-        setUploadingImage(true);
-        const tempId = editingId || crypto.randomUUID();
-        const uploadResult = await uploadProductImage(imageFile, tempId);
-        setUploadingImage(false);
+        setUploadingImage(true)
+        const tempId = editingId || crypto.randomUUID()
+        const uploadResult = await uploadImage(imageFile, tempId)
+        setUploadingImage(false)
         
-        if (!isOk(uploadResult)) {
-          showError(uploadResult.error.message);
-          return;
+        if (!uploadResult) {
+          return
         }
-        imageUrl = uploadResult.value;
+        imageUrl = uploadResult
       }
 
       const productData = {
-        name: form.name,
-        sku: form.sku,
-        price: Number(form.price) || 0,
-        cost: Number(form.cost) || 0,
-        stock: Number(form.stock) || 0,
-        categoryId: form.categoryId,
+        ...form,
         imageUrl,
-        isFavorite: form.isFavorite,
-        isActive: form.isActive,
-      };
+      }
 
       if (editingId) {
-        const result = await updateProduct(editingId, productData);
-        if (!isOk(result)) {
-          showError(result.error.message);
-          return;
+        const success = await updateProduct(editingId, {
+          name: productData.name,
+          sku: productData.sku,
+          price: Number(productData.price) || 0,
+          cost: Number(productData.cost) || 0,
+          stock: Number(productData.stock) || 0,
+          categoryId: productData.categoryId,
+          imageUrl,
+          isFavorite: productData.isFavorite,
+          isActive: productData.isActive,
+        })
+        if (success) {
+          setShowModal(false)
+          resetForm()
         }
-        showSuccess('Producto actualizado correctamente');
       } else {
-        const result = await createProduct(productData);
-        if (!isOk(result)) {
-          showError(result.error.message);
-          return;
+        const success = await createProduct(productData)
+        if (success) {
+          setShowModal(false)
+          resetForm()
         }
-        showSuccess('Producto creado correctamente');
       }
-      setShowModal(false);
-      resetForm();
-    } catch (_error) {
-      showError('Error al guardar producto');
+    } catch (error) {
+      logger.error('Error saving product', error instanceof Error ? error : undefined, { category: logCategories.INVENTORY })
     }
-  }, [form, imageFile, editingId, showError, showSuccess, resetForm]);
+  }, [form, imageFile, editingId, uploadImage, updateProduct, createProduct, setShowModal, setUploadingImage, resetForm])
 
   const handleEdit = useCallback((product: Product) => {
     setForm({
@@ -171,54 +118,28 @@ export default function Inventory() {
       imageUrl: product.imageUrl,
       isFavorite: product.isFavorite || false,
       isActive: product.isActive,
-    });
-    setImagePreview(product.imageUrl || null);
-    setEditingId(product.localId);
-    setShowModal(true);
-  }, []);
+    })
+    setImagePreview(product.imageUrl || null)
+    setEditingId(product.localId)
+    setShowModal(true)
+  }, [setForm, setImagePreview, setEditingId, setShowModal])
 
   const handleDelete = useCallback(async (localId: string) => {
     if (confirm('¿Estás seguro de eliminar este producto?')) {
-      const result = await deleteProduct(localId);
-      if (!isOk(result)) {
-        showError(result.error.message);
-        return;
-      }
-      showSuccess('Producto eliminado correctamente');
+      await deleteProduct(localId)
     }
-  }, [showError, showSuccess]);
+  }, [deleteProduct])
 
   const handleCreateCategory = useCallback(async () => {
-    if (!newCategoryName.trim()) {
-      showError('El nombre de la categoría es requerido');
-      return;
-    }
-    
-    const result = await createCategory({ name: newCategoryName.trim(), description: '' });
-    if (!isOk(result)) {
-      showError(result.error.message);
-      return;
-    }
-    
-    showSuccess('Categoría creada correctamente');
-    const catData = await getCategories();
-    setCategories(catData);
-    setShowNewCategory(false);
-    setNewCategoryName('');
-  }, [newCategoryName, showError, showSuccess]);
-
-  const getStockStatus = (stock: number) => {
-    if (stock === 0) return { label: 'Sin Stock', color: 'text-red-400 bg-red-500/10', icon: PackageX };
-    if (stock <= 10) return { label: 'Stock Bajo', color: 'text-amber-400 bg-amber-500/10', icon: AlertTriangle };
-    return { label: 'En Stock', color: 'text-green-400 bg-green-500/10', icon: Package };
-  };
-
-  const hasActiveFilters = selectedCategory || stockFilter !== 'all' || statusFilter !== 'all' || priceRange.min || priceRange.max;
+    if (!newCategoryName.trim()) return
+    await createCategory(newCategoryName.trim())
+    setShowNewCategory(false)
+    setNewCategoryName('')
+  }, [newCategoryName, createCategory, setShowNewCategory, setNewCategoryName])
 
   const renderProductCard = (product: Product) => {
-    const stockStatus = getStockStatus(product.stock);
-    const StockIcon = stockStatus.icon;
-    const category = categories.find(c => c.id === product.categoryId);
+    const stockStatus = getStockStatus(product.stock)
+    const category = categories.find(c => c.id === product.categoryId)
     
     return (
       <div key={product.localId} className="bg-(--bg-secondary) border border-(--border-color) rounded-xl p-4 shadow-lg hover:shadow-xl transition-all">
@@ -263,8 +184,8 @@ export default function Inventory() {
           </div>
           <div className="text-right">
             <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md ${stockStatus.color}`}>
-              <StockIcon className="w-3 h-3" />
-              <span className="text-xs font-medium">{product.stock}</span>
+              <span className="text-xs font-medium">{stockStatus.label}</span>
+              <span className="text-xs font-bold">{product.stock}</span>
             </div>
           </div>
         </div>
@@ -283,8 +204,8 @@ export default function Inventory() {
           )}
         </div>
       </div>
-    );
-  };
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -297,14 +218,14 @@ export default function Inventory() {
           <div className="flex items-center bg-(--bg-tertiary)/50 rounded-lg p-1 border border-(--border-color)">
             <button
               onClick={() => setViewMode('table')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-(--brand-600) text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-md transition-colors ${filters.viewMode === 'table' ? 'bg-(--brand-600) text-white' : 'text-slate-400 hover:text-white'}`}
               title="Vista Tabla"
             >
               <List className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-(--brand-600) text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-md transition-colors ${filters.viewMode === 'grid' ? 'bg-(--brand-600) text-white' : 'text-slate-400 hover:text-white'}`}
               title="Vista Grid"
             >
               <LayoutGrid className="w-4 h-4" />
@@ -325,7 +246,7 @@ export default function Inventory() {
               <input
                 type="text"
                 placeholder="Buscar por nombre o SKU..."
-                value={search}
+                value={filters.search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500) transition-all font-sans"
               />
@@ -346,7 +267,7 @@ export default function Inventory() {
                 <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Categoría</label>
                 <select 
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
-                  value={selectedCategory}
+                  value={filters.selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                 >
                   <option value="">Todas</option>
@@ -359,8 +280,8 @@ export default function Inventory() {
                 <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Stock</label>
                 <select 
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
-                  value={stockFilter}
-                  onChange={(e) => setStockFilter(e.target.value as StockFilter)}
+                  value={filters.stockFilter}
+                  onChange={(e) => setStockFilter(e.target.value as any)}
                 >
                   <option value="all">Todos</option>
                   <option value="in_stock">En Stock (&gt;10)</option>
@@ -372,8 +293,8 @@ export default function Inventory() {
                 <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Estado</label>
                 <select 
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                  value={filters.statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
                 >
                   <option value="all">Todos</option>
                   <option value="active">Activos</option>
@@ -386,15 +307,15 @@ export default function Inventory() {
                   <input
                     type="number"
                     placeholder="Min"
-                    value={priceRange.min}
-                    onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
+                    value={filters.priceRange.min}
+                    onChange={(e) => setPriceRange({ ...filters.priceRange, min: e.target.value })}
                     className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   />
                   <input
                     type="number"
                     placeholder="Max"
-                    value={priceRange.max}
-                    onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
+                    value={filters.priceRange.max}
+                    onChange={(e) => setPriceRange({ ...filters.priceRange, max: e.target.value })}
                     className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   />
                 </div>
@@ -403,7 +324,7 @@ export default function Inventory() {
           )}
         </div>
 
-        {viewMode === 'grid' ? (
+        {filters.viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {loading ? (
               <div className="col-span-full py-10 text-center text-slate-500">Cargando productos...</div>
@@ -446,8 +367,7 @@ export default function Inventory() {
                   </tr>
                 ) : (
                   filteredProducts.map((product) => {
-                    const stockStatus = getStockStatus(product.stock);
-                    const StockIcon = stockStatus.icon;
+                    const stockStatus = getStockStatus(product.stock)
                     return (
                       <tr key={product.localId} className="border-b border-(--border-color) hover:bg-(--brand-500)/5 transition-colors group">
                         <td className="py-4 px-4">
@@ -474,7 +394,6 @@ export default function Inventory() {
                         </td>
                         <td className="py-4 px-4 text-right">
                           <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${stockStatus.color}`}>
-                            <StockIcon className="w-3 h-3" />
                             <span className="font-bold">{product.stock}</span>
                           </div>
                         </td>
@@ -500,7 +419,7 @@ export default function Inventory() {
                           </div>
                         </td>
                       </tr>
-                    );
+                    )
                   })
                 )}
               </tbody>
@@ -557,10 +476,10 @@ export default function Inventory() {
                             accept="image/jpeg,image/png,image/webp,image/gif"
                             className="hidden"
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
+                              const file = e.target.files?.[0]
                               if (file) {
-                                setImageFile(file);
-                                setImagePreview(URL.createObjectURL(file));
+                                setImageFile(file)
+                                setImagePreview(URL.createObjectURL(file))
                               }
                             }}
                             disabled={uploadingImage}
@@ -720,5 +639,5 @@ export default function Inventory() {
         </div>
       )}
     </div>
-  );
+  )
 }

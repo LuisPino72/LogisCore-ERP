@@ -1,2 +1,7 @@
-export { default as Inventory } from './components/Inventory';
-export * from './services/products.service';
+export { default as Inventory } from './components/Inventory'
+export { useInventory } from './hooks/useInventory'
+export type { ViewMode, StockFilter, StatusFilter, ProductFormData } from './types/inventory.types'
+export { DEFAULT_PRODUCT_FORM } from './types/inventory.types'
+export * as productsService from './services/products.service'
+export * as categoriesService from './services/categories.service'
+export * as imagesService from './services/images.service'

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getEmployees, createEmployee, deleteEmployee, DEFAULT_EMPLOYEE_PERMISSIONS } from '../services/employees.service';
+import { getEmployees, createEmployee, deleteEmployee } from '../services/employees.service';
+import { DEFAULT_EMPLOYEE_PERMISSIONS } from '../types/employees.types';
 import { isOk, isErr } from '@/lib/types/result';
 
 vi.mock('@/store/useTenantStore', () => ({

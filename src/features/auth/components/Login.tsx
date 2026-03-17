@@ -1,144 +1,57 @@
-import { useState } from "react";
-import { supabase } from "../../../lib/supabase";
-import { useTenantStore, TenantConfig } from "../../../store/useTenantStore";
-import { useToast } from "../../../providers/ToastProvider";
-import { User, Lock, Loader2, ArrowLeft } from "lucide-react";
-import Emblema from "../../../assets/Emblema.ico";
+import { useState } from 'react';
+import { User, Lock, Loader2, ArrowLeft } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../../../providers/ToastProvider';
+import Emblema from '../../../assets/Emblema.ico';
+
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [recoverySent, setRecoverySent] = useState(false);
-  const setRole = useTenantStore((state) => state.setRole);
-  const setTenant = useTenantStore((state) => state.setTenant);
-  const { showError, showSuccess } = useToast();
+  const { signIn, resetPassword, isLoading } = useAuth();
+  const { showError } = useToast();
 
   const handleRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim()) {
-      showError("Por favor ingresa tu correo electrónico");
+      showError('Por favor ingresa tu correo electrónico');
       return;
     }
 
-    setLoading(true);
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
-    });
-
-    if (error) {
-      showError("Error al enviar correo: " + error.message);
-    } else {
-      showSuccess(
-        "Correo de recuperación enviado. Revisa tu bandeja de entrada.",
-      );
+    const success = await resetPassword(email);
+    if (success) {
       setRecoverySent(true);
     }
-
-    setLoading(false);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim() || !password.trim()) {
-      showError("Por favor ingresa correo y contraseña");
+      showError('Por favor ingresa correo y contraseña');
       return;
     }
 
-    setLoading(true);
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      showError("Error al iniciar sesión: " + error.message);
-      setLoading(false);
-      return;
-    }
-
-    if (data.user) {
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select(`
-          role,
-          permissions,
-          tenants (
-            id,
-            name,
-            slug,
-            modules,
-            config
-          )
-        `)
-        .eq("user_id", data.user.id);
-
-      if (roles && roles.length > 0) {
-        const preferredRole = 
-          roles.find((r) => r.role === "super_admin") || 
-          roles.find((r) => r.role === "owner") || 
-          roles[0];
-        
-        const employeePermissions = preferredRole.role === 'employee' ? (preferredRole.permissions || {}) : {};
-        setRole(preferredRole.role as any, employeePermissions);
-        
-        if (preferredRole.role === 'super_admin') {
-          setTenant(null);
-          showSuccess("Panel de Administración de LogisCore");
-        } else {
-          const rawTenant = preferredRole.tenants;
-          let tenantData = Array.isArray(rawTenant) ? rawTenant[0] : rawTenant;
-          
-          if (tenantData) {
-            const { data: tenantRows } = await supabase
-              .from("tenants")
-              .select("id")
-              .eq("slug", tenantData.slug)
-              .single();
-            
-            if (tenantRows) {
-              tenantData = { ...tenantData, id: tenantRows.id };
-            }
-            
-            setTenant(tenantData as unknown as TenantConfig);
-            showSuccess(`¡Bienvenido a ${tenantData.name}!`);
-          } else {
-            showError("No se encontró información de la empresa.");
-          }
-        }
-      } else {
-        showError(
-          "Tu usuario no tiene un rol o empresa asignada. Contacta al administrador.",
-        );
-        await supabase.auth.signOut();
-      }
-    }
-
-    setLoading(false);
+    await signIn({ email, password });
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-(--bg-primary) relative overflow-hidden transition-colors duration-500">
-      {/* Dynamic background gradient */}
       <div className="absolute inset-0 bg-linear-to-br from-(--bg-primary) via-(--bg-secondary) to-(--bg-tertiary)" />
 
-      {/* Decorative brand glow - subtle and dynamic */}
       <div className="absolute top-1/4 -left-32 w-96 h-96 bg-(--brand-500)/5 rounded-full blur-[100px] pointer-events-none animate-pulse" />
       <div
         className="absolute bottom-1/4 -right-32 w-96 h-96 bg-(--brand-secondary-500,var(--brand-500))/5 rounded-full blur-[100px] pointer-events-none animate-pulse"
-        style={{ animationDelay: "1s" }}
+        style={{ animationDelay: '1s' }}
       />
 
-      {/* Subtle pattern overlay - simplified and variable controlled */}
       <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
           backgroundImage: `radial-gradient(var(--text-muted) 0.5px, transparent 0.5px)`,
-          backgroundSize: "32px 32px",
+          backgroundSize: '32px 32px',
         }}
       />
 
@@ -205,15 +118,15 @@ export default function Login() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isLoading}
             className="w-full flex items-center justify-center py-4 px-4 bg-linear-to-r from-(--brand-700) to-(--brand-600) hover:from-(--brand-600) hover:to-(--brand-500) text-white text-lg font-bold rounded-2xl shadow-xl shadow-(--brand-900)/20 hover:shadow-(--brand-500)/30 transition-all duration-300 hover:scale-[0.98] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
-            {loading ? (
+            {isLoading ? (
               <>
                 <Loader2 className="animate-spin h-5 w-5 mr-3" />
                 Verificando...
               </>
             ) : (
-              "Entrar al Panel"
+              'Entrar al Panel'
             )}
           </button>
 
@@ -267,7 +180,7 @@ export default function Login() {
             {recoverySent ? (
               <div className="text-center py-4">
                 <p className="text-(--brand-400) text-sm">
-                  Se ha enviado un correo de recuperación a{" "}
+                  Se ha enviado un correo de recuperación a{' '}
                   <strong>{email}</strong>
                 </p>
                 <p className="text-(--text-muted) text-xs mt-2">
@@ -277,15 +190,15 @@ export default function Login() {
             ) : (
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isLoading}
                 className="w-full flex items-center justify-center py-4 px-4 bg-linear-to-r from-(--brand-700) to-(--brand-600) hover:from-(--brand-600) hover:to-(--brand-500) text-white text-lg font-bold rounded-2xl shadow-xl shadow-(--brand-900)/20 hover:shadow-(--brand-500)/30 transition-all duration-300 hover:scale-[0.98] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
-                {loading ? (
+                {isLoading ? (
                   <>
                     <Loader2 className="animate-spin h-5 w-5 mr-3" />
                     Enviando...
                   </>
                 ) : (
-                  "Enviar Correo de Recuperación"
+                  'Enviar Correo de Recuperación'
                 )}
               </button>
             )}

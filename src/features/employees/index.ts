@@ -1,1 +1,5 @@
-export { default as Employees } from "@/features/employees/components/Employees";
+export { default as Employees } from './components/Employees'
+export { useEmployees } from './hooks/useEmployees'
+export type { EmployeePermissions } from './types/employees.types'
+export { DEFAULT_EMPLOYEE_PERMISSIONS, PERMISSION_LABELS } from './types/employees.types'
+export * as employeesService from './services/employees.service'
