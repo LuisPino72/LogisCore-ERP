@@ -24,9 +24,49 @@ npm run test:watch # Watch mode
 
 ---
 
-# SECCIÓN 1: Reglas de Arquitectura (OBLIGATORIAS)
+# SECCIÓN 1: Identificadores de Base de Datos
 
-## 1.1 Capa de Servicios — SIN EXCEPCIONES
+## 1.1 Estructura de Identificadores
+
+| Campo | Tipo | Dónde se usa | Descripción |
+|-------|------|--------------|-------------|
+| `tenant_id` | UUID | Supabase (FK) | ID real del tenant (relación a tabla `tenants`) |
+| `tenant_slug` | text | Supabase + Dexie | Slug amigable del tenant para filtrado rápido |
+| `tenantId` | text | Dexie (local) | **Siempre guardar el `slug`, NO el UUID** |
+| `local_id` | UUID | Supabase | UUID generado en cliente antes de sincronizar |
+| `localId` | string | Dexie (local) | Mismo valor que `local_id` en Supabase |
+
+### Flujo de creación de registro:
+```typescript
+// 1. Generar localId
+const localId = crypto.randomUUID();
+
+// 2. Guardar en Dexie con tenantId = slug
+await db.products.add({
+  localId,
+  tenantId: currentTenant.slug,  // ← SLUG, NO UUID
+  name: '...'
+});
+
+// 3. Encolar sync (envía ambos)
+await SyncEngine.addToQueue('products', 'create', product, localId);
+// SyncEngine envía: p_tenant_uuid (UUID) y p_tenant_slug (slug)
+```
+
+### Filtrado correcto:
+```typescript
+// Dexie: filtrar por slug
+db.products.where('tenantId').equals(tenant.slug).toArray()
+
+// Supabase: filtrar por tenant_slug (NO por tenant_id en consultas públicas)
+supabase.from('products').eq('tenant_slug', tenant.slug)
+```
+
+---
+
+## SECCIÓN 2: Arquitectura (OBLIGATORIAS)
+
+## 2.1 Capa de Servicios — SIN EXCEPCIONES
 
 > **NUNCA llames a Supabase o Dexie directamente desde un componente React.**
 
@@ -35,49 +75,11 @@ npm run test:watch # Watch mode
 ❌ Componente → Supabase/Dexie directo
 ```
 
-```typescript
-// ✅ Correcto - en el componente
-const result = await createProduct(data);
-
-// ✅ Correcto - en products.service.ts
-await db.products.add(product);           // 1. Guardar local
-await SyncEngine.addToQueue(...);        // 2. Encolar sync
-EventBus.emit(Events.INVENTORY_UPDATED);  // 3. Notificar
-```
-
----
-
-## 1.2 Patrón Result<T, AppError>
+## 2.2 Patrón Result<T, AppError>
 
 > **Toda función async de servicio debe retornar `Result<T, AppError>`.**
 
-```typescript
-import { Ok, Err, Result, AppError, ValidationError, isOk } from '@/types/result';
-
-export async function createProduct(data: ProductData): Promise<Result<string, AppError>> {
-  try {
-    if (!data.name?.trim()) return Err(new ValidationError('El nombre es requerido'));
-    
-    await db.products.add(product);
-    await SyncEngine.addToQueue(...);
-    
-    return Ok(localId);
-  } catch (error) {
-    return Err(new AppError('Error al crear', 'CREATE_ERROR', 500));
-  }
-}
-
-// ✅ Uso correcto en componente
-const result = await createProduct(data);
-if (!isOk(result)) {
-  showError(result.error.message);  // NUNCA alert()
-  return;
-}
-```
-
----
-
-## 1.3 Offline-First: Orden OBLIGATORIO
+## 2.3 Offline-First: Orden OBLIGATORIO
 
 ```typescript
 // 1. Validar localmente
@@ -95,54 +97,92 @@ EventBus.emit(Events.INVENTORY_UPDATED, { action: 'create', product });
 
 > **Si omites el paso 3, los datos NO se sincronizan con Supabase.**
 
----
-
-## 1.4 Multi-Tenencia
-
-```typescript
-// Dexie (local): filtrar por slug (tenantId = tenant.slug)
-db.products.where('tenantId').equals(tenant.slug).toArray()
-
-// Supabase (remoto): filtrar por tenant_slug (texto)
-supabase.from('products').eq('tenant_slug', tenant.slug)
-```
-
-> **CRÍTICO: El campo `tenantId` en Dexie debe almacenar el `slug` del tenant, NO el UUID.**
-> **En Supabase, usar la columna `tenant_slug` para filtrar, no `tenant_id`.**
-
----
-
-## 1.5 Transacciones en Dexie
+## 2.4 Transacciones en Dexie
 
 > **Para operaciones que modifican múltiples tablas, usar transacciones.**
 
+---
+
+## SECCIÓN 3: Login y Carga de Datos
+
+## 3.1 Flujo de Login
+
+1. Usuario inicia sesión con email/password
+2. Supabase Auth valida credenciales
+3. Se consultan `user_roles` del usuario
+4. Si es `super_admin` → acceso al panel de admin (sin tenant)
+5. Si es `owner`/`employee` → se carga el `tenant` relacionado
+
+## 3.2 Estructura de user_roles
+
+```sql
+-- Un usuario puede tener múltiples registros (uno por empresa)
+user_roles:
+  - user_id (FK a auth.users)
+  - role: 'super_admin' | 'owner' | 'employee'
+  - tenant_id: UUID (FK a tenants) - NULL para super_admin
+  - tenant_slug: text -冗余 para consultas rápidas
+  - permissions: jsonb
+```
+
+**Reglas:**
+- `super_admin`: `tenant_id = NULL` (acceso a todas las empresas)
+- `owner`/`employee`: `tenant_id = UUID` específico de la empresa
+
+## 3.3 Carga de Datos al Iniciar Sesión
+
 ```typescript
-await db.transaction('rw', db.sales, db.products, async () => {
-  for (const item of data.items) {
-    const product = await db.products.where('localId').equals(item.productId).first();
-    if (!product || product.stock < item.quantity) {
-      throw new ValidationError(`Stock insuficiente para ${item.productName}`);
-    }
-    await db.products.put({ ...product, stock: product.stock - item.quantity });
-  }
-  await db.sales.add(sale);
+// App.tsx - loadTenantData
+// Consultar Supabase filtrando por tenant_slug EXACTO
+supabase.from("products").eq('tenant_slug', tenantSlug)
+
+// IMPORTANTE: No usar .or() con null - puede traer datos incorrectos
+// ✅ Correcto
+supabase.from("products").eq('tenant_slug', tenantSlug)
+// ❌ Incorrecto
+supabase.from("products").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`)
+```
+
+### Sanitize functions (Mapear de Supabase a Dexie):
+```typescript
+// Usar local_id como localId (fallback a id para datos antiguos)
+const sanitizeProduct = (p: Record<string, unknown>) => ({
+  localId: String(p.local_id ?? p.id ?? ""),  // ← local_id primero
+  tenantId: tenantSlug,
+  // ...
 });
 ```
 
 ---
 
-## 1.6 Sincronización con Supabase
+## SECCIÓN 4: Sincronización
+
+## 4.1 Edge Function sync_table_item
+
+La función RPC recibe:
+- `p_table`: nombre de la tabla
+- `p_operation`: 'create' | 'update' | 'delete'
+- `p_data`: datos del registro
+- `p_local_id`: UUID local
+- `p_tenant_uuid`: UUID del tenant (para FK)
+- `p_tenant_slug`: slug del tenant (para columna tenant_slug)
+
+**La función debe:**
+1. Agregar `local_id` al datos
+2. Agregar `tenant_id` (UUID) en operaciones create/update
+3. Agregar `tenant_slug` en operaciones create/update
+4. Eliminar `tenant_slug` del payload si existe (evitar duplicado)
+
+## 4.2 Circuit Breaker
 
 ```typescript
-// Al encolar para sync
-await SyncEngine.addToQueue('products', 'create', product, localId);
-
-// Función RPC: sync_table_item(p_table, p_operation, p_data, p_local_id, p_tenant_slug)
+const state = SyncEngine.getCircuitStatus();
+// { status: 'closed' | 'open' | 'half-open', failures: number, ... }
 ```
 
 ---
 
-## 1.7 RLS (Row Level Security)
+## SECCIÓN 5: RLS (Row Level Security)
 
 > **Toda tabla nueva DEBE tener RLS activado.**
 
@@ -151,7 +191,9 @@ CREATE OR REPLACE FUNCTION check_tenant_access(target_tenant_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
-    SELECT 1 FROM user_roles WHERE tenant_id = target_tenant_id AND user_id = auth.uid()
+    SELECT 1 FROM user_roles
+    WHERE user_id = auth.uid()
+    AND (role = 'super_admin' OR tenant_id = target_tenant_id)
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -164,86 +206,34 @@ CREATE POLICY tenant_scoped_access ON public.nueva_tabla
 
 ---
 
-## 1.8 Notificaciones — SOLO ToastProvider
+## SECCIÓN 6: Mejoras de Calidad
 
+## 6.1 Notificaciones — SOLO ToastProvider
 ```typescript
-// ✅ Correcto
 const { showError, showSuccess, showInfo } = useToast();
-showError('Error al guardar');
-
-// ❌ PROHIBIDO
-alert('Error al guardar');
+showError('Error al guardar');  // ✅
+alert('Error al guardar');     // ❌ PROHIBIDO
 ```
 
----
-
-## 1.9 Imports — Usar alias `@/`
-
+## 6.2 Imports — Usar alias `@/`
 ```typescript
-// ✅ Correcto
 import { db } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
-
-// ❌ Evitar
-import { db } from '../../../lib/db';
 ```
 
----
-
-# SECCIÓN 2: Mejoras de Calidad
-
-## 2.1 Logger Estructurado
-
+## 6.3 Logger Estructurado
 ```typescript
 import { logger, logCategories } from '@/lib/logger';
-
 logger.info('Venta creada', { saleId: localId, total });
 logger.error('Error sync', error, { category: logCategories.SYNC });
 ```
-
 **Categorías:** `SYNC`, `AUTH`, `INVENTORY`, `SALES`, `DATABASE`, `UI`
 
 ---
 
-## 2.2 Circuit Breaker en SyncEngine
+## SECCIÓN 7: Patrones React
 
-```typescript
-const state = SyncEngine.getCircuitStatus();
-// { status: 'closed' | 'open' | 'half-open', failures: number, ... }
-```
-
----
-
-## 2.3 Validación de Inputs
-
-```typescript
-function validateSaleInput(data: CreateSaleInput): string[] {
-  const errors: string[] = [];
-  if (!data.items?.length) errors.push('La venta debe tener productos');
-  if (data.total < 0) errors.push('Total no puede ser negativo');
-  return errors;
-}
-```
-
----
-
-## 2.4 Índices en Dexie
-
-```typescript
-this.version(5).stores({
-  products: '++id, localId, tenantId, sku, categoryId, isActive, name',
-  sales: '++id, localId, tenantId, status, createdAt, paymentMethod',
-  employees: '++id, localId, tenantId, role',
-  // ...
-});
-```
-
----
-
-# SECCIÓN 3: Patrones React
-
-## 3.1 useCallback y useMemo
-
+## 7.1 useCallback y useMemo
 ```typescript
 // ✅ Correcto
 const loadData = useCallback(async () => {
@@ -263,22 +253,9 @@ useEffect(() => {
 
 ---
 
-# SECCIÓN 4: Testing
+## SECCIÓN 8: Testing
 
-## 4.1 Archivos de Test
-
-```bash
-src/test/
-├── products.service.test.ts    # Productos
-├── images.service.test.ts      # Imágenes
-├── employees.service.test.ts  # Empleados
-├── circuit-breaker.test.ts    # Circuit breaker
-├── pos-sales.test.ts          # Lógica POS
-└── ...
-```
-
-## 4.2 Mocks Estándar
-
+## 8.1 Mocks Estándar
 ```typescript
 vi.mock('@/store/useTenantStore', () => ({
   useTenantStore: { getState: vi.fn(() => ({ currentTenant: { slug: 'test' } })) },
@@ -291,7 +268,7 @@ vi.mock('@/lib/sync/SyncEngine', () => ({
 
 ---
 
-# SECCIÓN 5: Eventos del Sistema
+## SECCIÓN 9: Eventos del Sistema
 
 ```typescript
 Events.SALE_COMPLETED     // 'sale.completed'
@@ -312,9 +289,9 @@ Events.CONFLICT_DETECTED // 'conflict.detected'
 - [ ] ¿Se usa `useToast()` en lugar de `alert()`?
 - [ ] ¿Nueva tabla tiene RLS?
 - [ ] ¿Se usa `tenant.slug` para filtrar en Dexie?
-- [ ] ¿Hay test para el servicio?
+- [ ] ¿Se usa `tenant_slug` para filtrar en Supabase?
+- [ ] ¿Las sanitize functions usan `local_id` antes que `id`?
 - [ ] ¿`npm run lint` pasa (0 errores)?
-- [ ] ¿`npm run test` pasa?
 - [ ] ¿`npm run build` pasa?
 
 ---
@@ -323,10 +300,12 @@ Events.CONFLICT_DETECTED // 'conflict.detected'
 
 | Archivo | Propósito |
 |---------|-----------|
-| `src/lib/db/index.ts` | Schema Dexie |
+| `src/lib/db/index.ts` | Schema Dexie y tipos |
 | `src/types/result.ts` | Result<T>, AppError |
 | `src/lib/sync/SyncEngine.ts` | Sincronización offline |
 | `src/features/*/services/*.service.ts` | Servicios por módulo |
+| `src/App.tsx` | Login, carga de datos por tenant |
+| Edge Function: `sync_table_item` | Sincronización a Supabase |
 
 ---
 
@@ -336,3 +315,50 @@ Events.CONFLICT_DETECTED // 'conflict.detected'
 2. **Sin transacción**: Modificar múltiples tablas sin `db.transaction()` ❌
 3. **No deducir stock**: En ventas, siempre deducir inventario ✅
 4. **Acceso directo a Supabase**: Desde servicios, siempre pasar por Dexie + SyncEngine
+5. **Filtrar por tenant_id en Supabase**: Usar `tenant_slug` para consultas públicas ✅
+6. **Olvidar tenant_slug en sync**: La edge function debe setear ambos campos ✅
+
+---
+
+## SECCIÓN 10: Estructura de Archivos por Feature
+
+### 10.1 Estructura Obligatoria de Carpetas
+
+```
+src/features/{modulo}/
+├── components/           # Componentes React (UI only)
+│   └── *.tsx
+├── services/            # Lógica de negocio (OBLIGATORIO)
+│   └── *.service.ts
+├── types/               # Tipos específicos del módulo
+│   └── *.types.ts
+├── hooks/               # Custom hooks reutilizables
+│   └── *.ts
+├── __tests__/          # Tests unitarios del módulo
+│   └── *.test.ts
+└── index.ts            # Exports del módulo
+```
+
+### 10.2 Reglas de Organización
+
+| Carpeta | Contenido | Ejemplo |
+|---------|-----------|---------|
+| `components/` | Solo JSX y handlers simples | `Inventory.tsx`, `ProductCard.tsx` |
+| `services/` | Lógica de negocio, validaciones, DB | `products.service.ts`, `sales.service.ts` |
+| `types/` | Interfaces y tipos TypeScript | `Inventory.types.ts` |
+| `hooks/` | Custom hooks reutilizables | `useInventory.ts` |
+| `__tests__/` | Tests unitarios | `products-validation.test.ts` |
+
+### 10.3 Responsabilidades
+
+**components/:**
+- Solo renderizado de UI
+- Usa `useState`, `useEffect`, `useCallback`, `useMemo`
+- Llama a servicios para lógica de negocio
+- NO accede a `db` (Dexie) directamente
+
+**services/:**
+- Toda la lógica de negocio
+- Acceso a Dexie, Supabase, SyncEngine
+- Retorna `Result<T, AppError>`
+- Funciones async

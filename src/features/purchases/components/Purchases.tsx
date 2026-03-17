@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { db, Product, Purchase, Supplier } from "../../../services/db";
+import { db, Product, Purchase, Supplier } from "../../../lib/db";
 import { useTenantStore } from "../../../store/useTenantStore";
-import { SyncEngine } from "../../../services/sync/SyncEngine";
+import { SyncEngine } from "../../../lib/sync/SyncEngine";
+import { useToast } from "../../../providers/ToastProvider";
 import Card from "../../../common/Card";
 import Button from "../../../common/Button";
 import Input from "../../../common/Input";
@@ -34,6 +35,7 @@ export default function Purchases() {
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [search, setSearch] = useState("");
   const [expandedPurchase, setExpandedPurchase] = useState<string | null>(null);
+  const { showSuccess } = useToast();
 
   const [form, setForm] = useState({
     supplierId: "" as string | undefined,
@@ -99,7 +101,7 @@ export default function Purchases() {
     return matchesSearch;
   });
 
-  const addItem = () => {
+  const addItem = useCallback(() => {
     const product = products.find((p) => p.localId === newItem.productId);
     if (!product) return;
 
@@ -118,13 +120,13 @@ export default function Purchases() {
     });
     setNewItem({ productId: "", quantity: 1, cost: 0 });
     setShowAddItem(false);
-  };
+  }, [products, newItem, form]);
 
-  const removeItem = (index: number) => {
+  const removeItem = useCallback((index: number) => {
     setForm({ ...form, items: form.items.filter((_, i) => i !== index) });
-  };
+  }, [form]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!tenant?.slug) return;
     const subtotal = form.items.reduce((sum, item) => sum + item.total, 0);
     const selectedSupplier = suppliers.find(
@@ -162,7 +164,7 @@ export default function Purchases() {
       }
     }
 
-    setPurchases([newPurchase, ...purchases]);
+    setPurchases(prev => [newPurchase, ...prev]);
     setShowModal(false);
     setForm({
       supplierId: undefined,
@@ -170,10 +172,10 @@ export default function Purchases() {
       invoiceNumber: "",
       items: [],
     });
-    alert("Compra registrada y stock actualizado");
-  };
+    showSuccess("Compra registrada y stock actualizado");
+  }, [tenant?.slug, form, suppliers, products, showSuccess]);
 
-  const handleSupplierSubmit = async () => {
+  const handleSupplierSubmit = useCallback(async () => {
     if (!tenant?.slug) return;
 
     const supplierData: Supplier = {
@@ -215,16 +217,16 @@ export default function Purchases() {
     setShowSupplierModal(false);
     setEditingSupplier(null);
     setSupplierForm({ name: "", phone: "", notes: "" });
-  };
+  }, [tenant?.slug, editingSupplier, supplierForm, suppliers]);
 
-  const handleDeleteSupplier = async (localId: string) => {
+  const handleDeleteSupplier = useCallback(async (localId: string) => {
     if (confirm("¿Estás seguro de eliminar este proveedor?")) {
       await db.suppliers.update(localId, { isActive: false });
       setSuppliers(suppliers.filter((s) => s.localId !== localId));
     }
-  };
+  }, [suppliers]);
 
-  const editSupplier = (supplier: Supplier) => {
+  const editSupplier = useCallback((supplier: Supplier) => {
     setSupplierForm({
       name: supplier.name,
       phone: supplier.phone || "",
@@ -232,7 +234,7 @@ export default function Purchases() {
     });
     setEditingSupplier(supplier);
     setShowSupplierModal(true);
-  };
+  }, []);
 
   const totalPending = purchases
     .filter((p) => p.status === "pending")

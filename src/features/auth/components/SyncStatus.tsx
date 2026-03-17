@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { SyncEngine } from "../../../services/sync/SyncEngine";
+import { SyncEngine } from "../../../lib/sync/SyncEngine";
 import { useTenantStore } from "../../../store/useTenantStore";
 import { Wifi, WifiOff, RefreshCw } from "lucide-react";
 

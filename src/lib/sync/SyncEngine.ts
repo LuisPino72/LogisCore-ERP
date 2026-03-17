@@ -178,6 +178,7 @@ class SyncEngineClass {
       data,
       localId,
       tenantId: currentTenant.slug,
+      tenantUuid: currentTenant.id,
       status: 'pending',
       createdAt: new Date(),
       retryCount: 0,
@@ -275,17 +276,25 @@ class SyncEngineClass {
     const snakeCaseData = this.toSnakeCase(item.data);
 
     const syncOperation = async () => {
-      const { error } = await supabase.rpc('sync_table_item', {
-        p_table: item.tableName,
-        p_operation: item.operation,
-        p_data: snakeCaseData,
-        p_local_id: item.localId,
-        p_tenant_slug: item.tenantId,
+      const { data, error } = await supabase.functions.invoke('sync_table_item', {
+        body: {
+          p_table: item.tableName,
+          p_operation: item.operation,
+          p_data: snakeCaseData,
+          p_local_id: item.localId,
+          p_tenant_uuid: item.tenantUuid || item.tenantId,
+          p_tenant_slug: item.tenantId,
+        },
       });
 
       if (error) {
-        logger.error('Sync RPC error', error, { category: logCategories.SYNC });
+        logger.error('Sync Edge Function error', error, { category: logCategories.SYNC });
         throw error;
+      }
+
+      if (data?.error) {
+        logger.error('Sync Edge Function returned error', new Error(data.error), { category: logCategories.SYNC });
+        throw new Error(data.error);
       }
     };
 

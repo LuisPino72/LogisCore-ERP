@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createCategory, updateCategory, deleteCategory } from '../features/inventory/services/categories.service';
+import { createCategory, updateCategory, deleteCategory } from '../services/categories.service';
 import { db } from '@/lib/db';
-import { isOk } from '@/types/result';
+import { isOk } from '@/lib/types/result';
 
 // Mocking dependencies
 vi.mock('@/store/useTenantStore', () => ({

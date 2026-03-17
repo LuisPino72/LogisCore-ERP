@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "../../../services/supabase";
+import { supabase } from "../../../lib/supabase";
 import { useTenantStore, TenantConfig } from "../../../store/useTenantStore";
 import { useToast } from "../../../providers/ToastProvider";
 import { User, Lock, Loader2, ArrowLeft } from "lucide-react";

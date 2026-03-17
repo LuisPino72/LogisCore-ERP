@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { formatBs, shouldUpdateRate } from '../features/exchange-rate/services/exchangeRate.service';
+import { formatBs, shouldUpdateRate } from '../services/exchangeRate.service';
 
 vi.mock('@/store/useTenantStore', () => ({
   useTenantStore: {

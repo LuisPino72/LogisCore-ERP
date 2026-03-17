@@ -8,7 +8,7 @@ import { getCategories, createCategory } from '../services/categories.service';
 import { uploadProductImage } from '../services/images.service';
 import { Product, Category } from '@/lib/db';
 import { EventBus, Events } from '@/lib/events/EventBus';
-import { isOk } from '@/types/result';
+import { isOk } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 
 type ViewMode = 'table' | 'grid';
@@ -99,7 +99,16 @@ export default function Inventory() {
     });
   }, [products, search, selectedCategory, stockFilter, statusFilter, priceRange.min, priceRange.max]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const resetForm = useCallback(() => {
+    setForm({ name: '', sku: '', price: '0', cost: '0', stock: '0', categoryId: undefined, imageUrl: undefined, isFavorite: false, isActive: true });
+    setImageFile(null);
+    setImagePreview(null);
+    setEditingId(null);
+    setShowNewCategory(false);
+    setNewCategoryName('');
+  }, []);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       let imageUrl = form.imageUrl;
@@ -149,7 +158,7 @@ export default function Inventory() {
     } catch (_error) {
       showError('Error al guardar producto');
     }
-  };
+  }, [form, imageFile, editingId, showError, showSuccess, resetForm]);
 
   const handleEdit = useCallback((product: Product) => {
     setForm({
@@ -179,7 +188,7 @@ export default function Inventory() {
     }
   }, [showError, showSuccess]);
 
-  const handleCreateCategory = async () => {
+  const handleCreateCategory = useCallback(async () => {
     if (!newCategoryName.trim()) {
       showError('El nombre de la categoría es requerido');
       return;
@@ -196,16 +205,7 @@ export default function Inventory() {
     setCategories(catData);
     setShowNewCategory(false);
     setNewCategoryName('');
-  };
-
-  const resetForm = useCallback(() => {
-    setForm({ name: '', sku: '', price: '0', cost: '0', stock: '0', categoryId: undefined, imageUrl: undefined, isFavorite: false, isActive: true });
-    setImageFile(null);
-    setImagePreview(null);
-    setEditingId(null);
-    setShowNewCategory(false);
-    setNewCategoryName('');
-  }, []);
+  }, [newCategoryName, showError, showSuccess]);
 
   const getStockStatus = (stock: number) => {
     if (stock === 0) return { label: 'Sin Stock', color: 'text-red-400 bg-red-500/10', icon: PackageX };
@@ -528,7 +528,7 @@ export default function Inventory() {
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               <div className="space-y-4">
                 <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
+                  <div className="shrink-0">
                     <label className="text-sm font-medium text-slate-400 mb-2 block">Imagen</label>
                     <div className="w-24 h-24 rounded-xl border-2 border-dashed border-slate-700 bg-slate-800/50 flex items-center justify-center overflow-hidden relative group">
                       {imagePreview ? (

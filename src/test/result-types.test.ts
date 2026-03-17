@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Ok, Err, isOk, isErr, mapResult, unwrap, unwrapOr, AppError, ValidationError, NotFoundError, UnauthorizedError } from '@/types/result';
+import { Ok, Err, isOk, isErr, mapResult, unwrap, unwrapOr, AppError, ValidationError, NotFoundError, UnauthorizedError } from '@/lib/types/result';
 
 describe('Result Type', () => {
   describe('Ok', () => {

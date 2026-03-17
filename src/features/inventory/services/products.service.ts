@@ -2,9 +2,9 @@ import { db, Product } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { EventBus, Events } from '@/lib/events/EventBus';
 import { useTenantStore } from '@/store/useTenantStore';
-import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/types/result';
+import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/lib/types/result';
 
-function getCurrentTenantId(): string {
+function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
     throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
@@ -12,18 +12,26 @@ function getCurrentTenantId(): string {
   return currentTenant.slug;
 }
 
+function getCurrentTenantId(): string {
+  const { currentTenant } = useTenantStore.getState();
+  if (!currentTenant) {
+    throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
+  }
+  return currentTenant.id;
+}
+
 export async function getProducts(): Promise<Product[]> {
-  const tenantId = getCurrentTenantId();
-  return db.products.where('tenantId').equals(tenantId).toArray();
+  const tenantSlug = getCurrentTenantSlug();
+  return db.products.where('tenantId').equals(tenantSlug).toArray();
 }
 
 export async function getProductById(localId: string): Promise<Result<Product, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantSlug = getCurrentTenantSlug();
     const product = await db.products
       .where('localId')
       .equals(localId)
-      .filter(p => p.tenantId === tenantId)
+      .filter(p => p.tenantId === tenantSlug)
       .first();
     
     if (!product) {

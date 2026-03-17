@@ -2,7 +2,7 @@ import { db, TenantSetting } from '@/lib/db';
 import { useTenantStore } from '@/store/useTenantStore';
 import { logger, logCategories } from '@/lib/logger';
 import { EventBus, Events } from '@/lib/events/EventBus';
-import { Ok, Err, Result, AppError, isOk } from '@/types/result';
+import { Ok, Err, Result, AppError, isOk } from '@/lib/types/result';
 
 export interface ExchangeRate {
   rate: number;

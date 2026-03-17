@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { useTenantStore } from '@/store/useTenantStore';
-import { Ok, Err, Result, AppError } from '@/types/result';
+import { Ok, Err, Result, AppError } from '@/lib/types/result';
 
 export async function uploadProductImage(
   file: File,

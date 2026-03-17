@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { db, Product, Recipe, ProductionLog } from "../../../services/db";
+import { db, Product, Recipe, ProductionLog } from "../../../lib/db";
 import { useTenantStore } from "../../../store/useTenantStore";
-import { SyncEngine } from "../../../services/sync/SyncEngine";
+import { useToast } from "../../../providers/ToastProvider";
+import { SyncEngine } from "../../../lib/sync/SyncEngine";
 import Card from "../../../common/Card";
 import Button from "../../../common/Button";
 import Input from "../../../common/Input";
@@ -40,6 +41,7 @@ export default function Recipes() {
   });
   const [produceQty, setProduceQty] = useState(1);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const { showSuccess } = useToast();
   const tenant = useTenantStore((state) => state.currentTenant);
 
   const loadData = useCallback(async () => {
@@ -68,7 +70,7 @@ export default function Recipes() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleCreateRecipe = async () => {
+  const handleCreateRecipe = useCallback(async () => {
     if (!tenant?.slug || !form.name || !form.productId) return;
 
     const newRecipe: Recipe = {
@@ -105,9 +107,9 @@ export default function Recipes() {
       yield: 1,
       isActive: true,
     });
-  };
+  }, [tenant?.slug, form, recipes]);
 
-  const handleProduce = async () => {
+  const handleProduce = useCallback(async () => {
     if (!tenant?.slug || !selectedRecipe) return;
 
     const ingredientsUsed = selectedRecipe.ingredients.map((ing) => ({
@@ -152,14 +154,12 @@ export default function Recipes() {
       });
     }
 
-    alert(
-      `Producción completada: ${produceQty} unidades de ${selectedRecipe.name}`,
-    );
+    showSuccess(`Producción completada: ${produceQty} unidades de ${selectedRecipe.name}`);
     setSelectedRecipe(null);
     setProduceQty(1);
-  };
+  }, [tenant?.slug, selectedRecipe, produceQty, products, showSuccess]);
 
-  const addIngredient = () => {
+  const addIngredient = useCallback(() => {
     setForm({
       ...form,
       ingredients: [
@@ -167,19 +167,19 @@ export default function Recipes() {
         { productId: "", quantity: 0, unit: "kg" },
       ],
     });
-  };
+  }, [form]);
 
-  const getIngredientStock = (productId: string) => {
+  const getIngredientStock = useCallback((productId: string) => {
     const product = products.find((p) => p.localId === productId);
     return product?.stock || 0;
-  };
+  }, [products]);
 
-  const canProduce = (recipe: Recipe, qty: number) => {
+  const canProduce = useCallback((recipe: Recipe, qty: number) => {
     return recipe.ingredients.every((ing) => {
       const stock = getIngredientStock(ing.productId);
       return stock >= ing.quantity * qty;
     });
-  };
+  }, [getIngredientStock]);
 
   return (
     <div className="space-y-6">

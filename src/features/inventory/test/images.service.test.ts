@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { uploadProductImage, getProductImageUrl } from '../features/inventory/services/images.service';
+import { uploadProductImage, getProductImageUrl } from '../services/images.service';
 import { supabase } from '@/lib/supabase';
-import { isOk, isErr } from '@/types/result';
+import { isOk, isErr } from '@/lib/types/result';
 
 vi.mock('@/store/useTenantStore', () => ({
   useTenantStore: {

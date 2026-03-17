@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createSupplier, updateSupplier, deleteSupplier } from '../features/purchases/services/suppliers.service';
+import { createSupplier, updateSupplier, deleteSupplier } from '../services/suppliers.service';
 import { db } from '@/lib/db';
-import { isOk } from '@/types/result';
+import { isOk } from '@/lib/types/result';
 
 // Mocking dependencies
 vi.mock('@/store/useTenantStore', () => ({

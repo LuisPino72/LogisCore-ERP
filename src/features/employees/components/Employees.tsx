@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTenantStore } from "../../../store/useTenantStore";
 import { getEmployees, createEmployee, updateEmployeePermissions, deleteEmployee, EmployeePermissions, DEFAULT_EMPLOYEE_PERMISSIONS } from "../services/employees.service";
 import { Employee } from "../../../lib/db";
-import { isOk } from "../../../types/result";
+import { isOk } from "@/lib/types/result";
 import { useToast } from "../../../providers/ToastProvider";
 import Card from "../../../common/Card";    
 import Button from "../../../common/Button";
@@ -71,12 +71,12 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, isEditing }: Employe
     }
   };
 
-  const togglePermission = (key: keyof EmployeePermissions) => {
+  const togglePermission = useCallback((key: keyof EmployeePermissions) => {
     setPermissions(prev => ({
       ...prev,
       [key]: !prev[key]
     }));
-  };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -225,15 +225,15 @@ export default function Employees() {
     }
   };
 
-  const openEditModal = (employee: Employee) => {
+  const openEditModal = useCallback((employee: Employee) => {
     setEditingEmployee(employee);
     setModalOpen(true);
-  };
+  }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModalOpen(false);
     setEditingEmployee(undefined);
-  };
+  }, []);
 
   const filteredEmployees = employees.filter((emp) =>
     emp.userId.toLowerCase().includes(search.toLowerCase())

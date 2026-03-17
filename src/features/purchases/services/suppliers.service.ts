@@ -1,7 +1,7 @@
 import { db, Supplier } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { useTenantStore } from '@/store/useTenantStore';
-import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/types/result';
+import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 
 function getCurrentTenantId(): string {
@@ -95,7 +95,7 @@ export async function deleteSupplier(localId: string): Promise<Result<void, AppE
       return Err(new ValidationError('No se puede eliminar un proveedor con historial de compras. Considere desactivarlo.'));
     }
 
-    await db.suppliers.delete(supplier.id!);
+    await db.suppliers.where('localId').equals(localId).delete();
     await SyncEngine.addToQueue('suppliers', 'delete', { localId }, localId);
     
     return Ok(undefined);

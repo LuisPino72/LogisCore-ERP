@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../../../services/supabase";
+import { supabase } from "../../../lib/supabase";
 import { useToast } from "../../../providers/ToastProvider";
 import { Lock, Loader2, Check, ArrowLeft } from "lucide-react";
 import Emblema from "../../../assets/Emblema.ico";

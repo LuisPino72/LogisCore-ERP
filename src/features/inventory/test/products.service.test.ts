@@ -5,8 +5,8 @@ import {
   deleteProduct, 
   updateStock, 
   getProductById 
-} from '../features/inventory/services/products.service';
-import { isOk, isErr } from '@/types/result';
+} from '../services/products.service';
+import { isOk, isErr } from '@/lib/types/result';
 
 vi.mock('@/store/useTenantStore', () => ({
   useTenantStore: {

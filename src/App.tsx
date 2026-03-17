@@ -10,7 +10,8 @@ import { initializeCatalogs } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { db } from "@/lib/db";
 import { SyncEngine } from "@/lib/sync/SyncEngine";
-import { isOk } from "@/types/result";
+import { isOk } from "@/lib/types/result";
+import { logger, logCategories } from "@/lib/logger";
 import {
   Package,
   ShoppingCart,
@@ -143,11 +144,11 @@ function App() {
       setIsLoadingData(true);
       try {
         const [productsRes, categoriesRes, salesRes, recipesRes, purchasesRes] = await Promise.all([
-          supabase.from("products").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
-          supabase.from("categories").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
-          supabase.from("sales").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
-          supabase.from("recipes").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
-          supabase.from("purchases").select("*").or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`),
+          supabase.from("products").select("*").eq('tenant_slug', tenantSlug),
+          supabase.from("categories").select("*").eq('tenant_slug', tenantSlug),
+          supabase.from("sales").select("*").eq('tenant_slug', tenantSlug),
+          supabase.from("recipes").select("*").eq('tenant_slug', tenantSlug),
+          supabase.from("purchases").select("*").eq('tenant_slug', tenantSlug),
         ]);
 
         const productsData = productsRes.data || [];
@@ -157,7 +158,7 @@ function App() {
         const purchasesData = purchasesRes.data || [];
 
         const sanitizeCategory = (c: Record<string, unknown>) => ({
-          localId: String(c.id ?? ""),
+          localId: String(c.local_id ?? c.id ?? ""),
           tenantId: tenantSlug,
           name: String(c.name ?? ""),
           description: c.description ? String(c.description) : undefined,
@@ -168,7 +169,7 @@ function App() {
         });
 
         const sanitizeProduct = (p: Record<string, unknown>) => ({
-          localId: String(p.id ?? ""),
+          localId: String(p.local_id ?? p.id ?? ""),
           tenantId: tenantSlug,
           name: String(p.name ?? ""),
           sku: String(p.sku ?? ""),
@@ -189,7 +190,7 @@ function App() {
         });
 
         const sanitizeSale = (s: Record<string, unknown>) => ({
-          localId: String(s.id ?? ""),
+          localId: String(s.local_id ?? s.id ?? ""),
           tenantId: tenantSlug,
           items: Array.isArray(s.items) ? s.items : [],
           subtotal: Number(s.subtotal) || 0,
@@ -212,7 +213,7 @@ function App() {
         });
 
         const sanitizeRecipe = (r: Record<string, unknown>) => ({
-          localId: String(r.id ?? ""),
+          localId: String(r.local_id ?? r.id ?? ""),
           tenantId: tenantSlug,
           name: String(r.name ?? ""),
           description: r.description ? String(r.description) : undefined,
@@ -227,7 +228,7 @@ function App() {
         });
 
         const sanitizePurchase = (p: Record<string, unknown>) => ({
-          localId: String(p.id ?? ""),
+          localId: String(p.local_id ?? p.id ?? ""),
           tenantId: tenantSlug,
           supplier: String(p.supplier ?? ""),
           invoiceNumber: String(p.invoice_number ?? ""),
@@ -269,7 +270,7 @@ function App() {
           );
         }
       } catch (error) {
-        console.error("Error loading tenant data:", error);
+        logger.error("Error loading tenant data", error instanceof Error ? error : undefined, { category: logCategories.DATABASE });
       } finally {
         setIsLoadingData(false);
       }

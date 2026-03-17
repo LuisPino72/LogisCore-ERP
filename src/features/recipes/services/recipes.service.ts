@@ -2,7 +2,7 @@ import { db, Recipe, ProductionLog } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { EventBus, Events } from '@/lib/events/EventBus';
 import { useTenantStore } from '@/store/useTenantStore';
-import { Ok, Err, Result, ValidationError, AppError, isOk } from '@/types/result';
+import { Ok, Err, Result, ValidationError, AppError, isOk } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 
 function getCurrentTenantId(): string {

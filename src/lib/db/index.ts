@@ -7,6 +7,7 @@ export interface SyncQueueItem {
   data: Record<string, unknown>;
   localId: string;
   tenantId: string;
+  tenantUuid?: string;
   status: 'pending' | 'syncing' | 'failed' | 'conflict' | 'synced';
   errorMessage?: string;
   createdAt: Date;
@@ -183,23 +184,6 @@ class LogisCoreDB extends Dexie {
 
 export const db = new LogisCoreDB();
 
-export async function initializeCatalogs(tenantId: string): Promise<void> {
-  const categoryCount = await db.categories.where({ tenantId }).count();
-  
-  if (categoryCount === 0) {
-    const defaultCategories = [
-      { name: 'General', description: 'Categoría general', tenantId },
-      { name: 'Bebidas', description: 'Bebidas y líquidos', tenantId },
-      { name: 'Comida', description: 'Alimentos preparados', tenantId },
-      { name: 'Insumos', description: 'Materiales e insumos', tenantId },
-    ];
-
-    for (const cat of defaultCategories) {
-      await db.categories.add({
-        ...cat,
-        localId: crypto.randomUUID(),
-        createdAt: new Date(),
-      });
-    }
-  }
+export async function initializeCatalogs(_tenantId: string): Promise<void> {
+  // Categorías por defecto desactivadas - cada empresa crea las suyas
 }

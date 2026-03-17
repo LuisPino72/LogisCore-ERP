@@ -2,7 +2,7 @@ import { db, Employee } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { supabase } from '@/lib/supabase';
 import { useTenantStore } from '@/store/useTenantStore';
-import { Ok, Err, Result, AppError, ValidationError } from '@/types/result';
+import { Ok, Err, Result, AppError, ValidationError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 
 function getCurrentTenantId(): string {

@@ -3,7 +3,7 @@ import { useTenantStore } from "../../../store/useTenantStore";
 import { db, Sale } from "../../../lib/db";
 import { cancelSale } from "../services/sales.service";
 import { formatBs } from "../../exchange-rate/services/exchangeRate.service";
-import { isOk } from "../../../types/result";
+import { isOk } from "@/lib/types/result";
 import { useToast } from "../../../providers/ToastProvider";
 import { logger, logCategories } from "../../../lib/logger";
 import Card from "../../../common/Card";
@@ -116,7 +116,7 @@ export default function Sales() {
     setCurrentPage(1);
   }, [dateRange, paymentFilter, search]);
 
-  const handleCancelSale = async (localId: string) => {
+  const handleCancelSale = useCallback(async (localId: string) => {
     if (!confirm("¿Estás seguro de cancelar esta venta?")) return;
     
     setCancellingId(localId);
@@ -135,7 +135,7 @@ export default function Sales() {
       showError("Error al cancelar la venta");
       setCancellingId(null);
     }
-  };
+  }, [showError, showSuccess]);
 
   const totalRevenue = filteredSales
     .filter((s) => s.status === "completed")

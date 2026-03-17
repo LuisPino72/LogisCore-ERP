@@ -1,7 +1,7 @@
 import { db, Category } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { useTenantStore } from '@/store/useTenantStore';
-import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/types/result';
+import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/lib/types/result';
 
 function getCurrentTenantId(): string {
   const { currentTenant } = useTenantStore.getState();
@@ -87,7 +87,7 @@ export async function deleteCategory(localId: string): Promise<Result<void, AppE
       return Err(new ValidationError('No se puede eliminar una categoría que tiene productos asociados'));
     }
 
-    await db.categories.delete(category.id!);
+    await db.categories.where('localId').equals(localId).delete();
     await SyncEngine.addToQueue('categories', 'delete', { localId }, localId);
     
     return Ok(undefined);
