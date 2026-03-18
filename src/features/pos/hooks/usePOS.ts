@@ -15,7 +15,7 @@ export interface UsePOSReturn {
   cart: CartItem[]
   search: string
   selectedCategory: number | string
-  paymentMethod: 'cash' | 'card'
+  paymentMethod: 'cash' | 'card' | 'pago_movil'
   showCheckout: boolean
   exchangeRate: number
   filteredProducts: Product[]
@@ -24,7 +24,7 @@ export interface UsePOSReturn {
   loading: boolean
   setSearch: (value: string) => void
   setSelectedCategory: (value: number | string) => void
-  setPaymentMethod: (value: 'cash' | 'card') => void
+  setPaymentMethod: (value: 'cash' | 'card' | 'pago_movil') => void
   setShowCheckout: (value: boolean) => void
   addToCart: (product: Product) => void
   updateQuantity: (localId: string, delta: number) => void
@@ -43,7 +43,7 @@ export function usePOS(): UsePOSReturn {
   const [cart, setCart] = useState<CartItem[]>([])
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<number | string>('')
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'pago_movil'>('cash')
   const [showCheckout, setShowCheckout] = useState(false)
   const [exchangeRate, setExchangeRate] = useState(0)
   const [loading, setLoading] = useState(false)

@@ -3,6 +3,7 @@ import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
+import type { SortConfig, DateRange, PurchaseStatus, PurchaseStats } from '../types/purchases.types';
 
 function getCurrentTenantId(): string {
   const { currentTenant } = useTenantStore.getState();
@@ -167,4 +168,107 @@ export async function getPendingPurchases(): Promise<Purchase[]> {
     .equals(tenantId)
     .filter(p => p.status === 'pending')
     .toArray();
+}
+
+export interface FilterOptions {
+  search?: string
+  status?: PurchaseStatus | 'all'
+  dateRange?: DateRange
+  sort?: SortConfig
+  page?: number
+  pageSize?: number
+}
+
+export async function filterPurchases(options: FilterOptions = {}): Promise<{
+  purchases: Purchase[]
+  total: number
+  stats: PurchaseStats
+}> {
+  const tenantId = getCurrentTenantId();
+  const { search = '', status = 'all', dateRange, sort, page = 1, pageSize = 20 } = options;
+
+  let purchases = await db.purchases
+    .where('tenantId')
+    .equals(tenantId)
+    .toArray();
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    purchases = purchases.filter(p =>
+      p.supplier.toLowerCase().includes(searchLower) ||
+      p.invoiceNumber.toLowerCase().includes(searchLower)
+    );
+  }
+
+  if (status !== 'all') {
+    purchases = purchases.filter(p => p.status === status);
+  }
+
+  if (dateRange?.start) {
+    purchases = purchases.filter(p => p.createdAt >= dateRange.start!);
+  }
+  if (dateRange?.end) {
+    purchases = purchases.filter(p => p.createdAt <= dateRange.end!);
+  }
+
+  const stats: PurchaseStats = {
+    totalCompleted: purchases.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.total, 0),
+    totalPending: purchases.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.total, 0),
+    totalCancelled: purchases.filter(p => p.status === 'cancelled').reduce((sum, p) => sum + p.total, 0),
+    countCompleted: purchases.filter(p => p.status === 'completed').length,
+    countPending: purchases.filter(p => p.status === 'pending').length,
+    countCancelled: purchases.filter(p => p.status === 'cancelled').length,
+    avgPurchase: purchases.length > 0 ? purchases.reduce((sum, p) => sum + p.total, 0) / purchases.length : 0,
+  };
+
+  if (sort) {
+    purchases.sort((a, b) => {
+      let comparison = 0;
+      switch (sort.field) {
+        case 'createdAt':
+          comparison = a.createdAt.getTime() - b.createdAt.getTime();
+          break;
+        case 'supplier':
+          comparison = a.supplier.localeCompare(b.supplier);
+          break;
+        case 'invoiceNumber':
+          comparison = a.invoiceNumber.localeCompare(b.invoiceNumber);
+          break;
+        case 'total':
+          comparison = a.total - b.total;
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  } else {
+    purchases.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  const total = purchases.length;
+  const startIndex = (page - 1) * pageSize;
+  const paginatedPurchases = purchases.slice(startIndex, startIndex + pageSize);
+
+  return { purchases: paginatedPurchases, total, stats };
+}
+
+export function exportPurchasesToCSV(purchases: Purchase[]): string {
+  const headers = ['Fecha', 'Proveedor', 'Factura', 'Items', 'Subtotal', 'Total', 'Estado'];
+  const rows = purchases.map(p => [
+    p.createdAt.toLocaleDateString(),
+    p.supplier,
+    p.invoiceNumber,
+    p.items.length.toString(),
+    p.subtotal.toFixed(2),
+    p.total.toFixed(2),
+    p.status === 'completed' ? 'Completado' : p.status === 'pending' ? 'Pendiente' : 'Cancelado',
+  ]);
+
+  const csvContent = [headers, ...rows]
+    .map(row => row.map(cell => `"${cell}"`).join(','))
+    .join('\n');
+
+  return csvContent;
 }

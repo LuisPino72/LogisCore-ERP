@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import { db, Product, Purchase, Supplier } from "../../../lib/db";
-import { useTenantStore } from "../../../store/useTenantStore";
-import { SyncEngine } from "../../../lib/sync/SyncEngine";
-import { useToast } from "../../../providers/ToastProvider";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Purchase, Supplier } from "../../../lib/db";
+import { usePurchases } from "../hooks/usePurchases";
 import Card from "../../../common/Card";
 import Button from "../../../common/Button";
 import Input from "../../../common/Input";
@@ -19,38 +17,83 @@ import {
   Edit2,
   Trash2,
   User,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Download,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import type { SortField, PurchaseStatus } from "../types/purchases.types";
 
 type ViewMode = "table" | "grid";
 type Tab = "purchases" | "suppliers";
 
+interface PurchaseForm {
+  supplierId: string | undefined;
+  supplierName: string;
+  invoiceNumber: string;
+  items: {
+    productId: string;
+    productName: string;
+    quantity: number;
+    cost: number;
+    total: number;
+  }[];
+}
+
+interface SupplierForm {
+  name: string;
+  phone: string;
+  notes: string;
+}
+
+const DATE_PRESETS = [
+  { label: "Hoy", days: 0 },
+  { label: "Esta semana", days: 7 },
+  { label: "Este mes", days: 30 },
+  { label: "Últimos 3 meses", days: 90 },
+];
+
 export default function Purchases() {
+  const {
+    purchases,
+    suppliers,
+    products,
+    stats,
+    total,
+    currentPage,
+    totalPages,
+    sort,
+    filters,
+    loadData,
+    createPurchase,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    setSort,
+    setPage,
+    setFilters,
+    exportCSV,
+  } = usePurchases();
+
   const [activeTab, setActiveTab] = useState<Tab>("purchases");
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [showModal, setShowModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
-  const [search, setSearch] = useState("");
   const [expandedPurchase, setExpandedPurchase] = useState<string | null>(null);
-  const { showSuccess } = useToast();
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const [form, setForm] = useState({
-    supplierId: "" as string | undefined,
+  const [form, setForm] = useState<PurchaseForm>({
+    supplierId: undefined,
     supplierName: "",
     invoiceNumber: "",
-    items: [] as {
-      productId: string;
-      productName: string;
-      quantity: number;
-      cost: number;
-      total: number;
-    }[],
+    items: [],
   });
 
-  const [supplierForm, setSupplierForm] = useState({
+  const [supplierForm, setSupplierForm] = useState<SupplierForm>({
     name: "",
     phone: "",
     notes: "",
@@ -63,43 +106,28 @@ export default function Purchases() {
     cost: 0,
   });
 
-  const tenant = useTenantStore((state) => state.currentTenant);
-
-  const loadData = useCallback(async () => {
-    if (!tenant?.slug) return;
-    const [prods, purcs, sups] = await Promise.all([
-      db.products.where("tenantId").equals(tenant.slug).toArray(),
-      db.purchases
-        .where("tenantId")
-        .equals(tenant.slug)
-        .reverse()
-        .sortBy("createdAt"),
-      db.suppliers.where("tenantId").equals(tenant.slug).toArray(),
-    ]);
-    setProducts(prods);
-    setPurchases(purcs);
-    setSuppliers(sups.filter((s) => s.isActive));
-  }, [tenant?.slug]);
-
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const filteredPurchases = purchases.filter((p) => {
-    const matchesSearch =
-      !search ||
-      p.supplier.toLowerCase().includes(search.toLowerCase()) ||
-      p.invoiceNumber.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
-  });
+  const handleSort = useCallback((field: SortField) => {
+    setSort({
+      field,
+      direction: sort.field === field && sort.direction === "desc" ? "asc" : "desc",
+    });
+  }, [sort.field, sort.direction, setSort]);
 
-  const filteredSuppliers = suppliers.filter((s) => {
-    const matchesSearch =
-      !search ||
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.phone?.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
-  });
+  const handleDatePreset = useCallback((days: number) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    setFilters({ dateRange: { start, end } });
+    setShowDatePicker(false);
+  }, [setFilters]);
+
+  const handleStatusFilter = useCallback((status: PurchaseStatus | "all") => {
+    setFilters({ status });
+  }, [setFilters]);
 
   const addItem = useCallback(() => {
     const product = products.find((p) => p.localId === newItem.productId);
@@ -127,15 +155,12 @@ export default function Purchases() {
   }, [form]);
 
   const handleSubmit = useCallback(async () => {
-    if (!tenant?.slug) return;
     const subtotal = form.items.reduce((sum, item) => sum + item.total, 0);
     const selectedSupplier = suppliers.find(
       (s) => s.localId === form.supplierId,
     );
 
-    const newPurchase: Purchase = {
-      localId: crypto.randomUUID(),
-      tenantId: tenant.slug,
+    const success = await createPurchase({
       supplier: selectedSupplier?.name || form.supplierName || "Sin proveedor",
       invoiceNumber: form.invoiceNumber,
       items: form.items,
@@ -143,88 +168,48 @@ export default function Purchases() {
       tax: 0,
       total: subtotal,
       status: "completed",
-      createdAt: new Date(),
-    };
-
-    await db.purchases.add(newPurchase);
-    await SyncEngine.addToQueue(
-      "purchases",
-      "create",
-      newPurchase as unknown as Record<string, unknown>,
-      newPurchase.localId,
-    );
-
-    for (const item of form.items) {
-      const product = products.find((p) => p.localId === item.productId);
-      if (product) {
-        await db.products.update(product.localId, {
-          stock: product.stock + item.quantity,
-          updatedAt: new Date(),
-        });
-      }
-    }
-
-    setPurchases(prev => [newPurchase, ...prev]);
-    setShowModal(false);
-    setForm({
-      supplierId: undefined,
-      supplierName: "",
-      invoiceNumber: "",
-      items: [],
     });
-    showSuccess("Compra registrada y stock actualizado");
-  }, [tenant?.slug, form, suppliers, products, showSuccess]);
+
+    if (success) {
+      setShowModal(false);
+      setForm({
+        supplierId: undefined,
+        supplierName: "",
+        invoiceNumber: "",
+        items: [],
+      });
+    }
+  }, [form, suppliers, createPurchase]);
 
   const handleSupplierSubmit = useCallback(async () => {
-    if (!tenant?.slug) return;
-
-    const supplierData: Supplier = {
-      localId: editingSupplier?.localId || crypto.randomUUID(),
-      tenantId: tenant.slug,
-      name: supplierForm.name,
-      phone: supplierForm.phone || undefined,
-      notes: supplierForm.notes || undefined,
-      isActive: true,
-      createdAt: editingSupplier?.createdAt || new Date(),
-      updatedAt: new Date(),
-    };
-
+    let success: boolean;
     if (editingSupplier) {
-      await db.suppliers.update(editingSupplier.localId, supplierData);
-      await SyncEngine.addToQueue(
-        "suppliers",
-        "update",
-        supplierData as unknown as Record<string, unknown>,
-        supplierData.localId,
-      );
+      success = await updateSupplier(editingSupplier.localId, {
+        name: supplierForm.name,
+        phone: supplierForm.phone || undefined,
+        notes: supplierForm.notes || undefined,
+      });
     } else {
-      await db.suppliers.add(supplierData);
-      await SyncEngine.addToQueue(
-        "suppliers",
-        "create",
-        supplierData as unknown as Record<string, unknown>,
-        supplierData.localId,
-      );
+      success = await createSupplier({
+        name: supplierForm.name,
+        phone: supplierForm.phone || undefined,
+        notes: supplierForm.notes || undefined,
+        isActive: true,
+      });
     }
 
-    const updatedSuppliers = editingSupplier
-      ? suppliers.map((s) =>
-          s.localId === editingSupplier.localId ? supplierData : s,
-        )
-      : [supplierData, ...suppliers];
-
-    setSuppliers(updatedSuppliers.filter((s) => s.isActive));
-    setShowSupplierModal(false);
-    setEditingSupplier(null);
-    setSupplierForm({ name: "", phone: "", notes: "" });
-  }, [tenant?.slug, editingSupplier, supplierForm, suppliers]);
+    if (success) {
+      setShowSupplierModal(false);
+      setEditingSupplier(null);
+      setSupplierForm({ name: "", phone: "", notes: "" });
+    }
+  }, [editingSupplier, supplierForm, createSupplier, updateSupplier]);
 
   const handleDeleteSupplier = useCallback(async (localId: string) => {
     if (confirm("¿Estás seguro de eliminar este proveedor?")) {
-      await db.suppliers.update(localId, { isActive: false });
-      setSuppliers(suppliers.filter((s) => s.localId !== localId));
+      await deleteSupplier(localId);
     }
-  }, [suppliers]);
+  }, [deleteSupplier]);
 
   const editSupplier = useCallback((supplier: Supplier) => {
     setSupplierForm({
@@ -236,12 +221,34 @@ export default function Purchases() {
     setShowSupplierModal(true);
   }, []);
 
-  const totalPending = purchases
-    .filter((p) => p.status === "pending")
-    .reduce((sum, p) => sum + p.total, 0);
-  const totalCompleted = purchases
-    .filter((p) => p.status === "completed")
-    .reduce((sum, p) => sum + p.total, 0);
+  const filteredPurchases = useMemo(() => {
+    return purchases.filter((p) => {
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        if (
+          !p.supplier.toLowerCase().includes(searchLower) &&
+          !p.invoiceNumber.toLowerCase().includes(searchLower)
+        ) {
+          return false;
+        }
+      }
+      if (filters.status !== "all" && p.status !== filters.status) {
+        return false;
+      }
+      return true;
+    });
+  }, [purchases, filters]);
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sort.field !== field) {
+      return <ArrowUpDown className="w-4 h-4 ml-1 inline opacity-30" />;
+    }
+    return sort.direction === "asc" ? (
+      <ArrowUp className="w-4 h-4 ml-1 inline text-(--brand-400)" />
+    ) : (
+      <ArrowDown className="w-4 h-4 ml-1 inline text-(--brand-400)" />
+    );
+  };
 
   const renderPurchaseCard = (purchase: Purchase) => {
     return (
@@ -392,7 +399,10 @@ export default function Purchases() {
                     Total Completado
                   </p>
                   <p className="text-2xl font-bold text-green-400">
-                    ${totalCompleted.toFixed(2)}
+                    ${stats?.totalCompleted.toFixed(2) || "0.00"}
+                  </p>
+                  <p className="text-xs text-(--text-muted)">
+                    {stats?.countCompleted || 0} compras
                   </p>
                 </div>
                 <div className="p-3 bg-green-500/20 rounded-lg">
@@ -405,7 +415,10 @@ export default function Purchases() {
                 <div>
                   <p className="text-sm text-(--text-muted)">Pendiente</p>
                   <p className="text-2xl font-bold text-yellow-400">
-                    ${totalPending.toFixed(2)}
+                    ${stats?.totalPending.toFixed(2) || "0.00"}
+                  </p>
+                  <p className="text-xs text-(--text-muted)">
+                    {stats?.countPending || 0} compras
                   </p>
                 </div>
                 <div className="p-3 bg-yellow-500/20 rounded-lg">
@@ -418,7 +431,10 @@ export default function Purchases() {
                 <div>
                   <p className="text-sm text-(--text-muted)">Total Compras</p>
                   <p className="text-2xl font-bold text-(--text-primary)">
-                    ${(totalCompleted + totalPending).toFixed(2)}
+                    ${((stats?.totalCompleted || 0) + (stats?.totalPending || 0)).toFixed(2)}
+                  </p>
+                  <p className="text-xs text-(--text-muted)">
+                    Promedio: ${stats?.avgPurchase.toFixed(2) || "0.00"}
                   </p>
                 </div>
                 <div className="p-3 bg-(--brand-500)/20 rounded-lg">
@@ -428,15 +444,65 @@ export default function Purchases() {
             </Card>
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-(--text-muted)" />
-            <input
-              type="text"
-              placeholder="Buscar compras..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
-            />
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-(--text-muted)" />
+              <input
+                type="text"
+                placeholder="Buscar compras..."
+                value={filters.search}
+                onChange={(e) => setFilters({ search: e.target.value })}
+                className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
+              />
+            </div>
+
+            <select
+              value={filters.status}
+              onChange={(e) => handleStatusFilter(e.target.value as PurchaseStatus | "all")}
+              className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500)">
+              <option value="all">Todos los estados</option>
+              <option value="completed">Completado</option>
+              <option value="pending">Pendiente</option>
+              <option value="cancelled">Cancelado</option>
+            </select>
+
+            <div className="relative">
+              <button
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) hover:bg-(--bg-secondary) transition-colors">
+                <Calendar className="w-4 h-4" />
+                {filters.dateRange.start || filters.dateRange.end
+                  ? `${filters.dateRange.start?.toLocaleDateString() || ""} - ${filters.dateRange.end?.toLocaleDateString() || ""}`
+                  : "Filtrar por fecha"}
+              </button>
+              {showDatePicker && (
+                <div className="absolute top-full mt-2 right-0 bg-(--bg-secondary) border border-(--border-color) rounded-lg shadow-xl z-20 p-3 min-w-[200px]">
+                  <div className="space-y-1">
+                    {DATE_PRESETS.map((preset) => (
+                      <button
+                        key={preset.label}
+                        onClick={() => handleDatePreset(preset.days)}
+                        className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg transition-colors">
+                        {preset.label}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => {
+                        setFilters({ dateRange: { start: null, end: null } });
+                        setShowDatePicker(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg transition-colors">
+                      Limpiar filtro
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Button variant="secondary" onClick={exportCSV}>
+              <Download className="w-4 h-4 mr-2" />
+              Exportar
+            </Button>
           </div>
 
           <Card>
@@ -456,23 +522,33 @@ export default function Purchases() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-(--border-color)">
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                        Fecha
+                      <th
+                        className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        onClick={() => handleSort("createdAt")}>
+                        Fecha <SortIcon field="createdAt" />
                       </th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                        Proveedor
+                      <th
+                        className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        onClick={() => handleSort("supplier")}>
+                        Proveedor <SortIcon field="supplier" />
                       </th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                        Factura
+                      <th
+                        className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        onClick={() => handleSort("invoiceNumber")}>
+                        Factura <SortIcon field="invoiceNumber" />
                       </th>
                       <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
                         Items
                       </th>
-                      <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                        Total
+                      <th
+                        className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        onClick={() => handleSort("total")}>
+                        Total <SortIcon field="total" />
                       </th>
-                      <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
-                        Estado
+                      <th
+                        className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        onClick={() => handleSort("status")}>
+                        Estado <SortIcon field="status" />
                       </th>
                     </tr>
                   </thead>
@@ -560,6 +636,52 @@ export default function Purchases() {
                 </table>
               </div>
             )}
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-(--border-color)">
+                <span className="text-sm text-(--text-muted)">
+                  Mostrando {((currentPage - 1) * 20) + 1} - {Math.min(currentPage * 20, total)} de {total}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg hover:bg-(--bg-tertiary) disabled:opacity-50 disabled:cursor-not-allowed">
+                    <ChevronLeft className="w-5 h-5 text-(--text-secondary)" />
+                  </button>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPage(pageNum)}
+                        className={`px-3 py-1 rounded-lg text-sm ${
+                          currentPage === pageNum
+                            ? "bg-(--brand-600) text-white"
+                            : "hover:bg-(--bg-tertiary) text-(--text-secondary)"
+                        }`}>
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg hover:bg-(--bg-tertiary) disabled:opacity-50 disabled:cursor-not-allowed">
+                    <ChevronRight className="w-5 h-5 text-(--text-secondary)" />
+                  </button>
+                </div>
+              </div>
+            )}
           </Card>
         </>
       )}
@@ -571,8 +693,8 @@ export default function Purchases() {
             <input
               type="text"
               placeholder="Buscar proveedores..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={filters.search}
+              onChange={(e) => setFilters({ search: e.target.value })}
               className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
             />
           </div>
@@ -597,7 +719,7 @@ export default function Purchases() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredSuppliers.length === 0 ? (
+                  {suppliers.length === 0 ? (
                     <tr>
                       <td
                         colSpan={5}
@@ -607,44 +729,51 @@ export default function Purchases() {
                       </td>
                     </tr>
                   ) : (
-                    filteredSuppliers.map((supplier) => (
-                      <tr
-                        key={supplier.localId}
-                        className="border-b border-(--border-color) hover:bg-(--brand-500)/5">
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-(--bg-tertiary) rounded-lg flex items-center justify-center border border-(--border-color)">
-                              <User className="w-5 h-5 text-(--text-muted)" />
+                    suppliers
+                      .filter((s) =>
+                        filters.search
+                          ? s.name.toLowerCase().includes(filters.search.toLowerCase()) ||
+                            s.phone?.toLowerCase().includes(filters.search.toLowerCase())
+                          : true
+                      )
+                      .map((supplier) => (
+                        <tr
+                          key={supplier.localId}
+                          className="border-b border-(--border-color) hover:bg-(--brand-500)/5">
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-(--bg-tertiary) rounded-lg flex items-center justify-center border border-(--border-color)">
+                                <User className="w-5 h-5 text-(--text-muted)" />
+                              </div>
+                              <span className="font-medium text-(--text-primary)">
+                                {supplier.name}
+                              </span>
                             </div>
-                            <span className="font-medium text-(--text-primary)">
-                              {supplier.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-(--text-secondary)">
-                          {supplier.phone || "-"}
-                        </td>
-                        <td className="py-4 px-4 text-(--text-muted) max-w-xs truncate">
-                          {supplier.notes || "-"}
-                        </td>
-                        <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => editSupplier(supplier)}
-                              className="p-2 hover:bg-(--bg-tertiary) rounded-lg text-(--text-muted) hover:text-(--text-primary) transition-all">
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDeleteSupplier(supplier.localId)
-                              }
-                              className="p-2 hover:bg-red-500/10 rounded-lg text-(--text-muted) hover:text-red-400 transition-all">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="py-4 px-4 text-(--text-secondary)">
+                            {supplier.phone || "-"}
+                          </td>
+                          <td className="py-4 px-4 text-(--text-muted) max-w-xs truncate">
+                            {supplier.notes || "-"}
+                          </td>
+                          <td className="py-4 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => editSupplier(supplier)}
+                                className="p-2 hover:bg-(--bg-tertiary) rounded-lg text-(--text-muted) hover:text-(--text-primary) transition-all">
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleDeleteSupplier(supplier.localId)
+                                }
+                                className="p-2 hover:bg-red-500/10 rounded-lg text-(--text-muted) hover:text-red-400 transition-all">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
                   )}
                 </tbody>
               </table>

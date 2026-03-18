@@ -9,7 +9,7 @@ import { useToast } from "@/providers/ToastProvider";
 import { loadPOSData, filterProducts, addToCart as addToCartUtil, updateCartQuantity, removeFromCart as removeFromCartUtil, calculateCartTotals, prepareSaleItems, CartItem } from "../services/pos.service";
 import { logger, logCategories } from "@/lib/logger";
 import Card from "@/common/Card";
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Package, Search, Star } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Package, Search, Star, Smartphone } from "lucide-react";
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -17,7 +17,7 @@ export default function POS() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | string>("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "pago_movil">("cash");
   const [showCheckout, setShowCheckout] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number>(0);
   const tenant = useTenantStore((state) => state.currentTenant);
@@ -160,6 +160,9 @@ export default function POS() {
                   </button>
                   <button onClick={() => setPaymentMethod("card")} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-colors ${paymentMethod === "card" ? "bg-(--brand-500)/20 border-(--brand-500) text-(--brand-400)" : "border-(--border-color) text-(--text-secondary) hover:bg-(--bg-tertiary)"}`}>
                     <CreditCard className="w-5 h-5" />Tarjeta
+                  </button>
+                  <button onClick={() => setPaymentMethod("pago_movil")} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-colors ${paymentMethod === "pago_movil" ? "bg-purple-500/20 border-purple-500 text-purple-400" : "border-(--border-color) text-(--text-secondary) hover:bg-(--bg-tertiary)"}`}>
+                    <Smartphone className="w-5 h-5" />Pago Móvil
                   </button>
                 </div>
                 <div className="flex gap-2">

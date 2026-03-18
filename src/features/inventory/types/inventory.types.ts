@@ -1,6 +1,8 @@
 export type ViewMode = 'table' | 'grid'
 export type StockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
 export type StatusFilter = 'all' | 'active' | 'inactive'
+export type SortField = 'name' | 'price' | 'stock' | 'sku'
+export type SortDirection = 'asc' | 'desc'
 
 export interface ProductFormData {
   name: string
@@ -12,6 +14,15 @@ export interface ProductFormData {
   imageUrl: string | undefined
   isFavorite: boolean
   isActive: boolean
+}
+
+export interface CategoryFormData {
+  name: string
+}
+
+export interface SortConfig {
+  field: SortField
+  direction: SortDirection
 }
 
 export const DEFAULT_PRODUCT_FORM: ProductFormData = {

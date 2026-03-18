@@ -11,10 +11,10 @@ export interface CreateSaleInput {
   subtotal: number
   tax: number
   total: number
-  paymentMethod: 'cash' | 'card'
+  paymentMethod: 'cash' | 'card' | 'pago_movil'
   exchangeRate?: number
   exchangeRateSource?: 'api' | 'manual'
 }
 
-export type PaymentMethod = 'cash' | 'card'
+export type PaymentMethod = 'cash' | 'card' | 'pago_movil'
 export type SaleStatus = 'pending' | 'completed' | 'cancelled' | 'refunded'

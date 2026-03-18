@@ -59,7 +59,7 @@ export interface Sale {
   total: number;
   exchangeRate: number;
   exchangeRateSource: 'api' | 'manual';
-  paymentMethod: 'cash' | 'card';
+  paymentMethod: 'cash' | 'card' | 'pago_movil';
   status: 'completed' | 'cancelled' | 'refunded';
   createdAt: Date;
   syncedAt?: Date;

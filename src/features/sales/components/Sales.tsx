@@ -1,12 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useTenantStore } from "../../../store/useTenantStore";
-import { db, Sale } from "../../../lib/db";
-import { cancelSale } from "../services/sales.service";
+import { useState, useEffect, useCallback } from "react";
+import { Sale } from "../../../lib/db";
 import { formatBs } from "../../exchange-rate/services/exchangeRate.service";
-import { isOk } from "@/lib/types/result";
-import { useToast } from "../../../providers/ToastProvider";
-import { logger, logCategories } from "../../../lib/logger";
 import Card from "../../../common/Card";
+import { useSales } from "../hooks/useSales";
 import {
   ShoppingBag,
   Search,
@@ -24,136 +20,62 @@ import {
   ChevronRight,
   Ban,
   Loader2,
+  Download,
+  Smartphone,
+  Calendar,
 } from "lucide-react";
 
-type DateRange = "today" | "week" | "month" | "all";
-type PaymentFilter = "all" | "cash" | "card";
+type PaymentFilter = "all" | "cash" | "card" | "pago_movil";
 
 export default function Sales() {
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [search, setSearch] = useState("");
-  const [dateRange, setDateRange] = useState<DateRange>("month");
-  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const ITEMS_PER_PAGE = 25;
-  
-  const tenant = useTenantStore((state) => state.currentTenant);
-  const { showError, showSuccess } = useToast();
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
 
-  const loadData = useCallback(async () => {
-    if (!tenant?.slug) return;
-    setLoading(true);
-    try {
-      const salesData = await db.sales
-        .where("tenantId")
-        .equals(tenant.slug)
-        .reverse()
-        .sortBy("createdAt");
-      setSales(salesData);
-    } catch (error) {
-      logger.error("Error loading sales", error instanceof Error ? error : undefined, { category: logCategories.SALES });
-    } finally {
-      setLoading(false);
-    }
-  }, [tenant?.slug]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const filteredSales = useMemo(() => {
-    const now = new Date();
-    let startDate: Date | null = null;
-
-    switch (dateRange) {
-      case "today":
-        startDate = new Date(now.setHours(0, 0, 0, 0));
-        break;
-      case "week":
-        startDate = new Date(now.setDate(now.getDate() - 7));
-        break;
-      case "month":
-        startDate = new Date(now.setMonth(now.getMonth() - 1));
-        break;
-      case "all":
-      default:
-        startDate = null;
-    }
-
-    let filtered = sales.filter((s) => {
-      if (!startDate) return true;
-      return s.createdAt >= startDate;
-    });
-
-    if (paymentFilter !== "all") {
-      filtered = filtered.filter((s) => s.paymentMethod === paymentFilter);
-    }
-
-    if (search) {
-      filtered = filtered.filter(
-        (s) =>
-          s.localId.toLowerCase().includes(search.toLowerCase()) ||
-          s.items.some((item) =>
-            item.productName.toLowerCase().includes(search.toLowerCase()),
-          ),
-      );
-    }
-
-    return filtered;
-  }, [sales, dateRange, paymentFilter, search]);
-
-  const paginatedSales = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredSales.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredSales, currentPage]);
-
-  const totalPages = Math.ceil(filteredSales.length / ITEMS_PER_PAGE);
+  const {
+    loading,
+    filters,
+    filteredSales,
+    paginatedSales,
+    currentPage,
+    totalPages,
+    stats,
+    setSearch,
+    setDateRange,
+    setCustomDateRange,
+    setPaymentFilter,
+    setStatusFilter,
+    setCurrentPage,
+    loadSales,
+    cancelSale,
+    exportCSV,
+  } = useSales()
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [dateRange, paymentFilter, search]);
+    loadSales()
+  }, [loadSales])
 
   const handleCancelSale = useCallback(async (localId: string) => {
-    if (!confirm("¿Estás seguro de cancelar esta venta?")) return;
+    if (!confirm("¿Estás seguro de cancelar esta venta?")) return
     
-    setCancellingId(localId);
+    setCancellingId(localId)
     try {
-      const result = await cancelSale(localId);
-      if (!isOk(result)) {
-        showError(result.error.message);
-        return;
-      }
-      
-      setSales(prev => prev.map(s => 
-        s.localId === localId ? { ...s, status: 'cancelled' as const } : s
-      ));
-      showSuccess("Venta cancelada correctamente");
-    } catch (_error) {
-      showError("Error al cancelar la venta");
-      setCancellingId(null);
+      await cancelSale(localId)
+    } catch {
+      // Error already handled in hook
+    } finally {
+      setCancellingId(null)
     }
-  }, [showError, showSuccess]);
+  }, [cancelSale])
 
-  const totalRevenue = filteredSales
-    .filter((s) => s.status === "completed")
-    .reduce((sum, s) => sum + s.total, 0);
-
-  const cashTotal = filteredSales
-    .filter((s) => s.status === "completed" && s.paymentMethod === "cash")
-    .reduce((sum, s) => sum + s.total, 0);
-
-  const cardTotal = filteredSales
-    .filter((s) => s.status === "completed" && s.paymentMethod === "card")
-    .reduce((sum, s) => sum + s.total, 0);
-
-  const avgOrder =
-    filteredSales.length > 0
-      ? totalRevenue /
-        filteredSales.filter((s) => s.status === "completed").length
-      : 0;
+  const handleCustomDateApply = useCallback(() => {
+    if (customStart && customEnd) {
+      setCustomDateRange(new Date(customStart), new Date(customEnd))
+      setShowDatePicker(false)
+    }
+  }, [customStart, customEnd, setCustomDateRange])
 
   return (
     <div className="space-y-6">
@@ -167,9 +89,16 @@ export default function Sales() {
             {filteredSales.length} transacciones
           </p>
         </div>
+        <button
+          onClick={exportCSV}
+          className="flex items-center gap-2 px-4 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-secondary) hover:text-white hover:bg-(--brand-500)/20 transition-colors"
+        >
+          <Download className="w-4 h-4" />
+          Exportar CSV
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <Card>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-green-500/10 rounded-lg">
@@ -180,7 +109,7 @@ export default function Sales() {
             </span>
           </div>
           <p className="text-2xl font-bold text-(--text-primary)">
-            ${totalRevenue.toFixed(2)}
+            ${stats.totalRevenue.toFixed(2)}
           </p>
         </Card>
         <Card>
@@ -193,7 +122,7 @@ export default function Sales() {
             </span>
           </div>
           <p className="text-2xl font-bold text-(--text-primary)">
-            {filteredSales.length}
+            {stats.totalTransactions}
           </p>
         </Card>
         <Card>
@@ -206,7 +135,7 @@ export default function Sales() {
             </span>
           </div>
           <p className="text-2xl font-bold text-(--text-primary)">
-            ${avgOrder.toFixed(2)}
+            ${stats.avgOrder.toFixed(2)}
           </p>
         </Card>
         <Card>
@@ -219,7 +148,7 @@ export default function Sales() {
             </span>
           </div>
           <p className="text-2xl font-bold text-(--text-primary)">
-            ${cashTotal.toFixed(2)}
+            ${stats.cashTotal.toFixed(2)}
           </p>
         </Card>
         <Card>
@@ -232,7 +161,20 @@ export default function Sales() {
             </span>
           </div>
           <p className="text-2xl font-bold text-(--text-primary)">
-            ${cardTotal.toFixed(2)}
+            ${stats.cardTotal.toFixed(2)}
+          </p>
+        </Card>
+        <Card>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-purple-500/10 rounded-lg">
+              <Smartphone className="w-5 h-5 text-purple-400" />
+            </div>
+            <span className="text-xs text-(--text-muted) uppercase">
+              Pago Móvil
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-(--text-primary)">
+            ${stats.pagoMovilTotal.toFixed(2)}
           </p>
         </Card>
       </div>
@@ -243,27 +185,55 @@ export default function Sales() {
           <input
             type="text"
             placeholder="Buscar ventas..."
-            value={search}
+            value={filters.search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
           />
         </div>
+        <div className="relative">
+          <button
+            onClick={() => setShowDatePicker(!showDatePicker)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors ${filters.dateRange === 'custom' ? 'bg-(--brand-500)/10 border-(--brand-500)/50 text-(--brand-400)' : 'bg-(--bg-tertiary) border border-(--border-color) text-(--text-secondary)'}`}
+          >
+            <Calendar className="w-4 h-4" />
+            {filters.dateRange === 'custom' ? 'Personalizado' : 
+              filters.dateRange === 'today' ? 'Hoy' :
+              filters.dateRange === 'week' ? '7 días' :
+              filters.dateRange === 'month' ? '30 días' : 'Todo'}
+          </button>
+          {showDatePicker && (
+            <div className="absolute top-full right-0 mt-2 bg-(--bg-secondary) border border-(--border-color) rounded-xl p-4 shadow-xl z-20">
+              <div className="flex gap-2 mb-3">
+                <button onClick={() => { setDateRange('today'); setShowDatePicker(false) }} className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">Hoy</button>
+                <button onClick={() => { setDateRange('week'); setShowDatePicker(false) }} className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">7 días</button>
+                <button onClick={() => { setDateRange('month'); setShowDatePicker(false) }} className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">30 días</button>
+                <button onClick={() => { setDateRange('all'); setShowDatePicker(false) }} className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">Todo</button>
+              </div>
+              <div className="flex gap-2">
+                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm" />
+                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm" />
+              </div>
+              <button onClick={handleCustomDateApply} className="w-full mt-3 py-2 bg-(--brand-500) hover:bg-(--brand-400) text-white rounded-lg text-sm">Aplicar</button>
+            </div>
+          )}
+        </div>
         <select
-          value={dateRange}
-          onChange={(e) => setDateRange(e.target.value as DateRange)}
-          className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer">
-          <option value="today">Hoy</option>
-          <option value="week">Últimos 7 días</option>
-          <option value="month">Último mes</option>
-          <option value="all">Todo</option>
-        </select>
-        <select
-          value={paymentFilter}
+          value={filters.paymentFilter}
           onChange={(e) => setPaymentFilter(e.target.value as PaymentFilter)}
           className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer">
           <option value="all">Todos los métodos</option>
           <option value="cash">Efectivo</option>
           <option value="card">Tarjeta</option>
+          <option value="pago_movil">Pago Móvil</option>
+        </select>
+        <select
+          value={filters.statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as any)}
+          className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer">
+          <option value="all">Todos los estados</option>
+          <option value="completed">Completadas</option>
+          <option value="cancelled">Canceladas</option>
+          <option value="pending">Pendientes</option>
         </select>
       </div>
 
@@ -417,11 +387,11 @@ export default function Sales() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-(--border-color)">
                 <p className="text-sm text-(--text-muted)">
-                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredSales.length)} de {filteredSales.length}
+                  Mostrando {((currentPage - 1) * 25) + 1}-{Math.min(currentPage * 25, filteredSales.length)} de {filteredSales.length}
                 </p>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
                     className="p-2 hover:bg-(--bg-tertiary) rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -431,7 +401,7 @@ export default function Sales() {
                     {currentPage} / {totalPages}
                   </span>
                   <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
                     className="p-2 hover:bg-(--bg-tertiary) rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >

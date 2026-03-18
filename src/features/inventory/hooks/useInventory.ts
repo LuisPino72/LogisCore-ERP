@@ -5,7 +5,7 @@ import * as productsService from '../services/products.service'
 import * as categoriesService from '../services/categories.service'
 import * as imagesService from '../services/images.service'
 import type { Product, Category } from '@/lib/db'
-import type { ProductFormData, StockFilter, StatusFilter, ViewMode } from '../types/inventory.types'
+import type { ProductFormData, StockFilter, StatusFilter, ViewMode, SortConfig, CategoryFormData } from '../types/inventory.types'
 import { DEFAULT_PRODUCT_FORM } from '../types/inventory.types'
 import { isOk } from '@/lib/types/result'
 import { EventBus, Events } from '@/lib/events/EventBus'
@@ -17,6 +17,9 @@ export interface UseInventoryFilters {
   stockFilter: StockFilter
   statusFilter: StatusFilter
   priceRange: { min: string; max: string }
+  sort: SortConfig
+  showFavoritesOnly: boolean
+  barcodeScan: string
 }
 
 export interface UseInventoryReturn {
@@ -25,6 +28,10 @@ export interface UseInventoryReturn {
   loading: boolean
   filters: UseInventoryFilters
   filteredProducts: Product[]
+  paginatedProducts: Product[]
+  currentPage: number
+  totalPages: number
+  selectedProducts: string[]
   form: ProductFormData
   imageFile: File | null
   imagePreview: string | null
@@ -34,12 +41,18 @@ export interface UseInventoryReturn {
   editingId: string | null
   showNewCategory: boolean
   newCategoryName: string
+  showCategoryModal: boolean
+  editingCategory: Category | null
+  showBarcodeScanner: boolean
   setSearch: (search: string) => void
   setSelectedCategory: (category: number | string) => void
   setViewMode: (mode: ViewMode) => void
   setStockFilter: (filter: StockFilter) => void
   setStatusFilter: (filter: StatusFilter) => void
   setPriceRange: (range: { min: string; max: string }) => void
+  setSort: (config: SortConfig | ((prev: SortConfig) => SortConfig)) => void
+  setShowFavoritesOnly: (show: boolean) => void
+  setBarcodeScan: (code: string) => void
   setForm: (update: ProductFormData | ((prev: ProductFormData) => ProductFormData)) => void
   setImageFile: (file: File | null) => void
   setImagePreview: (preview: string | null) => void
@@ -49,12 +62,23 @@ export interface UseInventoryReturn {
   setEditingId: (id: string | null) => void
   setShowNewCategory: (show: boolean) => void
   setNewCategoryName: (name: string) => void
+  setShowCategoryModal: (show: boolean) => void
+  setEditingCategory: (category: Category | null) => void
+  setShowBarcodeScanner: (show: boolean) => void
+  setCurrentPage: (page: number) => void
+  toggleProductSelection: (localId: string) => void
+  selectAllProducts: () => void
+  clearSelection: () => void
   loadData: () => Promise<void>
   createProduct: (data: ProductFormData) => Promise<boolean>
   updateProduct: (localId: string, data: Partial<Product>) => Promise<boolean>
   deleteProduct: (localId: string) => Promise<boolean>
+  deleteSelectedProducts: () => Promise<boolean>
   createCategory: (name: string) => Promise<boolean>
+  updateCategory: (localId: string, data: CategoryFormData) => Promise<boolean>
+  deleteCategory: (localId: string) => Promise<boolean>
   uploadImage: (file: File, productLocalId: string) => Promise<string | null>
+  exportProducts: (format: 'csv' | 'pdf') => void
   resetForm: () => void
   getStockStatus: (stock: number) => { label: string; color: string; icon: unknown }
   hasActiveFilters: boolean
@@ -74,6 +98,12 @@ export function useInventory(): UseInventoryReturn {
   const [stockFilter, setStockFilter] = useState<StockFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
+  const [sort, setSort] = useState<SortConfig>({ field: 'name', direction: 'asc' })
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+  const [barcodeScan, setBarcodeScan] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([])
+  const ITEMS_PER_PAGE = 20
   
   const [form, setForm] = useState<ProductFormData>(DEFAULT_PRODUCT_FORM)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -84,6 +114,9 @@ export function useInventory(): UseInventoryReturn {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!tenant?.slug) return
@@ -103,9 +136,10 @@ export function useInventory(): UseInventoryReturn {
   }, [tenant?.slug, showError])
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    let result = products.filter((p) => {
       const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-                           p.sku.toLowerCase().includes(search.toLowerCase())
+                           p.sku.toLowerCase().includes(search.toLowerCase()) ||
+                           (barcodeScan && p.sku.toLowerCase().includes(barcodeScan.toLowerCase()))
       const matchesCategory = !selectedCategory || p.categoryId === Number(selectedCategory)
       
       let matchesStock = true
@@ -120,12 +154,122 @@ export function useInventory(): UseInventoryReturn {
       let matchesPrice = true
       if (priceRange.min) matchesPrice = p.price >= Number(priceRange.min)
       if (priceRange.max) matchesPrice = matchesPrice && p.price <= Number(priceRange.max)
-      
-      return matchesSearch && matchesCategory && matchesStock && matchesStatus && matchesPrice
-    })
-  }, [products, search, selectedCategory, stockFilter, statusFilter, priceRange.min, priceRange.max])
 
-  const hasActiveFilters = Boolean(selectedCategory || stockFilter !== 'all' || statusFilter !== 'all' || priceRange.min || priceRange.max)
+      const matchesFavorites = !showFavoritesOnly || p.isFavorite
+      
+      return matchesSearch && matchesCategory && matchesStock && matchesStatus && matchesPrice && matchesFavorites
+    })
+
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      const sortField = sort.field
+      const sortDir = sort.direction
+      if (sortField === 'name') comparison = a.name.localeCompare(b.name)
+      else if (sortField === 'price') comparison = a.price - b.price
+      else if (sortField === 'stock') comparison = a.stock - b.stock
+      else if (sortField === 'sku') comparison = a.sku.localeCompare(b.sku)
+      return sortDir === 'asc' ? comparison : -comparison
+    })
+
+    return result
+  }, [products, search, selectedCategory, stockFilter, statusFilter, priceRange.min, priceRange.max, showFavoritesOnly, sort, barcodeScan])
+
+  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)
+  
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredProducts.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredProducts, currentPage])
+
+  const hasActiveFilters = Boolean(selectedCategory || stockFilter !== 'all' || statusFilter !== 'all' || priceRange.min || priceRange.max || showFavoritesOnly || barcodeScan)
+
+  const toggleProductSelection = useCallback((localId: string) => {
+    setSelectedProducts(prev => 
+      prev.includes(localId) 
+        ? prev.filter(id => id !== localId)
+        : [...prev, localId]
+    )
+  }, [])
+
+  const selectAllProducts = useCallback(() => {
+    setSelectedProducts(filteredProducts.map(p => p.localId))
+  }, [filteredProducts])
+
+  const clearSelection = useCallback(() => {
+    setSelectedProducts([])
+  }, [])
+
+  const deleteSelectedProducts = useCallback(async () => {
+    if (selectedProducts.length === 0) return false
+    setLoading(true)
+    let successCount = 0
+    for (const localId of selectedProducts) {
+      const result = await productsService.deleteProduct(localId)
+      if (isOk(result)) successCount++
+    }
+    showSuccess(`Se eliminaron ${successCount} productos`)
+    setSelectedProducts([])
+    await loadData()
+    EventBus.emit(Events.INVENTORY_UPDATED, { action: 'delete' })
+    setLoading(false)
+    return successCount > 0
+  }, [selectedProducts, loadData, showSuccess])
+
+  const updateCategory = useCallback(
+    async (localId: string, data: { name: string }): Promise<boolean> => {
+      setLoading(true)
+      const result = await categoriesService.updateCategory(localId, data)
+      if (isOk(result)) {
+        showSuccess('Categoría actualizada correctamente')
+        await loadData()
+        setLoading(false)
+        return true
+      }
+      showError(result.error.message)
+      setLoading(false)
+      return false
+    },
+    [loadData, showError, showSuccess]
+  )
+
+  const deleteCategory = useCallback(
+    async (localId: string): Promise<boolean> => {
+      setLoading(true)
+      const result = await categoriesService.deleteCategory(localId)
+      if (isOk(result)) {
+        showSuccess('Categoría eliminada correctamente')
+        await loadData()
+        setLoading(false)
+        return true
+      }
+      showError(result.error.message)
+      setLoading(false)
+      return false
+    },
+    [loadData, showError, showSuccess]
+  )
+
+  const exportProducts = useCallback((format: 'csv' | 'pdf') => {
+    const csvContent = [
+      ['Nombre', 'SKU', 'Categoría', 'Precio', 'Stock', 'Estado'].join(','),
+      ...filteredProducts.map(p => [
+        `"${p.name}"`,
+        p.sku,
+        categories.find(c => c.id === p.categoryId)?.name || 'Sin Categoría',
+        p.price,
+        p.stock,
+        p.isActive ? 'Activo' : 'Inactivo'
+      ].join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    const ext = format === 'pdf' ? 'csv' : 'csv'
+    link.download = `inventario_${new Date().toISOString().split('T')[0]}.${ext}`
+    link.click()
+    showSuccess('Inventario exportado correctamente')
+  }, [filteredProducts, categories, showSuccess])
 
   const resetForm = useCallback(() => {
     setForm(DEFAULT_PRODUCT_FORM)
@@ -247,8 +391,15 @@ export function useInventory(): UseInventoryReturn {
       stockFilter,
       statusFilter,
       priceRange,
+      sort,
+      showFavoritesOnly,
+      barcodeScan,
     },
     filteredProducts,
+    paginatedProducts,
+    currentPage,
+    totalPages,
+    selectedProducts,
     form,
     imageFile,
     imagePreview,
@@ -258,12 +409,18 @@ export function useInventory(): UseInventoryReturn {
     editingId,
     showNewCategory,
     newCategoryName,
+    showCategoryModal,
+    editingCategory,
+    showBarcodeScanner,
     setSearch,
     setSelectedCategory,
     setViewMode,
     setStockFilter,
     setStatusFilter,
     setPriceRange,
+    setSort,
+    setShowFavoritesOnly,
+    setBarcodeScan,
     setForm,
     setImageFile,
     setImagePreview,
@@ -273,12 +430,23 @@ export function useInventory(): UseInventoryReturn {
     setEditingId,
     setShowNewCategory,
     setNewCategoryName,
+    setShowCategoryModal,
+    setEditingCategory,
+    setShowBarcodeScanner,
+    setCurrentPage,
+    toggleProductSelection,
+    selectAllProducts,
+    clearSelection,
     loadData,
     createProduct,
     updateProduct,
     deleteProduct,
+    deleteSelectedProducts,
     createCategory,
+    updateCategory,
+    deleteCategory,
     uploadImage,
+    exportProducts,
     resetForm,
     getStockStatus,
     hasActiveFilters,

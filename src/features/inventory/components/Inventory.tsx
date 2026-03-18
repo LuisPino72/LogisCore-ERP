@@ -1,10 +1,10 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { Button, Input, Card } from '@/common'
-import { Plus, Search, Edit2, Trash2, Package, X, Cloud, CloudOff, LayoutGrid, List, Filter, Image as ImageIcon, Loader2, Star } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Package, X, Cloud, CloudOff, LayoutGrid, List, Filter, Image as ImageIcon, Loader2, Star, Download, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Barcode, Trash, CheckSquare, Square, FolderEdit, RotateCcw } from 'lucide-react'
 import { useInventory } from '../hooks/useInventory'
 import { EventBus, Events } from '@/lib/events/EventBus'
 import { logger, logCategories } from '@/lib/logger'
-import type { Product } from '@/lib/db'
+import type { Product, Category } from '@/lib/db'
 
 export default function Inventory() {
   const {
@@ -12,6 +12,10 @@ export default function Inventory() {
     loading,
     filters,
     filteredProducts,
+    paginatedProducts,
+    currentPage,
+    totalPages,
+    selectedProducts,
     form,
     imageFile,
     imagePreview,
@@ -21,12 +25,18 @@ export default function Inventory() {
     editingId,
     showNewCategory,
     newCategoryName,
+    showCategoryModal,
+    editingCategory,
+    showBarcodeScanner,
     setSearch,
     setSelectedCategory,
     setViewMode,
     setStockFilter,
     setStatusFilter,
     setPriceRange,
+    setSort,
+    setShowFavoritesOnly,
+    setBarcodeScan,
     setForm,
     setImageFile,
     setImagePreview,
@@ -36,16 +46,30 @@ export default function Inventory() {
     setEditingId,
     setShowNewCategory,
     setNewCategoryName,
+    setShowCategoryModal,
+    setEditingCategory,
+    setShowBarcodeScanner,
+    setCurrentPage,
+    toggleProductSelection,
+    selectAllProducts,
+    clearSelection,
     loadData,
     createProduct,
     updateProduct,
     deleteProduct,
+    deleteSelectedProducts,
     createCategory,
+    updateCategory,
+    deleteCategory,
     uploadImage,
+    exportProducts,
     resetForm,
     getStockStatus,
     hasActiveFilters,
   } = useInventory()
+
+  const [newCategoryForm, setNewCategoryForm] = useState({ name: '' })
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
 
   useEffect(() => {
     loadData()
@@ -56,6 +80,14 @@ export default function Inventory() {
       unsubscribeSync()
     }
   }, [loadData])
+
+  useEffect(() => {
+    if (filters.barcodeScan && paginatedProducts.length === 1) {
+      const product = paginatedProducts[0]
+      handleEdit(product)
+      setBarcodeScan('')
+    }
+  }, [filters.barcodeScan, paginatedProducts])
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -212,9 +244,63 @@ export default function Inventory() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">Inventario</h2>
-          <p className="text-slate-400">{filteredProducts.length} productos</p>
+          <p className="text-slate-400">{filteredProducts.length} productos {selectedProducts.length > 0 && `(${selectedProducts.length} seleccionados)`}</p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedProducts.length > 0 && (
+            <div className="flex items-center gap-2 pr-4 border-r border-(--border-color)">
+              <span className="text-sm text-slate-400">{selectedProducts.length} seleccionados</span>
+              <button
+                onClick={() => {
+                  if (confirm(`¿Eliminar ${selectedProducts.length} productos?`)) {
+                    deleteSelectedProducts()
+                  }
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+              >
+                <Trash className="w-4 h-4" />
+                Eliminar
+              </button>
+              <button onClick={clearSelection} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => setShowFavoritesOnly(!filters.showFavoritesOnly)}
+            className={`p-2 rounded-lg border transition-all ${filters.showFavoritesOnly ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-(--bg-tertiary) border-(--border-color) text-slate-400 hover:text-white'}`}
+            title="Solo favoritos"
+          >
+            <Star className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => selectAllProducts()}
+            className="p-2 rounded-lg border bg-(--bg-tertiary) border-(--border-color) text-slate-400 hover:text-white transition-all"
+            title="Seleccionar todos"
+          >
+            <CheckSquare className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowBarcodeScanner(!showBarcodeScanner)}
+            className={`p-2 rounded-lg border transition-all ${showBarcodeScanner ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-(--bg-tertiary) border-(--border-color) text-slate-400 hover:text-white'}`}
+            title="Escanear código de barras"
+          >
+            <Barcode className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => exportProducts('csv')}
+            className="p-2 rounded-lg border bg-(--bg-tertiary) border-(--border-color) text-slate-400 hover:text-white transition-all"
+            title="Exportar CSV"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            className="p-2 rounded-lg border bg-(--bg-tertiary) border-(--border-color) text-slate-400 hover:text-white transition-all"
+            title="Gestionar categorías"
+          >
+            <FolderEdit className="w-4 h-4" />
+          </button>
           <div className="flex items-center bg-(--bg-tertiary)/50 rounded-lg p-1 border border-(--border-color)">
             <button
               onClick={() => setViewMode('table')}
@@ -237,6 +323,28 @@ export default function Inventory() {
           </Button>
         </div>
       </div>
+
+      {showBarcodeScanner && (
+        <div className="bg-(--bg-secondary) border border-(--border-color) rounded-xl p-4">
+          <div className="flex items-center gap-4">
+            <Barcode className="w-6 h-6 text-blue-400" />
+            <input
+              type="text"
+              placeholder="Escanee o ingrese el código de barras/SKU..."
+              value={filters.barcodeScan}
+              onChange={(e) => setBarcodeScan(e.target.value)}
+              className="flex-1 px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            />
+            <button onClick={() => setBarcodeScan('')} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400">
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          </div>
+          {filters.barcodeScan && paginatedProducts.length > 1 && (
+            <p className="text-sm text-amber-400 mt-2">Se encontraron {paginatedProducts.length} productos. Refine la búsqueda.</p>
+          )}
+        </div>
+      )}
 
       <Card>
         <div className="flex flex-col gap-4 mb-6">
@@ -338,92 +446,173 @@ export default function Inventory() {
                 </Button>
               </div>
             ) : (
-              filteredProducts.map(renderProductCard)
+              <>
+                {paginatedProducts.map(renderProductCard)}
+                <div className="col-span-full flex justify-center mt-4">
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span className="text-sm text-slate-400">
+                        {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage === totalPages}
+                        className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-800">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Producto</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">SKU</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Categoría</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Precio</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Stock</th>
-                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sync</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={7} className="py-10 text-center text-slate-500">Cargando productos...</td></tr>
-                ) : filteredProducts.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500">
-                      <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                      <p className="text-lg">No hay productos que coincidan</p>
-                    </td>
+          <div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-800">
+                    <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <button onClick={() => setSort({ field: 'name', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1 hover:text-white">
+                        Producto
+                        {filters.sort.field === 'name' && (filters.sort.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                      </button>
+                    </th>
+                    <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <button onClick={() => setSort({ field: 'sku', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1 hover:text-white">
+                        SKU
+                        {filters.sort.field === 'sku' && (filters.sort.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                      </button>
+                    </th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Categoría</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <button onClick={() => setSort({ field: 'price', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1 hover:text-white">
+                        Precio
+                        {filters.sort.field === 'price' && (filters.sort.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                      </button>
+                    </th>
+                    <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <button onClick={() => setSort({ field: 'stock', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1 hover:text-white">
+                        Stock
+                        {filters.sort.field === 'stock' && (filters.sort.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                      </button>
+                    </th>
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sync</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
                   </tr>
-                ) : (
-                  filteredProducts.map((product) => {
-                    const stockStatus = getStockStatus(product.stock)
-                    return (
-                      <tr key={product.localId} className="border-b border-(--border-color) hover:bg-(--brand-500)/5 transition-colors group">
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                              {product.imageUrl ? (
-                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <Package className="w-5 h-5 text-slate-500" />
-                              )}
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={7} className="py-10 text-center text-slate-500">Cargando productos...</td></tr>
+                  ) : filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-500">
+                        <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                        <p className="text-lg">No hay productos que coincidan</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedProducts.map((product) => {
+                      const stockStatus = getStockStatus(product.stock)
+                      return (
+                        <tr key={product.localId} className="border-b border-(--border-color) hover:bg-(--brand-500)/5 transition-colors group">
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <button onClick={() => toggleProductSelection(product.localId)} className="text-slate-400 hover:text-white">
+                                {selectedProducts.includes(product.localId) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                              </button>
+                              <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                                {product.imageUrl ? (
+                                  <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Package className="w-5 h-5 text-slate-500" />
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-medium text-white flex items-center gap-2">
+                                  {product.name}
+                                  {product.isFavorite && <Star className="w-3 h-3 text-amber-400 fill-amber-400" />}
+                                </div>
+                                {!product.isActive && <span className="text-[10px] text-red-500 font-bold uppercase">Inactivo</span>}
+                              </div>
                             </div>
-                            <div>
-                              <div className="font-medium text-white">{product.name}</div>
-                              {!product.isActive && <span className="text-[10px] text-red-500 font-bold uppercase">Inactivo</span>}
+                          </td>
+                          <td className="py-4 px-4 text-slate-400 font-mono text-sm">{product.sku}</td>
+                          <td className="py-4 px-4 text-slate-400">
+                            {categories.find(c => c.id === product.categoryId)?.name || 'Sin Categoría'}
+                          </td>
+                          <td className="py-4 px-4 text-right text-green-400 font-medium">
+                            ${product.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-4 px-4 text-right">
+                            <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${stockStatus.color}`}>
+                              <span className="font-bold">{product.stock}</span>
                             </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-slate-400 font-mono text-sm">{product.sku}</td>
-                        <td className="py-4 px-4 text-slate-400">
-                          {categories.find(c => c.id === product.categoryId)?.name || 'Sin Categoría'}
-                        </td>
-                        <td className="py-4 px-4 text-right text-green-400 font-medium">
-                          ${product.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-4 px-4 text-right">
-                          <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${stockStatus.color}`}>
-                            <span className="font-bold">{product.stock}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-center">
-                          {product.syncedAt ? (
-                            <div title="Sincronizado">
-                              <Cloud className="w-4 h-4 text-(--brand-500) mx-auto" />
+                          </td>
+                          <td className="py-4 px-4 text-center">
+                            {product.syncedAt ? (
+                              <div title="Sincronizado">
+                                <Cloud className="w-4 h-4 text-(--brand-500) mx-auto" />
+                              </div>
+                            ) : (
+                              <div title="Pendiente de sincronizar">
+                                <CloudOff className="w-4 h-4 text-amber-500 mx-auto" />
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-4 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEdit(product)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all">
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleDelete(product.localId)} className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-all">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
-                          ) : (
-                            <div title="Pendiente de sincronizar">
-                              <CloudOff className="w-4 h-4 text-amber-500 mx-auto" />
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEdit(product)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all">
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleDelete(product.localId)} className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-all">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between py-4 px-2 border-t border-(--border-color)">
+                <span className="text-sm text-slate-400">
+                  Mostrando {((currentPage - 1) * 20) + 1}-{Math.min(currentPage * 20, filteredProducts.length)} de {filteredProducts.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-(--bg-tertiary) hover:bg-(--brand-500)/20 disabled:opacity-50 rounded-lg text-sm"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Anterior
+                  </button>
+                  <span className="text-sm text-(--text-secondary) px-4">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-(--bg-tertiary) hover:bg-(--brand-500)/20 disabled:opacity-50 rounded-lg text-sm"
+                  >
+                    Siguiente
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -635,6 +824,130 @@ export default function Inventory() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-(--bg-primary) border border-(--border-color) rounded-2xl w-full max-w-md shadow-2xl overflow-hidden ring-1 ring-white/10">
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-800/50 border-b border-slate-700/50">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <FolderEdit className="w-5 h-5 text-(--brand-400)" />
+                Gestionar Categorías
+              </h3>
+              <button onClick={() => { setShowCategoryModal(false); setEditingCategory(null); }} className="p-2 hover:bg-slate-700 rounded-full transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Nueva categoría..."
+                  value={newCategoryForm.name}
+                  onChange={(e) => setNewCategoryForm({ name: e.target.value })}
+                  className="flex-1 px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted)"
+                />
+                <button
+                  onClick={async () => {
+                    if (newCategoryForm.name.trim()) {
+                      await createCategory(newCategoryForm.name.trim())
+                      setNewCategoryForm({ name: '' })
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {categories.map(cat => (
+                  <div key={cat.localId} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                    <span className="text-white">{cat.name}</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingCategory(cat)
+                          setNewCategoryForm({ name: cat.name })
+                        }}
+                        className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setCategoryToDelete(cat)}
+                        className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {categories.length === 0 && (
+                  <p className="text-center text-slate-500 py-4">No hay categorías</p>
+                )}
+              </div>
+            </div>
+            {editingCategory && (
+              <div className="px-6 py-4 border-t border-slate-700/50 bg-slate-800/30">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newCategoryForm.name}
+                    onChange={(e) => setNewCategoryForm({ name: e.target.value })}
+                    className="flex-1 px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary)"
+                  />
+                  <Button
+                    onClick={async () => {
+                      if (newCategoryForm.name.trim() && editingCategory) {
+                        await updateCategory(editingCategory.localId, { name: newCategoryForm.name.trim() })
+                        setEditingCategory(null)
+                        setNewCategoryForm({ name: '' })
+                      }
+                    }}
+                  >
+                    Guardar
+                  </Button>
+                  <button
+                    onClick={() => { setEditingCategory(null); setNewCategoryForm({ name: '' }); }}
+                    className="px-3 py-2 text-slate-400 hover:text-white"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {categoryToDelete && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-(--bg-primary) border border-red-500/30 rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-red-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Eliminar Categoría</h3>
+              <p className="text-slate-400 mb-6">
+                ¿Eliminar "<span className="text-white">{categoryToDelete.name}</span>"? Los productos sin categoría se mantendrán.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="secondary" onClick={() => setCategoryToDelete(null)} className="flex-1">
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    await deleteCategory(categoryToDelete.localId)
+                    setCategoryToDelete(null)
+                  }}
+                  className="flex-1 bg-red-500 hover:bg-red-600"
+                >
+                  Eliminar
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
