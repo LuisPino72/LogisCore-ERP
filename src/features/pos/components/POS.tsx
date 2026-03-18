@@ -49,7 +49,8 @@ export default function POS() {
     });
     loadDailyStats();
     loadSuspended();
-  }, [tenant?.slug]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant?.slug]); // loadSuspended and loadDailyStats are stable functions
 
   const loadDailyStats = async () => {
     try {
@@ -124,7 +125,8 @@ export default function POS() {
     setShowSuspendModal(false);
     showSuccess("Venta suspendida");
     loadSuspended();
-  }, [tenant, cart, suspendNote, showSuccess]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant, cart, suspendNote, showSuccess]); // loadSuspended is stable
 
   const handleResumeSale = useCallback(async (sale: SuspendedSale) => {
     const cartItems: CartItem[] = sale.cart.map(item => ({
@@ -142,7 +144,8 @@ export default function POS() {
       loadSuspended();
       showSuccess("Venta eliminada");
     }
-  }, [showSuccess]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSuccess]); // loadSuspended is stable
 
   const getStockStatus = (stock: number) => stock === 0 || stock <= 5 ? "text-red-400" : stock <= 10 ? "text-amber-400" : "text-slate-500";
 

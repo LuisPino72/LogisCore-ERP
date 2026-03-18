@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import type { SortField } from "../types/recipes.types";
 
+type FilterStatus = "all" | "active" | "inactive";
+
 type RecipeForm = {
   name: string;
   description: string;
@@ -365,7 +367,7 @@ export default function Recipes() {
         </div>
         <select
           value={filterStatus}
-          onChange={(e) => { setFilterStatus(e.target.value as any); setCurrentPage(1); }}
+          onChange={(e) => { setFilterStatus(e.target.value as FilterStatus); setCurrentPage(1); }}
           className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer">
           <option value="all">Todas</option>
           <option value="active">Activas</option>

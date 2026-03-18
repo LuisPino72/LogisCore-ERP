@@ -14,6 +14,20 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-dexie': ['dexie', 'dexie-react-hooks'],
+          'vendor-zustand': ['zustand'],
+          'vendor-lucide': ['lucide-react'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 400,
+  },
   test: {
     globals: true,
     environment: 'jsdom',

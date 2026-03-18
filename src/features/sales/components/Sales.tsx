@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 type PaymentFilter = "all" | "cash" | "card" | "pago_movil";
+type SalesStatusFilter = "all" | "completed" | "cancelled" | "pending";
 
 export default function Sales() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -228,7 +229,7 @@ export default function Sales() {
         </select>
         <select
           value={filters.statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
+          onChange={(e) => setStatusFilter(e.target.value as SalesStatusFilter)}
           className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer">
           <option value="all">Todos los estados</option>
           <option value="completed">Completadas</option>

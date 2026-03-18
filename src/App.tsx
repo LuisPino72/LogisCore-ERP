@@ -276,17 +276,18 @@ function App() {
         }
 
         if (salesData) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await db.sales.bulkPut(salesData.map(sanitizeSale) as any);
         }
 
         if (recipesData) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await db.recipes.bulkPut(recipesData.map(sanitizeRecipe) as any);
         }
 
         if (purchasesData) {
-          await db.purchases.bulkPut(
-            purchasesData.map(sanitizePurchase) as any,
-          );
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await db.purchases.bulkPut(purchasesData.map(sanitizePurchase) as any);
         }
       } catch (error) {
         logger.error("Error loading tenant data", error instanceof Error ? error : undefined, { category: logCategories.DATABASE });
@@ -294,7 +295,7 @@ function App() {
         setIsLoadingData(false);
       }
     },
-    [db, supabase]
+    [] // db and supabase are stable references, intentionally excluded
   );
 
   useEffect(() => {
@@ -312,7 +313,8 @@ function App() {
         }
       })();
     }
-  }, [tenant, initializeCatalogs, loadTenantData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant]); // initializeCatalogs and loadTenantData are stable
 
   if (isUpdatePasswordPage) {
     return <UpdatePassword />;

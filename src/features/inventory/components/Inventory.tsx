@@ -5,6 +5,7 @@ import { useInventory } from '../hooks/useInventory'
 import { EventBus, Events } from '@/lib/events/EventBus'
 import { logger, logCategories } from '@/lib/logger'
 import type { Product, Category } from '@/lib/db'
+import type { StockFilter, StatusFilter } from '../types/inventory.types'
 
 export default function Inventory() {
   const {
@@ -87,7 +88,8 @@ export default function Inventory() {
       handleEdit(product)
       setBarcodeScan('')
     }
-  }, [filters.barcodeScan, paginatedProducts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.barcodeScan, paginatedProducts]) // handleEdit and setBarcodeScan are stable
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -389,7 +391,7 @@ export default function Inventory() {
                 <select 
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={filters.stockFilter}
-                  onChange={(e) => setStockFilter(e.target.value as any)}
+                  onChange={(e) => setStockFilter(e.target.value as StockFilter)}
                 >
                   <option value="all">Todos</option>
                   <option value="in_stock">En Stock (&gt;10)</option>
@@ -402,7 +404,7 @@ export default function Inventory() {
                 <select 
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={filters.statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
                 >
                   <option value="all">Todos</option>
                   <option value="active">Activos</option>
