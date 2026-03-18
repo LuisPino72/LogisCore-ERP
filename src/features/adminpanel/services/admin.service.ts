@@ -254,7 +254,7 @@ export async function getSystemMetrics(): Promise<Result<SystemMetrics, AppError
   const activeTenants = tenants.filter(t => t.config?.ownerId).length
 
   // Activity logs - table may not exist yet, skip silently
-  let activityLogs: ActivityLog[] = []
+  const activityLogs: ActivityLog[] = []
 
   return Ok({
     totalTenants: tenants.length,

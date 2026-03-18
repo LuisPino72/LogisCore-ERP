@@ -4,7 +4,8 @@ import { useToast } from '@/providers/ToastProvider'
 import { EventBus, Events } from '@/lib/events/EventBus'
 import * as dashboardService from '../services/dashboard.service'
 import { getExchangeRate, updateExchangeRate as updateRateService, formatBs } from '../../exchange-rate/services/exchangeRate.service'
-import type { DashboardStats, DailySales, CategorySales, LowStockProduct, ExchangeRateInfo } from '../types/dashboard.types'
+import type { DashboardStats, DailySales, CategorySales, LowStockProduct, ExchangeRateInfo, TopProduct, DashboardDateRange } from '../types/dashboard.types'
+import { getDefaultDashboardRange } from '../services/dashboard.service'
 import { isOk } from '@/lib/types/result'
 
 export interface UseDashboardReturn {
@@ -12,12 +13,15 @@ export interface UseDashboardReturn {
   dailySales: DailySales[]
   categorySales: CategorySales[]
   lowStockProducts: LowStockProduct[]
+  topProducts: TopProduct[]
   loading: boolean
   exchangeRate: ExchangeRateInfo | null
   isUpdatingRate: boolean
+  dateRange: DashboardDateRange
   loadData: () => Promise<void>
   handleUpdateRate: () => Promise<void>
   handleSaveManualRate: (rate: string) => Promise<void>
+  setDateRange: (range: DashboardDateRange) => void
 }
 
 export function useDashboard(): UseDashboardReturn {
@@ -27,6 +31,7 @@ export function useDashboard(): UseDashboardReturn {
   const [loading, setLoading] = useState(true)
   const [exchangeRate, setExchangeRate] = useState<ExchangeRateInfo | null>(null)
   const [isUpdatingRate, setIsUpdatingRate] = useState(false)
+  const [dateRange, setDateRangeState] = useState<DashboardDateRange>(getDefaultDashboardRange)
 
   const [stats, setStats] = useState<DashboardStats>({
     salesToday: 0,
@@ -40,23 +45,25 @@ export function useDashboard(): UseDashboardReturn {
   const [dailySales, setDailySales] = useState<DailySales[]>([])
   const [categorySales, setCategorySales] = useState<CategorySales[]>([])
   const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([])
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([])
 
   const loadData = useCallback(async () => {
     if (!tenant?.slug) return
     setLoading(true)
 
-    const result = await dashboardService.getDashboardData(tenant.slug)
+    const result = await dashboardService.getDashboardData(tenant.slug, dateRange)
     if (isOk(result)) {
       setStats(result.value.stats)
       setDailySales(result.value.dailySales)
       setCategorySales(result.value.categorySales)
       setLowStockProducts(result.value.lowStockProducts)
+      setTopProducts(result.value.topProducts)
     } else {
       showError(result.error.message)
     }
 
     setLoading(false)
-  }, [tenant?.slug, showError])
+  }, [tenant?.slug, showError, dateRange])
 
   const handleUpdateRate = useCallback(async () => {
     setIsUpdatingRate(true)
@@ -93,6 +100,10 @@ export function useDashboard(): UseDashboardReturn {
     [showError, showSuccess],
   )
 
+  const setDateRange = useCallback((range: DashboardDateRange) => {
+    setDateRangeState(range)
+  }, [])
+
   useEffect(() => {
     const loadExchangeRate = async () => {
       const result = await getExchangeRate()
@@ -126,11 +137,14 @@ export function useDashboard(): UseDashboardReturn {
     dailySales,
     categorySales,
     lowStockProducts,
+    topProducts,
     loading,
     exchangeRate,
     isUpdatingRate,
+    dateRange,
     loadData,
     handleUpdateRate,
     handleSaveManualRate,
+    setDateRange,
   }
 }

@@ -26,11 +26,25 @@ export interface LowStockProduct extends Product {
   categoryName: string
 }
 
+export interface TopProduct {
+  localId: string
+  name: string
+  quantity: number
+  total: number
+  categoryName: string
+}
+
+export interface DashboardDateRange {
+  start: Date
+  end: Date
+}
+
 export interface DashboardData {
   stats: DashboardStats
   dailySales: DailySales[]
   categorySales: CategorySales[]
   lowStockProducts: LowStockProduct[]
+  topProducts: TopProduct[]
 }
 
 export interface ExchangeRateInfo {

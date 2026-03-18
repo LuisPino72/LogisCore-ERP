@@ -403,7 +403,7 @@ function App() {
             fallback={
               <div className="p-8 text-center text-slate-400">Cargando...</div>
             }>
-            <Dashboard isLoadingData={isLoadingData} />
+            <Dashboard isLoadingData={isLoadingData} onNavigate={setActiveModule} />
           </Suspense>
         );
       case "sales":
@@ -475,7 +475,7 @@ function App() {
             fallback={
               <div className="p-8 text-center text-slate-400">Cargando...</div>
             }>
-            <Dashboard />
+            <Dashboard onNavigate={setActiveModule} />
           </Suspense>
         );
     }

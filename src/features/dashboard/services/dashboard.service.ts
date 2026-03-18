@@ -1,21 +1,45 @@
 import { db, Product, Sale, Category } from '@/lib/db'
 import { Result, Ok, Err, AppError } from '@/lib/types/result'
 import { logger, logCategories } from '@/lib/logger'
-import type { DashboardStats, DailySales, CategorySales, LowStockProduct, DashboardData } from '../types/dashboard.types'
+import type { DashboardStats, DailySales, CategorySales, LowStockProduct, DashboardData, TopProduct, DashboardDateRange } from '../types/dashboard.types'
 import { CATEGORY_COLORS } from '../types/dashboard.types'
 
-function getDateRange() {
+function getTodayRange(): DashboardDateRange {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const end = new Date(today)
+  end.setHours(23, 59, 59, 999)
+  return { start: today, end }
+}
 
+function getYesterdayRange(): DashboardDateRange {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
+  const endOfYesterday = new Date(yesterday)
+  endOfYesterday.setHours(23, 59, 59, 999)
+  return { start: yesterday, end: endOfYesterday }
+}
 
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-  const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-  const lastOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0)
+function getCurrentMonthRange(): DashboardDateRange {
+  const today = new Date()
+  const start = new Date(today.getFullYear(), today.getMonth(), 1)
+  const end = new Date()
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
 
-  return { today, yesterday, firstOfMonth, firstOfLastMonth, lastOfLastMonth }
+function getLastMonthRange(): DashboardDateRange {
+  const today = new Date()
+  const start = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+  const end = new Date(today.getFullYear(), today.getMonth(), 0)
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
+export function getDefaultDashboardRange(): DashboardDateRange {
+  return getCurrentMonthRange()
 }
 
 function filterSalesByDateRange(sales: Sale[], startDate: Date, endDate: Date): Sale[] {
@@ -35,13 +59,16 @@ function getLowStockProducts(products: Product[]): Product[] {
   return products.filter(p => (p.stock || 0) <= 10 && p.isActive)
 }
 
-export async function getDashboardData(tenantSlug: string): Promise<Result<DashboardData, AppError>> {
+export async function getDashboardData(
+  tenantSlug: string,
+  dateRange?: DashboardDateRange
+): Promise<Result<DashboardData, AppError>> {
   try {
     if (!tenantSlug) {
       return Err(new AppError('Tenant slug requerido', 'INVALID_TENANT', 400))
     }
 
-    const { today, yesterday, firstOfMonth, firstOfLastMonth, lastOfLastMonth } = getDateRange()
+    const range = dateRange || getDefaultDashboardRange()
 
     const [products, sales, categories] = await Promise.all([
       db.products.where('tenantId').equals(tenantSlug).toArray(),
@@ -49,26 +76,28 @@ export async function getDashboardData(tenantSlug: string): Promise<Result<Dashb
       db.categories.where('tenantId').equals(tenantSlug).toArray(),
     ])
 
-    const completedSales = sales.filter(s => s.status === 'completed')
+    const todayRange = getTodayRange()
+    const yesterdayRange = getYesterdayRange()
+    const currentMonthRange = getCurrentMonthRange()
+    const lastMonthRange = getLastMonthRange()
 
     const salesToday = calculateSalesTotal(
-      filterSalesByDateRange(sales, today, new Date(today.getTime() + 86400000))
+      filterSalesByDateRange(sales, todayRange.start, todayRange.end)
     )
 
     const salesYesterday = calculateSalesTotal(
-      filterSalesByDateRange(sales, yesterday, today)
+      filterSalesByDateRange(sales, yesterdayRange.start, yesterdayRange.end)
     )
 
-    const ordersThisMonth = filterSalesByDateRange(sales, firstOfMonth, new Date()).length
-    const ordersLastMonth = filterSalesByDateRange(sales, firstOfLastMonth, lastOfLastMonth).length
-
-    const monthlyRevenue = calculateSalesTotal(
-      filterSalesByDateRange(sales, firstOfMonth, new Date())
-    )
+    const ordersThisMonth = filterSalesByDateRange(sales, currentMonthRange.start, currentMonthRange.end).length
+    const ordersLastMonth = filterSalesByDateRange(sales, lastMonthRange.start, lastMonthRange.end).length
 
     const lastMonthRevenue = calculateSalesTotal(
-      filterSalesByDateRange(sales, firstOfLastMonth, lastOfLastMonth)
+      filterSalesByDateRange(sales, lastMonthRange.start, lastMonthRange.end)
     )
+
+    const rangeSales = filterSalesByDateRange(sales, range.start, range.end)
+    const rangeRevenue = calculateSalesTotal(rangeSales)
 
     const lowStock = getLowStockProducts(products)
 
@@ -78,7 +107,7 @@ export async function getDashboardData(tenantSlug: string): Promise<Result<Dashb
       ordersThisMonth,
       ordersLastMonth,
       lowStockProducts: lowStock.length,
-      monthlyRevenue,
+      monthlyRevenue: rangeRevenue,
       lastMonthRevenue,
     }
 
@@ -87,49 +116,44 @@ export async function getDashboardData(tenantSlug: string): Promise<Result<Dashb
       categoryName: categories.find(c => c.id === p.categoryId)?.name || 'Sin categoría',
     })).slice(0, 10)
 
-    const dailySales = calculateDailySales(sales, today)
-    const categorySales = calculateCategorySales(products, categories, completedSales)
+    const dailySales = calculateDailySalesForRange(sales, range.start, range.end)
+    const categorySales = calculateCategorySales(products, categories, rangeSales)
+    const topProducts = calculateTopProducts(products, categories, rangeSales)
 
-    logger.info('Dashboard data loaded', { tenantSlug, stats })
+    logger.info('Dashboard data loaded', { tenantSlug, stats, range })
 
-    return Ok({ stats, dailySales, categorySales, lowStockProducts })
+    return Ok({ stats, dailySales, categorySales, lowStockProducts, topProducts })
   } catch (error) {
     logger.error('Error loading dashboard data', error instanceof Error ? error : undefined, { category: logCategories.UI })
     return Err(new AppError('Error al cargar datos del dashboard', 'DASHBOARD_ERROR', 500, { detail: error instanceof Error ? error.message : 'Unknown error' }))
   }
 }
 
-function calculateDailySales(sales: Sale[], today: Date): DailySales[] {
+function calculateDailySalesForRange(sales: Sale[], startDate: Date, endDate: Date): DailySales[] {
   const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
   const dailyData: DailySales[] = []
 
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today)
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const dayCount = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+  const daysToShow = Math.min(7, dayCount)
+
+  for (let i = daysToShow - 1; i >= 0; i--) {
+    const date = new Date(end)
     date.setDate(date.getDate() - i)
     const dayStart = new Date(date)
     dayStart.setHours(0, 0, 0, 0)
     const dayEnd = new Date(date)
     dayEnd.setHours(23, 59, 59, 999)
 
-    const prevDate = new Date(dayStart)
-    prevDate.setDate(prevDate.getDate() - 7)
-    const prevDayStart = new Date(prevDate)
-    prevDayStart.setHours(0, 0, 0, 0)
-    const prevDayEnd = new Date(prevDate)
-    prevDayEnd.setHours(23, 59, 59, 999)
-
     const currentDaySales = calculateSalesTotal(
       filterSalesByDateRange(sales, dayStart, dayEnd)
-    )
-
-    const previousDaySales = calculateSalesTotal(
-      filterSalesByDateRange(sales, prevDayStart, prevDayEnd)
     )
 
     dailyData.push({
       day: days[date.getDay()],
       current: currentDaySales,
-      previous: previousDaySales,
+      previous: 0,
     })
   }
 
@@ -158,6 +182,35 @@ function calculateCategorySales(products: Product[], categories: Category[], sal
       color: CATEGORY_COLORS[category] || '#64748b',
     }))
     .sort((a, b) => b.total - a.total)
+}
+
+function calculateTopProducts(products: Product[], categories: Category[], sales: Sale[]): TopProduct[] {
+  const productMap = new Map<string, { quantity: number; total: number }>()
+
+  sales.forEach(sale => {
+    sale.items.forEach(item => {
+      const current = productMap.get(item.productId) || { quantity: 0, total: 0 }
+      productMap.set(item.productId, {
+        quantity: current.quantity + item.quantity,
+        total: current.total + item.total,
+      })
+    })
+  })
+
+  return Array.from(productMap.entries())
+    .map(([productId, data]) => {
+      const product = products.find(p => p.localId === productId)
+      const category = product ? categories.find(c => c.id === product.categoryId) : null
+      return {
+        localId: productId,
+        name: product?.name || 'Producto desconocido',
+        quantity: data.quantity,
+        total: data.total,
+        categoryName: category?.name || 'Sin categoría',
+      }
+    })
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
 }
 
 export function calculateTrend(current: number, previous: number): number {
