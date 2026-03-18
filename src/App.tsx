@@ -13,24 +13,11 @@ import { SyncEngine } from "@/lib/sync/SyncEngine";
 import { isOk } from "@/lib/types/result";
 import { logger, logCategories } from "@/lib/logger";
 import { verifySession } from "@/features/auth/services/auth.service";
+import { Sidebar } from "@/common/Sidebar";
 import {
-  Package,
-  ShoppingCart,
-  LayoutDashboard,
-  ShoppingBag,
-  ShoppingBasket,
-  ChefHat,
-  BarChart3,
   Loader2,
   Menu,
   X,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-  Store,
-  DollarSign,
-  RefreshCw,
-  Users,
 } from "lucide-react";
 import Emblema from "@/assets/Emblema.ico";
 
@@ -90,7 +77,6 @@ function App() {
   const [exchangeRate, setExchangeRate] = useState<{ rate: number; updatedAt: Date; source: string } | null>(null);
   const [isUpdatingRate, setIsUpdatingRate] = useState(false);
   const [isVerifyingSession, setIsVerifyingSession] = useState(true);
-
   const isUpdatePasswordPage = window.location.pathname === "/update-password";
 
   useEffect(() => {
@@ -335,16 +321,20 @@ function App() {
     return <Login />;
   }
 
-  const allModules = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "inventory", label: "Inventario", icon: Package },
-    { id: "sales", label: "Ventas", icon: ShoppingBag },
-    { id: "purchases", label: "Compras", icon: ShoppingBasket },
-    { id: "pos", label: "Punto de Venta", icon: ShoppingCart },
-    { id: "recipes", label: "Recetas", icon: ChefHat },
-    { id: "employees", label: "Empleados", icon: Users },
-    { id: "reports", label: "Reportes", icon: BarChart3 },
-  ] as const;
+  const moduleLabels: Record<string, string> = {
+    dashboard: "Dashboard",
+    inventory: "Inventario",
+    sales: "Ventas",
+    purchases: "Compras",
+    pos: "Punto de Venta",
+    recipes: "Recetas",
+    employees: "Empleados",
+    reports: "Reportes",
+  };
+
+  const handleSetActiveModule = (module: string) => {
+    setActiveModule(module as Module);
+  };
 
   const renderModule = () => {
     if (role === "super_admin" && !isImpersonating) {
@@ -485,187 +475,25 @@ function App() {
 
 
 
-  const Sidebar = () => (
-    <aside
-      className={`fixed left-0 top-0 h-screen bg-(--bg-secondary) border-r border-(--border-color) flex flex-col transition-all duration-300 z-50 ${
-        sidebarCollapsed ? "w-16" : "w-60"
-      } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-      <div className="p-4 flex items-center justify-between border-b border-(--border-color)">
-        {!sidebarCollapsed && (
-          <div className="flex items-center gap-3">
-            <img src={Emblema} alt="LogisCore" className="w-8 h-8 rounded-lg" />
-            <span className="font-bold text-(--text-primary)">
-              LogisCore
-            </span>
-          </div>
-        )}
-        {sidebarCollapsed && (
-          <img
-            src={Emblema}
-            alt="LogisCore"
-            className="w-8 h-8 rounded-lg mx-auto"
-          />
-        )}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className={`hidden lg:flex items-center justify-center w-6 h-6 rounded-md bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors ${sidebarCollapsed ? "absolute -right-3 top-4" : ""}`}>
-          {sidebarCollapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <ChevronLeft className="w-4 h-4" />
-          )}
-        </button>
-      </div>
-
-      <nav className="flex-1 py-4 overflow-y-auto">
-        <ul className="space-y-1 px-2">
-          {allModules
-            .filter((mod) => {
-              // Dashboard y Reportes siempre visibles (por defecto)
-              if (mod.id === "dashboard" || mod.id === "reports") return true;
-              
-              // Si es employee, verificar permisos
-              if (role === "employee") {
-                const permissionKey = `can_access_${mod.id}` as keyof typeof permissions;
-                if (mod.id === "pos") {
-                  return permissions.can_access_pos === true;
-                }
-                const viewPermissionKey = `can_view_${mod.id}` as keyof typeof permissions;
-                return permissions[viewPermissionKey] === true || permissions[permissionKey] === true;
-              }
-              
-              // Para owners y super_admins, verificar si están activos en el tenant
-              const modules = tenant?.modules as
-                | Record<string, boolean>
-                | undefined;
-              return modules?.[mod.id] === true;
-            })
-            .map((mod) => (
-              <li key={mod.id}>
-                <button
-                  onClick={() => {
-                    setActiveModule(mod.id as Module);
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                    activeModule === mod.id
-                      ? "bg-(--brand-600) text-white shadow-lg shadow-(--brand-600)/20"
-                      : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-tertiary)"
-                  }`}
-                  title={sidebarCollapsed ? mod.label : undefined}>
-                  <mod.icon className="w-5 h-5 shrink-0" />
-                  {!sidebarCollapsed && (
-                    <span className="font-medium">{mod.label}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-        </ul>
-      </nav>
-
-      {!sidebarCollapsed && (
-        <div className="p-4 border-t border-(--border-color)">
-          <div className="bg-(--bg-tertiary)/50 rounded-xl p-3 border border-(--border-color)">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-4 h-4 text-green-400" />
-              <span className="text-xs font-medium text-slate-400 uppercase">Tasa BCV</span>
-            </div>
-            {exchangeRate ? (
-              <>
-                <p className="text-lg font-bold text-green-400">
-                  Bs. {exchangeRate.rate.toFixed(2)}
-                </p>
-                <p className="text-xs text-slate-500 mb-2">
-                  por $1 • {exchangeRate.source === 'api' ? '🟢 Automático' : '🟡 Manual'}
-                </p>
-                <button
-                  onClick={async () => {
-                    setIsUpdatingRate(true);
-                    const { updateExchangeRate, getExchangeRate } = await import('@/features/exchange-rate/services/exchangeRate.service');
-                    await updateExchangeRate();
-                    const result = await getExchangeRate();
-                    if (isOk(result) && result.value) {
-                      setExchangeRate({ rate: result.value.rate, updatedAt: result.value.updatedAt, source: result.value.source });
-                    }
-                    setIsUpdatingRate(false);
-                  }}
-                  disabled={isUpdatingRate}
-                  className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-(--brand-500)/20 hover:bg-(--brand-500)/30 text-(--brand-400) text-xs rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3 h-3 ${isUpdatingRate ? 'animate-spin' : ''}`} />
-                  {isUpdatingRate ? 'Actualizando...' : 'Actualizar'}
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={async () => {
-                  setIsUpdatingRate(true);
-                  const { updateExchangeRate, getExchangeRate } = await import('@/features/exchange-rate/services/exchangeRate.service');
-                  await updateExchangeRate();
-                  const result = await getExchangeRate();
-                  if (isOk(result) && result.value) {
-                    setExchangeRate({ rate: result.value.rate, updatedAt: result.value.updatedAt, source: result.value.source });
-                  }
-                  setIsUpdatingRate(false);
-                }}
-                disabled={isUpdatingRate}
-                className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-(--brand-500)/20 hover:bg-(--brand-500)/30 text-(--brand-400) text-xs rounded-lg transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3 h-3 ${isUpdatingRate ? 'animate-spin' : ''}`} />
-                {isUpdatingRate ? 'Cargando...' : 'Configurar Tasa'}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="p-4 border-t border-(--border-color)">
-        {!sidebarCollapsed ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-(--bg-tertiary) rounded-lg flex items-center justify-center overflow-hidden">
-                {tenant?.config &&
-                typeof tenant.config === "object" &&
-                "logoUrl" in tenant.config &&
-                tenant.config.logoUrl ? (
-                  <img
-                    src={String(tenant.config.logoUrl)}
-                    alt={tenant.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Store className="w-4 h-4 text-slate-500" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-(--text-primary) truncate">
-                  {tenant?.name}
-                </p>
-                <p className="text-xs text-(--text-muted) capitalize">{role}</p>
-              </div>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) rounded-lg transition-colors text-sm">
-              <LogOut className="w-4 h-4" />
-              Cerrar Sesión
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center justify-center p-2 bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) rounded-lg transition-colors"
-            title="Cerrar Sesión">
-            <LogOut className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-    </aside>
-  );
-
   return (
     <div className={`min-h-screen ${isAdminPanel || !role ? 'system-fixed-theme' : 'bg-(--bg-primary) text-(--text-primary)'}`}>
-      {!isAdminPanel && role && <Sidebar />}
+      {!isAdminPanel && role && (
+        <Sidebar
+          activeModule={activeModule}
+          setActiveModule={handleSetActiveModule}
+          sidebarCollapsed={sidebarCollapsed}
+          setSidebarCollapsed={setSidebarCollapsed}
+          mobileMenuOpen={mobileMenuOpen}
+          setMobileMenuOpen={setMobileMenuOpen}
+          role={role}
+          tenant={tenant as { name: string; slug: string; modules?: Record<string, boolean | undefined>; config?: Record<string, unknown> } | null}
+          permissions={permissions as Record<string, boolean | undefined>}
+          exchangeRate={exchangeRate}
+          isUpdatingRate={isUpdatingRate}
+          setIsUpdatingRate={setIsUpdatingRate}
+          handleSignOut={handleSignOut}
+        />
+      )}
 
       <div
         className={`transition-all duration-300 ${isAdminPanel ? "" : sidebarCollapsed ? "lg:ml-16" : "lg:ml-60"}`}>
@@ -684,8 +512,7 @@ function App() {
                 </button>
                 <div>
                   <h1 className="text-xl font-bold text-(--text-primary)">
-                    {allModules.find((m) => m.id === activeModule)?.label ||
-                      "LogisCore"}
+                    {moduleLabels[activeModule] || "LogisCore"}
                   </h1>
                 </div>
               </div>

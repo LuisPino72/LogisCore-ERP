@@ -299,7 +299,7 @@ export default function Dashboard({ isLoadingData: _isLoadingData, onNavigate }:
             {exchangeRate && (
               <button
                 onClick={() => setShowManualRateModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-sm text-blue-400 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-sm"
               >
                 <DollarSign className="w-4 h-4" />
                 <span className="font-medium">{formatBs(exchangeRate.rate)}</span>
