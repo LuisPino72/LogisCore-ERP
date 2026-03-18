@@ -101,6 +101,62 @@ EventBus.emit(Events.INVENTORY_UPDATED, { action: 'create', product });
 
 > **Para operaciones que modifican múltiples tablas, usar transacciones.**
 
+## 2.5 Code-Splitting
+
+> **Usar lazy loading para módulos que no son críticos en la carga inicial.**
+
+```typescript
+// App.tsx - módulos cargados dinámicamente
+const Dashboard = lazy(() => import('@/features/dashboard/components/Dashboard'));
+const POS = lazy(() => import('@/features/pos').then(m => ({ default: m.POS })));
+
+// vite.config.ts - separar vendors en chunks
+build: {
+  rollupOptions: {
+    output: {
+      manualChunks: {
+        'vendor-react': ['react', 'react-dom'],
+        'vendor-supabase': ['@supabase/supabase-js'],
+        'vendor-dexie': ['dexie', 'dexie-react-hooks'],
+        'vendor-zustand': ['zustand'],
+        'vendor-lucide': ['lucide-react'],
+      },
+    },
+  },
+},
+```
+
+## SECCIÓN 2.5: Métodos de Pago
+
+> **Usar siempre los 3 métodos de pago válidos.**
+
+```typescript
+type PaymentMethod = 'cash' | 'card' | 'pago_movil';
+
+// Validación correcta en servicios:
+if (!['cash', 'card', 'pago_movil'].includes(data.paymentMethod)) {
+  return Err(new ValidationError('Método de pago inválido'));
+}
+```
+
+## SECCIÓN 2.6: Ventas Suspendidas
+
+```typescript
+// Estructura en Dexie (ya existe en db/index.ts)
+interface SuspendedSale {
+  localId: string;
+  tenantId: string;
+  cart: CartItem[];  // Incluye productSnapshot para persistencia
+  note?: string;
+  createdAt: Date;
+}
+
+// Servicios en pos.service.ts
+saveSuspendedSale(tenantSlug, cart, note?)
+getSuspendedSales(tenantSlug)
+deleteSuspendedSale(localId)
+```
+
 ---
 
 ## SECCIÓN 3: Login y Carga de Datos
@@ -265,6 +321,25 @@ vi.mock('@/lib/sync/SyncEngine', () => ({
   SyncEngine: { addToQueue: vi.fn().mockResolvedValue(undefined) },
 }));
 ```
+
+## 8.2 Warnings de Lint en Tests
+
+> **Los warnings de `any` en archivos de test son intencionales** para mocks y fixtures de datos. NO agregar `eslint-disable` en tests para estos casos.
+
+```typescript
+// ✅ Correcto en tests - no agregar disable
+const mockData = { id: 1, name: 'test' } as any;  // warning OK
+
+// ✅ Correcto en código de producción - usar tipos propios
+onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+```
+
+## 8.3 Tests Obligatorios por Feature
+
+Cada módulo debe tener:
+- `*.validation.test.ts` - Validaciones de entrada
+- `*.service.test.ts` - Lógica de negocio
+- Tests cubriendo: happy path, edge cases, errores
 
 ---
 

@@ -13,7 +13,7 @@ interface CreateSaleInput {
   subtotal: number;
   tax: number;
   total: number;
-  paymentMethod: 'cash' | 'card';
+  paymentMethod: 'cash' | 'card' | 'pago_movil';
 }
 
 describe('Sales Validation', () => {
@@ -28,7 +28,7 @@ describe('Sales Validation', () => {
       errors.push('El total no puede ser negativo');
     }
     
-    if (!['cash', 'card'].includes(data.paymentMethod)) {
+    if (!['cash', 'card', 'pago_movil'].includes(data.paymentMethod)) {
       errors.push('Método de pago inválido');
     }
     
@@ -99,6 +99,19 @@ describe('Sales Validation', () => {
     
     const errors = validateSaleInput(input);
     expect(errors).toContain('Método de pago inválido');
+  });
+
+  it('debe aceptar pago_movil como método de pago válido', () => {
+    const input: CreateSaleInput = {
+      items: [{ productId: '1', productName: 'P', quantity: 1, unitPrice: 10, total: 10 }],
+      subtotal: 10,
+      tax: 0,
+      total: 10,
+      paymentMethod: 'pago_movil',
+    };
+    
+    const errors = validateSaleInput(input);
+    expect(errors).toHaveLength(0);
   });
 
   it('debe rechazar cantidad cero', () => {

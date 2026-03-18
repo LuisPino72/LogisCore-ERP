@@ -42,7 +42,7 @@ function validateSaleInput(data: CreateSaleInput): string[] {
     errors.push('El total no puede ser negativo');
   }
   
-  if (!['cash', 'card'].includes(data.paymentMethod)) {
+  if (!['cash', 'card', 'pago_movil'].includes(data.paymentMethod)) {
     errors.push('Método de pago inválido');
   }
   

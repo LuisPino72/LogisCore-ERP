@@ -135,10 +135,10 @@ describe('Payment Processing', () => {
 
 describe('Sales Status', () => {
   type SaleStatus = 'completed' | 'cancelled' | 'refunded';
-  type PaymentMethod = 'cash' | 'card';
+  type PaymentMethod = 'cash' | 'card' | 'pago_movil';
 
   const validStatuses: SaleStatus[] = ['completed', 'cancelled', 'refunded'];
-  const validMethods: PaymentMethod[] = ['cash', 'card'];
+  const validMethods: PaymentMethod[] = ['cash', 'card', 'pago_movil'];
 
   it('debe tener estados de venta válidos', () => {
     expect(validStatuses).toContain('completed');
