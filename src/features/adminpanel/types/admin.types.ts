@@ -12,8 +12,7 @@ export interface TenantModules {
 
 export interface TenantThemeConfig {
   themeColor: string
-  mode: 'dark' | 'light'
-  accentIntensity: 'subtle' | 'normal' | 'intense'
+  themeColorSecondary?: string
 }
 
 export interface TenantConfig {
@@ -51,8 +50,43 @@ export const ALL_MODULES = [
 
 export const DEFAULT_THEME_CONFIG: TenantThemeConfig = {
   themeColor: '#ea580c',
-  mode: 'dark',
-  accentIntensity: 'normal',
+}
+
+export interface SystemMetrics {
+  totalTenants: number
+  activeTenants: number
+  totalUsers: number
+  recentActivity: ActivityLog[]
+}
+
+export interface ActivityLog {
+  id: string
+  tenant_id: string
+  tenant_name: string
+  action: 'create' | 'update' | 'delete' | 'login' | 'logout'
+  target: 'tenant' | 'user' | 'config'
+  description: string
+  created_at: string
+  user_id?: string
+  user_email?: string
+}
+
+export interface DashboardStats {
+  tenants: {
+    total: number
+    active: number
+    inactive: number
+  }
+  users: {
+    total: number
+    owners: number
+    employees: number
+  }
+  activity: {
+    today: number
+    thisWeek: number
+    thisMonth: number
+  }
 }
 
 export const DEFAULT_TENANT_CONFIG: TenantConfig = {

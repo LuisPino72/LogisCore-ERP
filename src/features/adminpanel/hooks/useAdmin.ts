@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTenantStore } from '@/store/useTenantStore'
 import { useToast } from '@/providers/ToastProvider'
 import * as adminService from '../services/admin.service'
-import type { Tenant } from '../types/admin.types'
+import type { Tenant, SystemMetrics } from '../types/admin.types'
 import { isOk } from '@/lib/types/result'
 
 export interface UseAdminReturn {
@@ -14,11 +14,16 @@ export interface UseAdminReturn {
   viewMode: 'table' | 'grid' | 'expandable'
   expandedId: string | null
   editingTenant: Tenant | null
+  metrics: SystemMetrics | null
+  metricsLoading: boolean
+  deleteConfirm: { isOpen: boolean; tenantId: string | null; tenantName: string }
   setSearchQuery: (query: string) => void
   setViewMode: (mode: 'table' | 'grid' | 'expandable') => void
   setExpandedId: (id: string | null) => void
   setEditingTenant: (tenant: Tenant | null) => void
+  setDeleteConfirm: (state: { isOpen: boolean; tenantId: string | null; tenantName: string }) => void
   fetchTenants: () => Promise<void>
+  fetchMetrics: () => Promise<void>
   createTenant: (name: string, slug: string) => Promise<boolean>
   updateTenant: (id: string, data: Partial<Tenant>) => Promise<boolean>
   deleteTenant: (id: string) => Promise<boolean>
@@ -36,6 +41,13 @@ export function useAdmin(): UseAdminReturn {
   const [viewMode, setViewMode] = useState<'table' | 'grid' | 'expandable'>('table')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
+  const [metrics, setMetrics] = useState<SystemMetrics | null>(null)
+  const [metricsLoading, setMetricsLoading] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; tenantId: string | null; tenantName: string }>({
+    isOpen: false,
+    tenantId: null,
+    tenantName: '',
+  })
 
   const startImpersonation = useTenantStore((state) => state.startImpersonation)
   const { showError, showSuccess } = useToast()
@@ -56,6 +68,21 @@ export function useAdmin(): UseAdminReturn {
   useEffect(() => {
     fetchTenants()
   }, [fetchTenants])
+
+  const fetchMetrics = useCallback(async () => {
+    setMetricsLoading(true)
+    const result = await adminService.getSystemMetrics()
+    if (isOk(result)) {
+      setMetrics(result.value)
+    } else {
+      showError(result.error.message)
+    }
+    setMetricsLoading(false)
+  }, [showError])
+
+  useEffect(() => {
+    fetchMetrics()
+  }, [fetchMetrics])
 
   useEffect(() => {
     const query = searchQuery.toLowerCase()
@@ -106,6 +133,7 @@ export function useAdmin(): UseAdminReturn {
       const result = await adminService.deleteTenant(id)
       if (isOk(result)) {
         showSuccess('Tenant eliminado correctamente')
+        setDeleteConfirm({ isOpen: false, tenantId: null, tenantName: '' })
         await fetchTenants()
         setLoading(false)
         return true
@@ -114,7 +142,7 @@ export function useAdmin(): UseAdminReturn {
       setLoading(false)
       return false
     },
-    [fetchTenants, showError, showSuccess]
+    [fetchTenants, showError, showSuccess, setDeleteConfirm]
   )
 
   const uploadLogo = useCallback(
@@ -176,11 +204,16 @@ export function useAdmin(): UseAdminReturn {
     viewMode,
     expandedId,
     editingTenant,
+    metrics,
+    metricsLoading,
+    deleteConfirm,
     setSearchQuery,
     setViewMode,
     setExpandedId,
     setEditingTenant,
+    setDeleteConfirm,
     fetchTenants,
+    fetchMetrics,
     createTenant,
     updateTenant,
     deleteTenant,

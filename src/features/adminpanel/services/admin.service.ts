@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { Result, Ok, Err, AppError, ValidationError, UnauthorizedError } from '@/lib/types/result'
-import type { Tenant, TenantConfig } from '../types/admin.types'
+import type { Tenant, TenantConfig, SystemMetrics, ActivityLog } from '../types/admin.types'
 
 export async function verifySuperAdmin(): Promise<Result<void, AppError>> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -233,4 +233,33 @@ export async function createOwner(
   }
 
   return Ok(undefined)
+}
+
+export async function getSystemMetrics(): Promise<Result<SystemMetrics, AppError>> {
+  const tenantsResult = await getAllTenants()
+  if (!tenantsResult.ok) {
+    return Err(tenantsResult.error)
+  }
+
+  const tenants = tenantsResult.value
+  const { data: userRoles, error: rolesError } = await supabase
+    .from('user_roles')
+    .select('user_id, role, tenant_id, tenants!inner(name)')
+
+  if (rolesError) {
+    return Err(new AppError('Error al obtener métricas', 'METRICS_ERROR', 500, { detail: rolesError.message }))
+  }
+
+  const uniqueUsers = new Set(userRoles?.map(r => r.user_id) || [])
+  const activeTenants = tenants.filter(t => t.config?.ownerId).length
+
+  // Activity logs - table may not exist yet, skip silently
+  let activityLogs: ActivityLog[] = []
+
+  return Ok({
+    totalTenants: tenants.length,
+    activeTenants,
+    totalUsers: uniqueUsers.size,
+    recentActivity: activityLogs,
+  })
 }

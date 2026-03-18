@@ -15,8 +15,6 @@ export interface TenantModules {
 export interface TenantThemeConfig {
   themeColor: string
   themeColorSecondary?: string
-  mode: 'dark' | 'light' | 'system'
-  accentIntensity: 'subtle' | 'normal' | 'bold'
 }
 
 export interface TenantConfig {

@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { TenantThemeConfig } from './useTenantStore';
 
 type Theme = 'light' | 'dark';
-type AccentIntensity = 'subtle' | 'normal' | 'bold';
+type AccentIntensity = 'subtle' | 'normal' | 'intense';
 
 interface ThemeState {
   theme: Theme;
@@ -40,14 +40,8 @@ function adjustBrightness(hex: string, factor: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
-function generateColorPalette(baseColor: string, intensity: AccentIntensity): Record<string, string> {
+function generateColorPalette(baseColor: string): Record<string, string> {
   const base = baseColor.startsWith('#') ? baseColor : `#${baseColor}`;
-  const factorMap = {
-    subtle: { bg: 0.15, hover: 0.25, active: 0.3 },
-    normal: { bg: 0.2, hover: 0.35, active: 0.45 },
-    bold: { bg: 0.25, hover: 0.45, active: 0.55 },
-  };
-  const factors = factorMap[intensity];
   
   return {
     '50': adjustBrightness(base, 0.95),
@@ -61,9 +55,9 @@ function generateColorPalette(baseColor: string, intensity: AccentIntensity): Re
     '800': adjustBrightness(base, 0.55),
     '900': adjustBrightness(base, 0.4),
     '950': adjustBrightness(base, 0.25),
-    'bg': adjustBrightness(base, factors.bg),
-    'bg-hover': adjustBrightness(base, factors.hover),
-    'bg-active': adjustBrightness(base, factors.active),
+    'bg': adjustBrightness(base, 0.15),
+    'bg-hover': adjustBrightness(base, 0.25),
+    'bg-active': adjustBrightness(base, 0.35),
   };
 }
 
@@ -87,8 +81,6 @@ export const useThemeStore = create<ThemeState>()(
         set({
           themeColor: config.themeColor || DEFAULT_THEME_COLOR,
           themeColorSecondary: config.themeColorSecondary || DEFAULT_SECONDARY_COLOR,
-          accentIntensity: config.accentIntensity || 'normal',
-          theme: config.mode === 'dark' ? 'dark' : 'light',
           isTenantMode: true,
         });
 
@@ -99,24 +91,8 @@ export const useThemeStore = create<ThemeState>()(
 
       generateCssVariables: () => {
         const state = get();
-        const palette = generateColorPalette(state.themeColor, state.accentIntensity);
-        const secondaryPalette = generateColorPalette(state.themeColorSecondary, state.accentIntensity);
-        const isDark = state.theme === 'dark';
-
-        // Base dark background calculation
-        const baseDark = { r: 9, g: 9, b: 11 }; // Zinc-950 base
-        const brandRgb = hexToRgb(state.themeColor) || { r: 234, g: 88, b: 12 };
-        
-        const blend = (c1: number, c2: number, factor: number) => Math.round(c1 * (1 - factor) + c2 * factor);
-        
-        const tintedR = blend(baseDark.r, brandRgb.r, 0.05);
-        const tintedG = blend(baseDark.g, brandRgb.g, 0.05);
-        const tintedB = blend(baseDark.b, brandRgb.b, 0.05);
-        
-        const darkBgPrimary = `rgb(${tintedR}, ${tintedG}, ${tintedB})`;
-        const darkBgSecondary = `rgb(${tintedR + 10}, ${tintedG + 10}, ${tintedB + 10})`;
-        const darkBgTertiary = `rgb(${tintedR + 20}, ${tintedG + 20}, ${tintedB + 20})`;
-        const darkBgElevated = `rgb(${tintedR + 30}, ${tintedG + 30}, ${tintedB + 30})`;
+        const palette = generateColorPalette(state.themeColor);
+        const secondaryPalette = generateColorPalette(state.themeColorSecondary);
 
         return `
           --brand-50: ${palette['50']};
@@ -145,25 +121,23 @@ export const useThemeStore = create<ThemeState>()(
           --brand-secondary-800: ${secondaryPalette['800']};
           --brand-secondary-900: ${secondaryPalette['900']};
           
-          --bg-primary: ${isDark ? darkBgPrimary : '#ffffff'};
-          --bg-secondary: ${isDark ? darkBgSecondary : '#f8fafc'};
-          --bg-tertiary: ${isDark ? darkBgTertiary : '#f1f5f9'};
-          --bg-elevated: ${isDark ? darkBgElevated : '#f1f5f9'};
-          --text-primary: ${isDark ? '#f8fafc' : '#0f172a'};
-          --text-secondary: ${isDark ? '#cbd5e1' : '#475569'};
-          --text-muted: ${isDark ? '#94a3b8' : '#94a3b8'};
-          --border-color: ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)'};
-          --border-subtle: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)'};
+          --bg-primary: #ffffff;
+          --bg-secondary: #f8fafc;
+          --bg-tertiary: #f1f5f9;
+          --bg-elevated: #f1f5f9;
+          --text-primary: #0f172a;
+          --text-secondary: #475569;
+          --text-muted: #94a3b8;
+          --border-color: rgba(15,23,42,0.1);
+          --border-subtle: rgba(15,23,42,0.05);
         `.trim();
       },
     }),
     {
       name: 'logiscore-theme',
       partialize: (state) => ({
-        theme: state.theme,
         themeColor: state.themeColor,
         themeColorSecondary: state.themeColorSecondary,
-        accentIntensity: state.accentIntensity,
         isTenantMode: state.isTenantMode,
       }),
     }

@@ -3,10 +3,14 @@ import { useAdmin } from '../hooks/useAdmin'
 import {
   Search, LayoutGrid, List, ChevronDown, ChevronUp,
   Store, Hash, Users, Plus, Edit2, LogIn,
-  Building2, X, Check, Palette, KeyRound
+  Building2
 } from 'lucide-react'
 import { ALL_MODULES, DEFAULT_THEME_CONFIG } from '../types/admin.types'
 import type { Tenant, TenantConfig, TenantThemeConfig } from '../types/admin.types'
+import { DashboardMetrics } from './DashboardMetrics'
+import { TenantGrid } from './TenantGrid'
+import { TenantEditor } from './TenantEditor'
+import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 
 function getThemeConfig(config: TenantConfig | undefined): TenantThemeConfig {
   return config?.themeConfig || DEFAULT_THEME_CONFIG
@@ -54,52 +58,6 @@ function renderEmptyState(onCreate: () => void) {
   )
 }
 
-function renderTenantCard(tenant: Tenant, onImpersonate: (t: Tenant) => void, onEdit: (t: Tenant) => void) {
-  return (
-    <div key={tenant.id} className="bg-(--bg-secondary) border border-(--border-color) rounded-2xl p-5 shadow-lg hover:shadow-xl hover:border-(--brand-500)/30 transition-all duration-300 group">
-      <div className="flex items-start gap-4 mb-4">
-        <div className="w-14 h-14 bg-(--bg-tertiary) rounded-xl flex items-center justify-center overflow-hidden shrink-0 ring-4 ring-(--border-subtle) group-hover:ring-(--brand-500)/30 transition-all">
-          {tenant.config?.logoUrl ? (
-            <img src={tenant.config.logoUrl} alt={tenant.name} className="w-full h-full object-cover" />
-          ) : (
-            <Store className="w-7 h-7 text-(--text-muted)" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-(--text-primary) text-lg truncate">{tenant.name}</h3>
-          <p className="text-(--text-muted) text-sm font-mono truncate">/{tenant.slug}</p>
-        </div>
-      </div>
-      <div className="space-y-3 mb-4">
-        <div>
-          <p className="text-xs text-(--text-muted) mb-2 uppercase tracking-wide font-medium">Módulos</p>
-          {renderModuleBadges(tenant)}
-        </div>
-        <div className="flex items-center gap-2 text-sm text-(--text-secondary)">
-          <Users className="w-4 h-4 text-(--brand-400)" />
-          <span>{tenant.config?.maxEmployees || 3} usuarios permitidos</span>
-        </div>
-      </div>
-      <div className="flex gap-2 pt-4 border-t border-(--border-color)">
-        <button
-          onClick={() => onImpersonate(tenant)}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-linear-to-r from-(--brand-600) to-(--brand-500) hover:from-(--brand-500) hover:to-(--brand-400) text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-md shadow-(--brand-900)/20 hover:shadow-(--brand-500)/30"
-        >
-          <LogIn className="w-4 h-4" />
-          Entrar
-        </button>
-        <button
-          onClick={() => onEdit(tenant)}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-(--bg-tertiary) hover:bg-(--bg-elevated) text-(--text-secondary) rounded-xl text-sm font-medium transition-all duration-200 border border-(--border-color) hover:border-(--brand-500)/30"
-        >
-          <Edit2 className="w-4 h-4" />
-          Editar
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export default function AdminPanel() {
   const {
     filteredTenants,
@@ -108,23 +66,25 @@ export default function AdminPanel() {
     viewMode,
     expandedId,
     editingTenant,
+    metrics,
+    metricsLoading,
+    deleteConfirm,
     setSearchQuery,
     setViewMode,
     setExpandedId,
     setEditingTenant,
+    setDeleteConfirm,
     createTenant,
     updateTenant,
     uploadLogo,
     createOwner,
     handleImpersonate,
+    deleteTenant,
   } = useAdmin()
 
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
-  const [ownerUsername, setOwnerUsername] = useState('')
-  const [ownerPassword, setOwnerPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [ownerLoading, setOwnerLoading] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(true)
 
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -132,41 +92,56 @@ export default function AdminPanel() {
     if (success) {
       setName('')
       setSlug('')
+      setShowCreateForm(false)
     }
   }
 
-  const handleUpdateTenant = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleUpdateTenant = async (data: Partial<Tenant>) => {
     if (!editingTenant) return
-    await updateTenant(editingTenant.id, {
-      name: editingTenant.name,
-      modules: editingTenant.modules,
-      config: editingTenant.config,
-    })
+    await updateTenant(editingTenant.id, data)
   }
 
-  const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!editingTenant || !e.target.files || e.target.files.length === 0) return
-    const file = e.target.files[0]
+  const handleUploadLogo = async (file: File) => {
+    if (!editingTenant) return
     await uploadLogo(editingTenant.id, file)
   }
 
-  const handleCreateOwner = async () => {
+  const handleCreateOwner = async (email: string, password: string) => {
     if (!editingTenant) return
-    if (!ownerUsername.trim()) return
-    if (!ownerPassword || ownerPassword.length < 6) return
-    if (ownerPassword !== confirmPassword) return
+    await createOwner(editingTenant.id, email, password)
+  }
 
-    setOwnerLoading(true)
-    await createOwner(editingTenant.id, ownerUsername, ownerPassword)
-    setOwnerUsername('')
-    setOwnerPassword('')
-    setConfirmPassword('')
-    setOwnerLoading(false)
+  const handleDeleteConfirm = async () => {
+    if (deleteConfirm.tenantId) {
+      await deleteTenant(deleteConfirm.tenantId)
+    }
   }
 
   return (
     <div className="space-y-6">
+      {metrics && (
+        <DashboardMetrics metrics={metrics} loading={metricsLoading} />
+      )}
+
+      {editingTenant && (
+        <TenantEditor
+          tenant={editingTenant}
+          onClose={() => setEditingTenant(null)}
+          onSave={handleUpdateTenant}
+          onUploadLogo={handleUploadLogo}
+          onCreateOwner={handleCreateOwner}
+          loading={loading}
+        />
+      )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.isOpen}
+        tenantName={deleteConfirm.tenantName}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteConfirm({ isOpen: false, tenantId: null, tenantName: '' })}
+        loading={loading}
+      />
+
       {!editingTenant && (
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
           <div className="relative w-full sm:max-w-xs">
@@ -203,7 +178,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {!editingTenant ? (
+      {!editingTenant && showCreateForm && (
         <section className="bg-(--bg-secondary) border border-(--border-color) rounded-2xl p-6 shadow-xl">
           <h3 className="text-lg font-semibold mb-5 text-(--brand-400) flex items-center gap-2">
             <Plus className="w-5 h-5" />
@@ -247,224 +222,18 @@ export default function AdminPanel() {
             </button>
           </form>
         </section>
-      ) : (
-        <section className="bg-(--bg-secondary) border border-(--border-color) rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-(--brand-400) flex items-center gap-2">
-              <Edit2 className="w-5 h-5" />
-              Editando: {editingTenant.name}
-            </h3>
-            <button
-              type="button"
-              onClick={() => setEditingTenant(null)}
-              className="text-sm text-(--text-muted) hover:text-(--text-primary) flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-(--bg-tertiary) transition-colors"
-            >
-              <X className="w-4 h-4" />
-              Cancelar
-            </button>
-          </div>
-          <form onSubmit={handleUpdateTenant} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className="block text-sm text-(--text-secondary) mb-1.5 font-medium">Nombre Comercial</label>
-                <div className="relative">
-                  <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
-                  <input
-                    type="text"
-                    required
-                    className="w-full pl-10 pr-3 py-3 bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl text-(--text-primary) focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
-                    value={editingTenant.name}
-                    onChange={(e) => setEditingTenant({ ...editingTenant, name: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm text-(--text-secondary) mb-1.5 font-medium">Max Empleados</label>
-                <div className="relative">
-                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
-                  <input
-                    type="number"
-                    required
-                    className="w-full pl-10 pr-3 py-3 bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl text-(--text-primary) focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
-                    value={editingTenant.config?.maxEmployees || 3}
-                    onChange={(e) => setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, maxEmployees: parseInt(e.target.value) } })}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="flex text-sm text-(--text-secondary) mb-1.5 font-medium items-center justify-between">
-                  Logotipo
-                  {editingTenant.config?.logoUrl && (
-                    <a href={editingTenant.config.logoUrl} target="_blank" rel="noreferrer" className="text-(--brand-400) hover:underline text-xs">Ver Actual</a>
-                  )}
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleUploadLogo}
-                  className="w-full bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-(--brand-600) file:text-white hover:file:bg-(--brand-500) transition-all cursor-pointer"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-(--text-secondary) mb-2 font-medium">
-                  <span className="flex items-center gap-2">
-                    <Palette className="w-4 h-4" />
-                    Personalización Visual
-                  </span>
-                </label>
-                <div className="space-y-4 bg-(--bg-secondary) p-5 rounded-2xl border border-(--border-color) shadow-inner">
-                  <div>
-                    <label className="block text-xs text-(--text-muted) mb-2 font-medium">Color Principal</label>
-                    <div className="flex gap-3">
-                      <input
-                        type="color"
-                        value={getThemeConfig(editingTenant.config).themeColor}
-                        onChange={(e) => {
-                          const tc = getThemeConfig(editingTenant.config)
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, themeColor: e.target.value } } })
-                        }}
-                        className="h-12 w-12 rounded-xl border-2 border-(--border-color) bg-(--bg-tertiary) cursor-pointer hover:scale-105 transition-transform"
-                      />
-                      <input
-                        type="text"
-                        value={getThemeConfig(editingTenant.config).themeColor}
-                        onChange={(e) => {
-                          const tc = getThemeConfig(editingTenant.config)
-                          setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, themeColor: e.target.value } } })
-                        }}
-                        className="flex-1 bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) font-mono uppercase text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-(--text-muted) mb-2 font-medium">Intensidad del Color</label>
-                    <div className="flex gap-2">
-                      {(['subtle', 'normal', 'intense'] as const).map((intensity) => (
-                        <button
-                          key={intensity}
-                          type="button"
-                          onClick={() => {
-                            const tc = getThemeConfig(editingTenant.config)
-                            setEditingTenant({ ...editingTenant, config: { ...editingTenant.config, themeConfig: { ...tc, accentIntensity: intensity } } })
-                          }}
-                          className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                            getThemeConfig(editingTenant.config).accentIntensity === intensity
-                              ? 'bg-linear-to-r from-(--brand-600) to-(--brand-500) text-white shadow-md'
-                              : 'bg-(--bg-tertiary) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
-                          }`}
-                        >
-                          {intensity === 'subtle' ? 'Sutil' : intensity === 'normal' ? 'Normal' : 'Audaz'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="pt-5 border-t border-(--border-color)">
-              <h4 className="text-sm font-semibold text-(--text-primary) mb-4 flex items-center gap-2">
-                <Check className="w-4 h-4 text-(--brand-400)" />
-                Módulos Activos
-              </h4>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-(--bg-primary) p-5 rounded-xl border border-(--border-color)">
-                {ALL_MODULES.map(mod => (
-                  <label
-                    key={mod.id}
-                    className={`flex items-center gap-3 text-sm rounded-xl p-3 cursor-pointer transition-all ${
-                      editingTenant.modules?.[mod.id]
-                        ? 'bg-(--brand-500)/10 text-(--brand-400) border border-(--brand-500)/30'
-                        : 'text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-tertiary) border border-transparent'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!editingTenant.modules?.[mod.id]}
-                      onChange={(e) => setEditingTenant({ ...editingTenant, modules: { ...editingTenant.modules, [mod.id]: e.target.checked } })}
-                      className="sr-only"
-                    />
-                    <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
-                      editingTenant.modules?.[mod.id]
-                        ? 'bg-(--brand-500) border-(--brand-500)'
-                        : 'border-(--border-color)'
-                    }`}>
-                      {editingTenant.modules?.[mod.id] && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    <span className="capitalize font-medium">{mod.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 mt-2 flex items-center justify-center gap-2 bg-linear-to-r from-(--brand-600) to-(--brand-500) hover:from-(--brand-500) hover:to-(--brand-400) text-white rounded-xl transition-all duration-200 shadow-lg shadow-(--brand-900)/20 hover:shadow-(--brand-500)/30 font-medium"
-            >
-              {loading ? 'Guardando...' : <><Check className="w-4 h-4" /> Guardar Cambios y Cerrar Edición</>}
-            </button>
-          </form>
-          <div className="pt-6 border-t border-(--border-color)">
-            <h4 className="text-sm font-semibold text-(--text-primary) mb-4 flex items-center gap-2">
-              <KeyRound className="w-4 h-4 text-(--text-muted)" />
-              Crear Usuario Owner
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-              <div>
-                <label className="block text-xs text-(--text-muted) mb-1.5 font-medium">Nombre de Usuario</label>
-                <input
-                  type="text"
-                  placeholder="Ej: juan_admin"
-                  className="w-full bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
-                  value={ownerUsername}
-                  onChange={(e) => setOwnerUsername(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-(--text-muted) mb-1.5 font-medium">Contraseña</label>
-                <input
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  className="w-full bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
-                  value={ownerPassword}
-                  onChange={(e) => setOwnerPassword(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-(--text-muted) mb-1.5 font-medium">Confirmar Contraseña</label>
-                <input
-                  type="password"
-                  placeholder="Repite la contraseña"
-                  className="w-full bg-(--bg-tertiary)/50 border border-(--border-color) rounded-xl px-4 py-3 text-(--text-primary) text-sm focus:border-(--brand-500) focus:outline-none focus:ring-2 focus:ring-(--brand-500)/20 transition-all"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  disabled={ownerLoading || !!editingTenant.config?.ownerId}
-                  onClick={handleCreateOwner}
-                  className="w-full py-3 bg-(--brand-600) hover:bg-(--brand-500) disabled:bg-(--bg-tertiary) text-white rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:text-(--text-muted)"
-                >
-                  {ownerLoading ? 'Creando...' : editingTenant.config?.ownerId ? 'Owner ya creado' : <><KeyRound className="w-4 h-4" /> Crear Owner</>}
-                </button>
-              </div>
-            </div>
-            <p className="text-xs text-(--text-muted) mt-3">
-              {editingTenant.config?.ownerId 
-                ? '✓ Ya existe un usuario owner para este negocio' 
-                : 'El usuario owner podrá iniciar sesión con las credenciales que proporciones. Solo puede haber un owner por empresa.'}
-            </p>
-          </div>
-        </section>
       )}
 
       {!editingTenant && (
         <>
           {filteredTenants.length === 0 ? (
-            renderEmptyState(() => setEditingTenant(null))
+            renderEmptyState(() => setShowCreateForm(true))
           ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredTenants.map((t) => renderTenantCard(t, handleImpersonate, setEditingTenant))}
-            </div>
+            <TenantGrid 
+              tenants={filteredTenants} 
+              onImpersonate={handleImpersonate}
+              onEdit={setEditingTenant}
+            />
           ) : (
             <section className="bg-(--bg-secondary) border border-(--border-color) rounded-2xl overflow-hidden shadow-xl">
               <table className="w-full text-left border-collapse">
