@@ -30,6 +30,7 @@ interface SidebarProps {
   tenant: { name: string; slug: string; modules?: Record<string, boolean | undefined>; config?: Record<string, unknown> } | null;
   permissions: Record<string, boolean | undefined>;
   exchangeRate: { rate: number; updatedAt: Date; source: string } | null;
+  setExchangeRate: (rate: { rate: number; updatedAt: Date; source: string } | null) => void;
   isUpdatingRate: boolean;
   setIsUpdatingRate: (updating: boolean) => void;
   handleSignOut: () => void;
@@ -57,6 +58,7 @@ export function Sidebar({
   tenant,
   permissions,
   exchangeRate,
+  setExchangeRate,
   isUpdatingRate,
   setIsUpdatingRate,
   handleSignOut,
@@ -92,8 +94,12 @@ export function Sidebar({
 
   const handleUpdateRate = async () => {
     setIsUpdatingRate(true);
-    const { updateExchangeRate } = await import('@/features/exchange-rate/services/exchangeRate.service');
+    const { updateExchangeRate, getExchangeRate } = await import('@/features/exchange-rate/services/exchangeRate.service');
     await updateExchangeRate();
+    const result = await getExchangeRate();
+    if (result.ok && result.value) {
+      setExchangeRate({ rate: result.value.rate, updatedAt: result.value.updatedAt, source: result.value.source });
+    }
     setIsUpdatingRate(false);
   };
 

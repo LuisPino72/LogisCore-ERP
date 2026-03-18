@@ -489,6 +489,7 @@ function App() {
           tenant={tenant as { name: string; slug: string; modules?: Record<string, boolean | undefined>; config?: Record<string, unknown> } | null}
           permissions={permissions as Record<string, boolean | undefined>}
           exchangeRate={exchangeRate}
+          setExchangeRate={setExchangeRate}
           isUpdatingRate={isUpdatingRate}
           setIsUpdatingRate={setIsUpdatingRate}
           handleSignOut={handleSignOut}
