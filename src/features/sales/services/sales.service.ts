@@ -210,3 +210,42 @@ export async function getSalesStats(): Promise<{
     cancelledCount: sales.filter(s => s.status === 'cancelled').length,
   };
 }
+
+export async function getDailyStats(): Promise<{
+  totalSales: number;
+  totalAmount: number;
+  transactionCount: number;
+  averageTicket: number;
+  paymentMethodBreakdown: {
+    cash: number;
+    card: number;
+    pago_movil: number;
+  };
+}> {
+  const tenantId = getCurrentTenantId();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const sales = await db.sales
+    .where('tenantId')
+    .equals(tenantId)
+    .filter(s => s.createdAt >= today && s.createdAt < tomorrow && s.status === 'completed')
+    .toArray();
+  
+  const totalAmount = sales.reduce((sum, s) => sum + s.total, 0);
+  const transactionCount = sales.length;
+  
+  return {
+    totalSales: transactionCount,
+    totalAmount,
+    transactionCount,
+    averageTicket: transactionCount > 0 ? totalAmount / transactionCount : 0,
+    paymentMethodBreakdown: {
+      cash: sales.filter(s => s.paymentMethod === 'cash').reduce((sum, s) => sum + s.total, 0),
+      card: sales.filter(s => s.paymentMethod === 'card').reduce((sum, s) => sum + s.total, 0),
+      pago_movil: sales.filter(s => s.paymentMethod === 'pago_movil').reduce((sum, s) => sum + s.total, 0),
+    },
+  };
+}

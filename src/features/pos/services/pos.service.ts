@@ -1,17 +1,7 @@
-import { db, Product, Category } from '@/lib/db';
+import { db, Product, Category, SuspendedSale } from '@/lib/db';
+import type { SortConfig, CartItem, SaleItem } from '../types/pos.types';
 
-export interface CartItem {
-  product: Product;
-  quantity: number;
-}
-
-export interface SaleItem {
-  productId: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-}
+export type { CartItem, SaleItem } from '../types/pos.types';
 
 export async function loadPOSData(tenantSlug: string): Promise<{ products: Product[]; categories: Category[] }> {
   const [products, categories] = await Promise.all([
@@ -21,18 +11,49 @@ export async function loadPOSData(tenantSlug: string): Promise<{ products: Produ
   return { products, categories };
 }
 
-export function filterProducts(products: Product[], search: string, selectedCategory: number | string): Product[] {
-  return products
+export function filterProducts(
+  products: Product[], 
+  search: string, 
+  selectedCategory: number | string,
+  sort?: SortConfig,
+  showFavoritesOnly?: boolean
+): Product[] {
+  const filtered = products
     .filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
+      const searchLower = search.toLowerCase();
+      const matchesSearch = 
+        p.name.toLowerCase().includes(searchLower) || 
+        p.sku.toLowerCase().includes(searchLower);
       const matchesCategory = !selectedCategory || p.categoryId === Number(selectedCategory);
-      return matchesSearch && matchesCategory && p.isActive && p.stock > 0;
-    })
-    .sort((a, b) => {
+      const matchesFavorite = !showFavoritesOnly || p.isFavorite;
+      return matchesSearch && matchesCategory && matchesFavorite && p.isActive && p.stock > 0;
+    });
+
+  if (sort) {
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sort.field) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'price':
+          comparison = a.price - b.price;
+          break;
+        case 'stock':
+          comparison = a.stock - b.stock;
+          break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  } else {
+    filtered.sort((a, b) => {
       if (a.isFavorite && !b.isFavorite) return -1;
       if (!a.isFavorite && b.isFavorite) return 1;
       return a.name.localeCompare(b.name);
     });
+  }
+
+  return filtered;
 }
 
 export function addToCart(cart: CartItem[], product: Product): CartItem[] {
@@ -75,4 +96,42 @@ export function prepareSaleItems(cart: CartItem[]): SaleItem[] {
     unitPrice: item.product.price,
     total: item.product.price * item.quantity,
   }));
+}
+
+export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], note?: string): Promise<string> {
+  const localId = crypto.randomUUID();
+  const cartData = cart.map(item => ({
+    productId: item.product.localId,
+    productName: item.product.name,
+    quantity: item.quantity,
+    unitPrice: item.product.price,
+    total: item.product.price * item.quantity,
+    productSnapshot: item.product,
+  }));
+  
+  await db.suspendedSales.add({
+    localId,
+    tenantId: tenantSlug,
+    cart: cartData,
+    createdAt: new Date(),
+    note,
+  });
+  
+  return localId;
+}
+
+export async function getSuspendedSales(tenantSlug: string): Promise<SuspendedSale[]> {
+  return db.suspendedSales.where('tenantId').equals(tenantSlug).reverse().sortBy('createdAt');
+}
+
+export async function loadSuspendedSale(localId: string): Promise<SuspendedSale | undefined> {
+  return db.suspendedSales.where('localId').equals(localId).first();
+}
+
+export async function deleteSuspendedSale(localId: string): Promise<void> {
+  await db.suspendedSales.where('localId').equals(localId).delete();
+}
+
+export function findProductBySku(products: Product[], sku: string): Product | undefined {
+  return products.find(p => p.sku.toLowerCase() === sku.toLowerCase());
 }

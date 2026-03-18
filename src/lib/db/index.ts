@@ -134,6 +134,15 @@ export interface Employee {
   syncedAt?: Date;
 }
 
+export interface SuspendedSale {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  cart: { productId: string; productName: string; quantity: number; unitPrice: number; total: number; productSnapshot: Product }[];
+  createdAt: Date;
+  note?: string;
+}
+
 class LogisCoreDB extends Dexie {
   syncQueue!: Table<SyncQueueItem>;
   products!: Table<Product>;
@@ -145,40 +154,23 @@ class LogisCoreDB extends Dexie {
   recipes!: Table<Recipe>;
   productionLogs!: Table<ProductionLog>;
   suppliers!: Table<Supplier>;
+  suspendedSales!: Table<SuspendedSale>;
 
   constructor() {
     super('LogisCoreERP');
-    this.version(4).stores({
+    this.version(6).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
       products: '++id, localId, tenantId, sku, categoryId, isActive, name',
       categories: '++id, localId, tenantId, name',
-      settings: 'key, tenantId',
+      settings: '[tenantId+key]',
       sales: '++id, localId, tenantId, status, createdAt, paymentMethod',
       purchases: '++id, localId, tenantId, status, createdAt, supplier',
       recipes: '++id, localId, tenantId, isActive, productId',
       productionLogs: '++id, localId, tenantId, recipeId, createdAt',
       suppliers: '++id, localId, tenantId, name, isActive',
+      employees: '++id, localId, tenantId, role',
+      suspendedSales: '++id, localId, tenantId, createdAt',
     });
-    // Version 5: fix settings to use compound index [tenantId+key]
-    // Must delete and recreate table as Dexie doesn't support changing primary key
-    this.version(5)
-      .stores({
-        syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
-        products: '++id, localId, tenantId, sku, categoryId, isActive, name',
-        categories: '++id, localId, tenantId, name',
-        settings: '[tenantId+key]',
-        sales: '++id, localId, tenantId, status, createdAt, paymentMethod',
-        purchases: '++id, localId, tenantId, status, createdAt, supplier',
-        recipes: '++id, localId, tenantId, isActive, productId',
-        productionLogs: '++id, localId, tenantId, recipeId, createdAt',
-        suppliers: '++id, localId, tenantId, name, isActive',
-        employees: '++id, localId, tenantId, role',
-      })
-      .upgrade(async (trans) => {
-        // Migrate existing settings: ensure every record has a tenantId.
-        // First delete the old table and recreate with new schema
-        await trans.table('settings').clear();
-      });
   }
 }
 
