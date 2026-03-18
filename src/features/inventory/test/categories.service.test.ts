@@ -46,7 +46,7 @@ describe('Categories Service', () => {
 
   describe('createCategory', () => {
     it('debe crear una categoría válida', async () => {
-      const data = { name: 'Electrónica', description: 'Gadgets' };
+      const data = { name: 'Electrónica', description: 'Gadgets', saleType: 'unit' as const };
       const result = await createCategory(data);
       
       expect(isOk(result)).toBe(true);
@@ -54,7 +54,7 @@ describe('Categories Service', () => {
     });
 
     it('debe fallar si el nombre está vacío', async () => {
-      const data = { name: '', description: 'Gadgets' };
+      const data = { name: '', description: 'Gadgets', saleType: 'unit' as const };
       const result = await createCategory(data);
       
       expect(isOk(result)).toBe(false);

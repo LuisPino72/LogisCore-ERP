@@ -11,6 +11,12 @@ export async function loadPOSData(tenantSlug: string): Promise<{ products: Produ
   return { products, categories };
 }
 
+export function getCategorySaleType(categories: Category[], categoryId?: number): 'unit' | 'weight' | 'sample' {
+  if (!categoryId) return 'unit';
+  const category = categories.find(c => c.id === categoryId);
+  return category?.saleType || 'unit';
+}
+
 export function filterProducts(
   products: Product[], 
   search: string, 
@@ -82,20 +88,55 @@ export function removeFromCart(cart: CartItem[], localId: string): CartItem[] {
 }
 
 export function calculateCartTotals(cart: CartItem[]): { total: number; count: number } {
+  const total = cart.reduce((sum, item) => {
+    let itemTotal = 0;
+    const pricePerKg = item.product.pricePerKg || item.product.price;
+    const samples = item.product.samples;
+    
+    if (item.unit === 'g' && item.product.categoryId) {
+      itemTotal = (pricePerKg / 1000) * item.quantity;
+    } else if (item.selectedSampleId && samples) {
+      const sample = samples.find(s => s.id === item.selectedSampleId);
+      itemTotal = sample ? sample.price * item.quantity : item.product.price * item.quantity;
+    } else {
+      itemTotal = item.product.price * item.quantity;
+    }
+    
+    return sum + itemTotal;
+  }, 0);
+  
   return {
-    total: cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+    total,
     count: cart.reduce((sum, item) => sum + item.quantity, 0),
   };
 }
 
 export function prepareSaleItems(cart: CartItem[]): SaleItem[] {
-  return cart.map(item => ({
-    productId: item.product.localId,
-    productName: item.product.name,
-    quantity: item.quantity,
-    unitPrice: item.product.price,
-    total: item.product.price * item.quantity,
-  }));
+  return cart.map(item => {
+    let unitPrice = item.product.price;
+    let total = item.product.price * item.quantity;
+    
+    if (item.unit === 'g') {
+      const pricePerKg = item.product.pricePerKg || item.product.price;
+      unitPrice = pricePerKg / 1000;
+      total = unitPrice * item.quantity;
+    } else if (item.selectedSampleId && item.product.samples) {
+      const sample = item.product.samples.find(s => s.id === item.selectedSampleId);
+      if (sample) {
+        unitPrice = sample.price;
+        total = sample.price * item.quantity;
+      }
+    }
+    
+    return {
+      productId: item.product.localId,
+      productName: item.product.name,
+      quantity: item.quantity,
+      unit: item.unit || 'unit',
+      unitPrice: Math.round(unitPrice * 100) / 100,
+      total: Math.round(total * 100) / 100,
+    };
+  });
 }
 
 export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], note?: string): Promise<string> {
@@ -104,6 +145,7 @@ export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], no
     productId: item.product.localId,
     productName: item.product.name,
     quantity: item.quantity,
+    unit: item.unit || 'unit',
     unitPrice: item.product.price,
     total: item.product.price * item.quantity,
     productSnapshot: item.product,

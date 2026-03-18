@@ -167,6 +167,7 @@ function App() {
           tenantId: tenantSlug,
           name: String(c.name ?? ""),
           description: c.description ? String(c.description) : undefined,
+          saleType: (c.sale_type as 'unit' | 'weight' | 'sample') || 'unit',
           createdAt: c.created_at
             ? new Date(c.created_at as string)
             : new Date(),

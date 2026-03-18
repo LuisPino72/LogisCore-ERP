@@ -2,6 +2,7 @@ export interface SaleItem {
   productId: string
   productName: string
   quantity: number
+  unit: 'kg' | 'g' | 'unit' | 'carton' | 'half'
   unitPrice: number
   total: number
 }

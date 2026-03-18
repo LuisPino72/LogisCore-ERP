@@ -5,7 +5,7 @@ import * as productsService from '../services/products.service'
 import * as categoriesService from '../services/categories.service'
 import * as imagesService from '../services/images.service'
 import type { Product, Category } from '@/lib/db'
-import type { ProductFormData, StockFilter, StatusFilter, ViewMode, SortConfig, CategoryFormData } from '../types/inventory.types'
+import type { ProductFormData, StockFilter, StatusFilter, ViewMode, SortConfig, CategoryFormData, SaleType } from '../types/inventory.types'
 import { DEFAULT_PRODUCT_FORM } from '../types/inventory.types'
 import { isOk } from '@/lib/types/result'
 import { EventBus, Events } from '@/lib/events/EventBus'
@@ -74,7 +74,7 @@ export interface UseInventoryReturn {
   updateProduct: (localId: string, data: Partial<Product>) => Promise<boolean>
   deleteProduct: (localId: string) => Promise<boolean>
   deleteSelectedProducts: () => Promise<boolean>
-  createCategory: (name: string) => Promise<boolean>
+  createCategory: (name: string, saleType?: SaleType) => Promise<boolean>
   updateCategory: (localId: string, data: CategoryFormData) => Promise<boolean>
   deleteCategory: (localId: string) => Promise<boolean>
   uploadImage: (file: File, productLocalId: string) => Promise<string | null>
@@ -216,7 +216,7 @@ export function useInventory(): UseInventoryReturn {
   }, [selectedProducts, loadData, showSuccess])
 
   const updateCategory = useCallback(
-    async (localId: string, data: { name: string }): Promise<boolean> => {
+    async (localId: string, data: CategoryFormData): Promise<boolean> => {
       setLoading(true)
       const result = await categoriesService.updateCategory(localId, data)
       if (isOk(result)) {
@@ -299,6 +299,8 @@ export function useInventory(): UseInventoryReturn {
         imageUrl: data.imageUrl,
         isFavorite: data.isFavorite,
         isActive: data.isActive,
+        pricePerKg: data.pricePerKg ? parseFloat(data.pricePerKg) : undefined,
+        samples: data.samples,
       }
       const result = await productsService.createProduct(productData)
       if (isOk(result)) {
@@ -352,9 +354,9 @@ export function useInventory(): UseInventoryReturn {
   )
 
   const createCategory = useCallback(
-    async (name: string): Promise<boolean> => {
+    async (name: string, saleType: SaleType = 'unit'): Promise<boolean> => {
       setLoading(true)
-      const result = await categoriesService.createCategory({ name })
+      const result = await categoriesService.createCategory({ name, saleType })
       if (isOk(result)) {
         showSuccess('Categoría creada correctamente')
         await loadData()

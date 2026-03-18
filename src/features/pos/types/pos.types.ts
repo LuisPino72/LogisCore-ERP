@@ -3,12 +3,15 @@ import type { Product } from '@/lib/db'
 export interface CartItem {
   product: Product
   quantity: number
+  unit?: 'kg' | 'g' | 'unit' | 'carton' | 'half'
+  selectedSampleId?: string
 }
 
 export interface SaleItem {
   productId: string
   productName: string
   quantity: number
+  unit: 'kg' | 'g' | 'unit' | 'carton' | 'half'
   unitPrice: number
   total: number
 }
@@ -28,6 +31,7 @@ export interface SuspendedSaleItem {
   productId: string
   productName: string
   quantity: number
+  unit: 'kg' | 'g' | 'unit' | 'carton' | 'half'
   unitPrice: number
   total: number
   productSnapshot: Product

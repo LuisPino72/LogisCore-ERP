@@ -28,6 +28,9 @@ export interface UsePOSReturn {
   setShowCheckout: (value: boolean) => void
   addToCart: (product: Product) => void
   updateQuantity: (localId: string, delta: number) => void
+  updateWeight: (localId: string, grams: number) => void
+  selectSample: (localId: string, sampleId: string) => void
+  getSaleType: (categoryId?: number) => 'unit' | 'weight' | 'sample'
   removeFromCart: (localId: string) => void
   toggleFavorite: (product: Product) => Promise<void>
   handleCheckout: () => Promise<void>
@@ -104,6 +107,40 @@ export function usePOS(): UsePOSReturn {
     []
   )
 
+  const updateWeight = useCallback((localId: string, grams: number) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product.localId === localId
+          ? { ...item, quantity: grams, unit: 'g' as const }
+          : item
+      )
+    )
+  }, [])
+
+  const selectSample = useCallback((localId: string, sampleId: string) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.product.localId !== localId) return item
+        const sample = item.product.samples?.find((s) => s.id === sampleId)
+        return {
+          ...item,
+          quantity: sample?.quantity || 1,
+          unit: 'unit' as const,
+          selectedSampleId: sampleId,
+        }
+      })
+    )
+  }, [])
+
+  const getSaleType = useCallback(
+    (categoryId?: number): 'unit' | 'weight' | 'sample' => {
+      if (!categoryId) return 'unit'
+      const category = categories.find((c) => c.id === categoryId)
+      return category?.saleType || 'unit'
+    },
+    [categories]
+  )
+
   const handleCheckout = useCallback(async () => {
     if (!tenant) return
     setLoading(true)
@@ -124,11 +161,6 @@ export function usePOS(): UsePOSReturn {
       setLoading(false)
       return
     }
-
-    const stockUpdates = cart.map((item) =>
-      productsService.updateStock(item.product.localId, -item.quantity)
-    )
-    await Promise.all(stockUpdates)
 
     setCart([])
     setShowCheckout(false)
@@ -156,6 +188,9 @@ export function usePOS(): UsePOSReturn {
     setShowCheckout,
     addToCart,
     updateQuantity,
+    updateWeight,
+    selectSample,
+    getSaleType,
     removeFromCart,
     toggleFavorite,
     handleCheckout,

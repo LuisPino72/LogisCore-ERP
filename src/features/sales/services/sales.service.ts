@@ -17,6 +17,7 @@ export interface SaleItem {
   productId: string;
   productName: string;
   quantity: number;
+  unit: 'kg' | 'g' | 'unit' | 'carton' | 'half';
   unitPrice: number;
   total: number;
 }
@@ -110,7 +111,7 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
       exchangeRateSource: data.exchangeRateSource || 'manual',
     };
 
-    await db.transaction('rw', db.sales, db.products, async () => {
+    await db.transaction('rw', db.sales, db.products, db.categories, async () => {
       for (const item of data.items) {
         const product = await db.products
           .where('localId')
@@ -122,13 +123,28 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
           throw new AppError(`Producto no encontrado: ${item.productName}`, 'PRODUCT_NOT_FOUND', 404);
         }
         
-        if (product.stock < item.quantity) {
+        let stockToDeduct = item.quantity;
+        
+        if (product.categoryId) {
+          const category = await db.categories
+            .where('id')
+            .equals(product.categoryId)
+            .first();
+          
+          if (category?.saleType === 'weight') {
+            stockToDeduct = item.quantity / 1000;
+          } else if (category?.saleType === 'sample') {
+            stockToDeduct = 1;
+          }
+        }
+        
+        if (product.stock < stockToDeduct) {
           throw new ValidationError(`Stock insuficiente para ${item.productName}. Disponible: ${product.stock}`);
         }
         
         await db.products.put({
           ...product,
-          stock: product.stock - item.quantity,
+          stock: product.stock - stockToDeduct,
           updatedAt: new Date(),
         });
       }

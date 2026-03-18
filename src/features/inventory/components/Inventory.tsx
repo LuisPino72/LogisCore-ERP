@@ -5,7 +5,7 @@ import { useInventory } from '../hooks/useInventory'
 import { EventBus, Events } from '@/lib/events/EventBus'
 import { logger, logCategories } from '@/lib/logger'
 import type { Product, Category } from '@/lib/db'
-import type { StockFilter, StatusFilter } from '../types/inventory.types'
+import type { StockFilter, StatusFilter, SaleType } from '../types/inventory.types'
 
 export default function Inventory() {
   const {
@@ -69,7 +69,7 @@ export default function Inventory() {
     hasActiveFilters,
   } = useInventory()
 
-  const [newCategoryForm, setNewCategoryForm] = useState({ name: '' })
+  const [newCategoryForm, setNewCategoryForm] = useState({ name: '', saleType: 'unit' as SaleType })
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
 
   useEffect(() => {
@@ -124,6 +124,8 @@ export default function Inventory() {
           imageUrl,
           isFavorite: productData.isFavorite,
           isActive: productData.isActive,
+          pricePerKg: productData.pricePerKg ? Number(productData.pricePerKg) : undefined,
+          samples: productData.samples,
         })
         if (success) {
           setShowModal(false)
@@ -152,6 +154,8 @@ export default function Inventory() {
       imageUrl: product.imageUrl,
       isFavorite: product.isFavorite || false,
       isActive: product.isActive,
+      pricePerKg: product.pricePerKg ? String(product.pricePerKg) : undefined,
+      samples: product.samples,
     })
     setImagePreview(product.imageUrl || null)
     setEditingId(product.localId)
@@ -781,6 +785,95 @@ export default function Inventory() {
                   />
                 </div>
 
+                {(() => {
+                  const selectedCategory = categories.find(c => c.id === form.categoryId);
+                  const saleType = selectedCategory?.saleType || 'unit';
+                  
+                  if (saleType === 'weight') {
+                    return (
+                      <Input
+                        label="Precio por Kilogramo"
+                        type="number"
+                        step="0.01"
+                        value={form.pricePerKg || ''}
+                        placeholder="0.00"
+                        onChange={(e) => setForm({ ...form, pricePerKg: e.target.value })}
+                        onFocus={(e) => e.target.select()}
+                      />
+                    );
+                  }
+                  
+                  if (saleType === 'sample') {
+                    return (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-400">Muestras de Venta</label>
+                        <div className="space-y-2">
+                          {(form.samples || []).map((sample, index) => (
+                            <div key={index} className="flex gap-2 items-center">
+                              <input
+                                type="text"
+                                value={sample.name}
+                                onChange={(e) => {
+                                  const newSamples = [...(form.samples || [])];
+                                  newSamples[index] = { ...sample, name: e.target.value };
+                                  setForm({ ...form, samples: newSamples });
+                                }}
+                                placeholder="Nombre (ej: Cartón)"
+                                className="flex-1 px-3 py-2 bg-(--bg-primary) border border-(--border-color) rounded-lg text-(--text-primary)"
+                              />
+                              <input
+                                type="number"
+                                value={sample.quantity}
+                                onChange={(e) => {
+                                  const newSamples = [...(form.samples || [])];
+                                  newSamples[index] = { ...sample, quantity: parseFloat(e.target.value) || 0 };
+                                  setForm({ ...form, samples: newSamples });
+                                }}
+                                placeholder="Cant"
+                                className="w-20 px-3 py-2 bg-(--bg-primary) border border-(--border-color) rounded-lg text-(--text-primary)"
+                              />
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={sample.price}
+                                onChange={(e) => {
+                                  const newSamples = [...(form.samples || [])];
+                                  newSamples[index] = { ...sample, price: parseFloat(e.target.value) || 0 };
+                                  setForm({ ...form, samples: newSamples });
+                                }}
+                                placeholder="Precio"
+                                className="w-24 px-3 py-2 bg-(--bg-primary) border border-(--border-color) rounded-lg text-(--text-primary)"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newSamples = (form.samples || []).filter((_, i) => i !== index);
+                                  setForm({ ...form, samples: newSamples });
+                                }}
+                                className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newSamples = [...(form.samples || []), { id: crypto.randomUUID(), name: '', quantity: 1, price: 0 }];
+                              setForm({ ...form, samples: newSamples });
+                            }}
+                            className="text-sm text-(--brand-400) hover:text-(--brand-300)"
+                          >
+                            + Agregar muestra
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  return null;
+                })()}
+
                 <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-xl border border-slate-700/30">
                   <input
                     type="checkbox"
@@ -843,25 +936,36 @@ export default function Inventory() {
               </button>
             </div>
             <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Nueva categoría..."
-                  value={newCategoryForm.name}
-                  onChange={(e) => setNewCategoryForm({ name: e.target.value })}
-                  className="flex-1 px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted)"
-                />
-                <button
-                  onClick={async () => {
-                    if (newCategoryForm.name.trim()) {
-                      await createCategory(newCategoryForm.name.trim())
-                      setNewCategoryForm({ name: '' })
-                    }
-                  }}
-                  className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nueva categoría..."
+                    value={newCategoryForm.name}
+                    onChange={(e) => setNewCategoryForm({ name: e.target.value, saleType: newCategoryForm.saleType })}
+                    className="flex-1 px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted)"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (newCategoryForm.name.trim()) {
+                        await createCategory(newCategoryForm.name.trim(), newCategoryForm.saleType)
+                        setNewCategoryForm({ name: '', saleType: 'unit' })
+                      }
+                    }}
+                    className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+                <select
+                  value={newCategoryForm.saleType}
+                  onChange={(e) => setNewCategoryForm({ ...newCategoryForm, saleType: e.target.value as SaleType })}
+                  className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary)"
                 >
-                  <Plus className="w-5 h-5" />
-                </button>
+                  <option value="unit">Venta Unitaria</option>
+                  <option value="weight">Venta por Peso (kg)</option>
+                  <option value="sample">Venta por Muestra</option>
+                </select>
               </div>
               <div className="space-y-2">
                 {categories.map(cat => (
@@ -871,7 +975,7 @@ export default function Inventory() {
                       <button
                         onClick={() => {
                           setEditingCategory(cat)
-                          setNewCategoryForm({ name: cat.name })
+                          setNewCategoryForm({ name: cat.name, saleType: cat.saleType || 'unit' })
                         }}
                         className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white"
                       >
@@ -892,32 +996,41 @@ export default function Inventory() {
               </div>
             </div>
             {editingCategory && (
-              <div className="px-6 py-4 border-t border-slate-700/50 bg-slate-800/30">
+              <div className="px-6 py-4 border-t border-slate-700/50 bg-slate-800/30 space-y-3">
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={newCategoryForm.name}
-                    onChange={(e) => setNewCategoryForm({ name: e.target.value })}
+                    onChange={(e) => setNewCategoryForm({ name: e.target.value, saleType: newCategoryForm.saleType })}
                     className="flex-1 px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary)"
                   />
                   <Button
                     onClick={async () => {
                       if (newCategoryForm.name.trim() && editingCategory) {
-                        await updateCategory(editingCategory.localId, { name: newCategoryForm.name.trim() })
+                        await updateCategory(editingCategory.localId, { name: newCategoryForm.name.trim(), saleType: newCategoryForm.saleType })
                         setEditingCategory(null)
-                        setNewCategoryForm({ name: '' })
+                      setNewCategoryForm({ name: '', saleType: 'unit' })
                       }
                     }}
                   >
                     Guardar
                   </Button>
                   <button
-                    onClick={() => { setEditingCategory(null); setNewCategoryForm({ name: '' }); }}
+                    onClick={() => { setEditingCategory(null); setNewCategoryForm({ name: '', saleType: 'unit' }); }}
                     className="px-3 py-2 text-slate-400 hover:text-white"
                   >
                     Cancelar
                   </button>
                 </div>
+                <select
+                  value={newCategoryForm.saleType}
+                  onChange={(e) => setNewCategoryForm({ ...newCategoryForm, saleType: e.target.value as SaleType })}
+                  className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary)"
+                >
+                  <option value="unit">Venta Unitaria</option>
+                  <option value="weight">Venta por Peso (kg)</option>
+                  <option value="sample">Venta por Muestra</option>
+                </select>
               </div>
             )}
           </div>

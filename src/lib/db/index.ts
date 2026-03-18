@@ -1,5 +1,14 @@
 import Dexie, { Table } from 'dexie';
 
+export type SaleType = 'unit' | 'weight' | 'sample';
+
+export interface Sample {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
+
 export interface SyncQueueItem {
   id?: number;
   tableName: string;
@@ -28,6 +37,8 @@ export interface Product {
   imageUrl?: string;
   isFavorite?: boolean;
   isActive: boolean;
+  pricePerKg?: number;
+  samples?: Sample[];
   createdAt: Date;
   updatedAt: Date;
   syncedAt?: Date;
@@ -39,6 +50,7 @@ export interface Category {
   tenantId: string;
   name: string;
   description?: string;
+  saleType: SaleType;
   createdAt: Date;
   syncedAt?: Date;
 }
@@ -49,11 +61,20 @@ export interface TenantSetting {
   tenantId: string;
 }
 
+export interface SaleItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: 'kg' | 'g' | 'unit' | 'carton' | 'half';
+  unitPrice: number;
+  total: number;
+}
+
 export interface Sale {
   id?: number;
   localId: string;
   tenantId: string;
-  items: { productId: string; productName: string; quantity: number; unitPrice: number; total: number }[];
+  items: SaleItem[];
   subtotal: number;
   tax: number;
   total: number;
@@ -138,7 +159,7 @@ export interface SuspendedSale {
   id?: number;
   localId: string;
   tenantId: string;
-  cart: { productId: string; productName: string; quantity: number; unitPrice: number; total: number; productSnapshot: Product }[];
+  cart: { productId: string; productName: string; quantity: number; unit: 'kg' | 'g' | 'unit' | 'carton' | 'half'; unitPrice: number; total: number; productSnapshot: Product }[];
   createdAt: Date;
   note?: string;
 }
@@ -158,10 +179,10 @@ class LogisCoreDB extends Dexie {
 
   constructor() {
     super('LogisCoreERP');
-    this.version(6).stores({
+    this.version(7).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
       products: '++id, localId, tenantId, sku, categoryId, isActive, name',
-      categories: '++id, localId, tenantId, name',
+      categories: '++id, localId, tenantId, name, saleType',
       settings: '[tenantId+key]',
       sales: '++id, localId, tenantId, status, createdAt, paymentMethod',
       purchases: '++id, localId, tenantId, status, createdAt, supplier',

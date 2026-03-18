@@ -88,6 +88,33 @@ export default function POS() {
   const updateQuantity = useCallback((localId: string, delta: number) => setCart(prev => updateCartQuantity(prev, localId, delta)), []);
   const removeFromCart = useCallback((localId: string) => setCart(prev => removeFromCartUtil(prev, localId)), []);
 
+  const getSaleType = useCallback((categoryId?: number): 'unit' | 'weight' | 'sample' => {
+    if (!categoryId) return 'unit';
+    const category = categories.find(c => c.id === categoryId);
+    return category?.saleType || 'unit';
+  }, [categories]);
+
+  const updateWeight = useCallback((localId: string, grams: number) => {
+    setCart(prev => prev.map(item =>
+      item.product.localId === localId
+        ? { ...item, quantity: grams, unit: 'g' as const }
+        : item
+    ));
+  }, []);
+
+  const selectSample = useCallback((localId: string, sampleId: string) => {
+    setCart(prev => prev.map(item => {
+      if (item.product.localId !== localId) return item;
+      const sample = item.product.samples?.find(s => s.id === sampleId);
+      return {
+        ...item,
+        quantity: sample?.quantity || 1,
+        unit: 'unit' as const,
+        selectedSampleId: sampleId,
+      };
+    }));
+  }, []);
+
   const handleSkuSearch = useCallback(() => {
     const found = findProductBySku(products, search);
     if (found) {
@@ -281,21 +308,63 @@ export default function POS() {
               {cart.length === 0 ? (
                 <div className="text-center text-slate-500 py-8"><ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>El carrito está vacío</p></div>
               ) : (
-                cart.map(item => (
+              cart.map(item => {
+                const saleType = getSaleType(item.product.categoryId);
+                const isWeight = saleType === 'weight';
+                const isSample = saleType === 'sample';
+                
+                return (
                   <div key={item.product.localId} className="flex items-center gap-3 bg-(--bg-tertiary)/50 p-3 rounded-lg hover:bg-(--bg-tertiary) transition-colors">
                     <div className="w-10 h-10 bg-(--bg-primary) rounded-lg flex items-center justify-center shrink-0"><Package className="w-5 h-5 text-(--text-muted)" /></div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-white font-medium truncate text-sm">{item.product.name}</h4>
-                      <p className="text-green-400 text-xs">${item.product.price.toFixed(2)} c/u {exchangeRate > 0 && <span className="text-blue-400">{formatBs(item.product.price * exchangeRate)}</span>}</p>
+                      {isWeight ? (
+                        <p className="text-green-400 text-xs">
+                          ${(item.product.pricePerKg || item.product.price).toFixed(2)}/kg
+                          {exchangeRate > 0 && <span className="text-blue-400"> {formatBs((item.product.pricePerKg || item.product.price) * exchangeRate)}</span>}
+                        </p>
+                      ) : isSample && item.product.samples ? (
+                        <p className="text-green-400 text-xs">
+                          {item.product.samples.map(s => `${s.name}: $${s.price}`).join(' | ')}
+                        </p>
+                      ) : (
+                        <p className="text-green-400 text-xs">${item.product.price.toFixed(2)} c/u {exchangeRate > 0 && <span className="text-blue-400">{formatBs(item.product.price * exchangeRate)}</span>}</p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => updateQuantity(item.product.localId, -1)} className="p-1.5 hover:bg-(--bg-primary) rounded-lg transition-colors"><Minus className="w-3.5 h-3.5 text-(--text-secondary)" /></button>
-                      <span className="w-6 text-center text-(--text-primary) font-medium text-sm">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.product.localId, 1)} className="p-1.5 hover:bg-(--bg-primary) rounded-lg transition-colors"><Plus className="w-3.5 h-3.5 text-(--text-secondary)" /></button>
-                    </div>
+                    {isWeight ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => updateWeight(item.product.localId, Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-16 px-2 py-1 bg-(--bg-primary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm text-center"
+                          min="1"
+                          placeholder="g"
+                        />
+                        <span className="text-xs text-slate-400">g</span>
+                      </div>
+                    ) : isSample && item.product.samples ? (
+                      <select
+                        value={item.selectedSampleId || ''}
+                        onChange={(e) => selectSample(item.product.localId, e.target.value)}
+                        className="px-2 py-1 bg-(--bg-primary) border border-(--border-color) rounded-lg text-(--text-primary) text-xs"
+                      >
+                        <option value="">Seleccionar</option>
+                        {item.product.samples.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => updateQuantity(item.product.localId, -1)} className="p-1.5 hover:bg-(--bg-primary) rounded-lg transition-colors"><Minus className="w-3.5 h-3.5 text-(--text-secondary)" /></button>
+                        <span className="w-6 text-center text-(--text-primary) font-medium text-sm">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.product.localId, 1)} className="p-1.5 hover:bg-(--bg-primary) rounded-lg transition-colors"><Plus className="w-3.5 h-3.5 text-(--text-secondary)" /></button>
+                      </div>
+                    )}
                     <button onClick={() => removeFromCart(item.product.localId)} className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4 text-red-400" /></button>
                   </div>
-                ))
+                );
+              })
               )}
             </div>
 

@@ -3,6 +3,14 @@ export type StockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
 export type StatusFilter = 'all' | 'active' | 'inactive'
 export type SortField = 'name' | 'price' | 'stock' | 'sku'
 export type SortDirection = 'asc' | 'desc'
+export type SaleType = 'unit' | 'weight' | 'sample'
+
+export interface Sample {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
 
 export interface ProductFormData {
   name: string
@@ -14,10 +22,14 @@ export interface ProductFormData {
   imageUrl: string | undefined
   isFavorite: boolean
   isActive: boolean
+  pricePerKg?: string
+  samples?: Sample[]
 }
 
 export interface CategoryFormData {
   name: string
+  description?: string
+  saleType: SaleType
 }
 
 export interface SortConfig {
@@ -35,4 +47,12 @@ export const DEFAULT_PRODUCT_FORM: ProductFormData = {
   imageUrl: undefined,
   isFavorite: false,
   isActive: true,
+  pricePerKg: undefined,
+  samples: undefined,
+}
+
+export const DEFAULT_CATEGORY_FORM: CategoryFormData = {
+  name: '',
+  description: undefined,
+  saleType: 'unit',
 }
