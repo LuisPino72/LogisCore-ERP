@@ -40,3 +40,11 @@ export const PERMISSION_LABELS: Record<keyof EmployeePermissions, string> = {
   can_create_recipe: 'Crear Recetas',
   can_produce: 'Registrar Producción',
 };
+
+export type SortField = 'userId' | 'role' | 'createdAt'
+export type SortDirection = 'asc' | 'desc'
+
+export interface SortConfig {
+  field: SortField
+  direction: SortDirection
+}

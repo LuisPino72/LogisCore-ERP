@@ -262,3 +262,66 @@ export async function produce(localId: string, quantity: number): Promise<Result
     return Err(new AppError('Error al producir', 'PRODUCE_ERROR', 500));
   }
 }
+
+export interface FilterOptions {
+  search?: string
+  status?: 'all' | 'active' | 'inactive'
+  sort?: { field: 'name' | 'createdAt' | 'yield'; direction: 'asc' | 'desc' }
+  page?: number
+  pageSize?: number
+}
+
+export async function filterRecipes(options: FilterOptions = {}): Promise<{
+  recipes: Recipe[]
+  total: number
+}> {
+  const tenantId = getCurrentTenantId();
+  const { search = '', status = 'all', sort, page = 1, pageSize = 12 } = options;
+
+  let recipes = await db.recipes.where('tenantId').equals(tenantId).toArray();
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    recipes = recipes.filter(r =>
+      r.name.toLowerCase().includes(searchLower) ||
+      r.description?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  if (status !== 'all') {
+    recipes = recipes.filter(r => status === 'active' ? r.isActive : !r.isActive);
+  }
+
+  if (sort) {
+    recipes.sort((a, b) => {
+      let comparison = 0;
+      switch (sort.field) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'createdAt':
+          comparison = a.createdAt.getTime() - b.createdAt.getTime();
+          break;
+        case 'yield':
+          comparison = a.yield - b.yield;
+          break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  }
+
+  const total = recipes.length;
+  const startIndex = (page - 1) * pageSize;
+  const paginatedRecipes = recipes.slice(startIndex, startIndex + pageSize);
+
+  return { recipes: paginatedRecipes, total };
+}
+
+export async function getProductionHistory(): Promise<ProductionLog[]> {
+  const tenantId = getCurrentTenantId();
+  return db.productionLogs
+    .where('tenantId')
+    .equals(tenantId)
+    .reverse()
+    .sortBy('createdAt');
+}

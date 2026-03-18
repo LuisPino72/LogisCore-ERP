@@ -160,7 +160,7 @@ export default function POS() {
             Punto de Venta
           </h2>
         </div>
-        <Card className="bg-gradient-to-br from-green-900/30 to-green-800/20 border-green-500/30">
+        <Card className="bg-linear-to-br from-green-900/30 to-green-800/20 border-green-500/30">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-green-400/70 uppercase tracking-wide">Hoy</p>

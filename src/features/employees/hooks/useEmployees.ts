@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useToast } from '@/providers/ToastProvider'
 import * as employeesService from '../services/employees.service'
 import type { EmployeePermissions } from '../types/employees.types'
+import type { SortConfig } from '../types/employees.types'
 import type { Employee } from '@/lib/db'
 import { isOk } from '@/lib/types/result'
 
@@ -9,7 +10,7 @@ export interface UseEmployeesReturn {
   employees: Employee[]
   loading: boolean
   error: string | null
-  loadEmployees: () => Promise<void>
+  loadEmployees: (search?: string, sort?: SortConfig, page?: number, pageSize?: number) => Promise<{ employees: Employee[]; total: number } | null>
   syncEmployees: () => Promise<boolean>
   createEmployee: (email: string, password: string, permissions: EmployeePermissions) => Promise<boolean>
   updatePermissions: (localId: string, permissions: EmployeePermissions) => Promise<boolean>
@@ -22,17 +23,26 @@ export function useEmployees(): UseEmployeesReturn {
   const [error, setError] = useState<string | null>(null)
   const { showError, showSuccess } = useToast()
 
-  const loadEmployees = useCallback(async () => {
+  const loadEmployees = useCallback(async (
+    search: string = '', 
+    sort?: SortConfig, 
+    page: number = 1, 
+    pageSize: number = 10
+  ): Promise<{ employees: Employee[]; total: number } | null> => {
     setLoading(true)
     setError(null)
-    const result = await employeesService.getEmployees()
-    if (isOk(result)) {
-      setEmployees(result.value)
-    } else {
-      setError(result.error.message)
-      showError(result.error.message)
+    try {
+      const result = await employeesService.filterEmployees({ search, sort, page, pageSize })
+      setEmployees(result.employees)
+      return result
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error al cargar empleados'
+      setError(msg)
+      showError(msg)
+      return null
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [showError])
 
   const syncEmployees = useCallback(async (): Promise<boolean> => {
@@ -55,7 +65,6 @@ export function useEmployees(): UseEmployeesReturn {
       const result = await employeesService.createEmployee(email, password, permissions)
       if (isOk(result)) {
         showSuccess('Empleado creado correctamente')
-        await loadEmployees()
         setLoading(false)
         return true
       }
@@ -63,7 +72,7 @@ export function useEmployees(): UseEmployeesReturn {
       setLoading(false)
       return false
     },
-    [loadEmployees, showError, showSuccess],
+    [showError, showSuccess],
   )
 
   const updatePermissions = useCallback(
@@ -72,7 +81,6 @@ export function useEmployees(): UseEmployeesReturn {
       const result = await employeesService.updateEmployeePermissions(localId, permissions)
       if (isOk(result)) {
         showSuccess('Permisos actualizados correctamente')
-        await loadEmployees()
         setLoading(false)
         return true
       }
@@ -80,7 +88,7 @@ export function useEmployees(): UseEmployeesReturn {
       setLoading(false)
       return false
     },
-    [loadEmployees, showError, showSuccess],
+    [showError, showSuccess],
   )
 
   const deleteEmployee = useCallback(
@@ -92,7 +100,6 @@ export function useEmployees(): UseEmployeesReturn {
       const result = await employeesService.deleteEmployee(localId)
       if (isOk(result)) {
         showSuccess('Empleado eliminado correctamente')
-        await loadEmployees()
         setLoading(false)
         return true
       }
@@ -100,7 +107,7 @@ export function useEmployees(): UseEmployeesReturn {
       setLoading(false)
       return false
     },
-    [loadEmployees, showError, showSuccess],
+    [showError, showSuccess],
   )
 
   return {

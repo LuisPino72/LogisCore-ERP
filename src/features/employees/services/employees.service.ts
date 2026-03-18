@@ -6,6 +6,7 @@ import { Ok, Err, Result, AppError, ValidationError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 import type { EmployeePermissions } from '../types/employees.types';
 import { DEFAULT_EMPLOYEE_PERMISSIONS } from '../types/employees.types';
+import type { SortConfig } from '../types/employees.types';
 
 function getCurrentTenantId(): string {
   const { currentTenant } = useTenantStore.getState();
@@ -237,4 +238,53 @@ export async function deleteEmployee(localId: string): Promise<Result<void, AppE
     }
     return Err(new AppError('Error al eliminar empleado', 'DELETE_EMPLOYEE_ERROR', 500));
   }
+}
+
+export interface FilterOptions {
+  search?: string
+  sort?: SortConfig
+  page?: number
+  pageSize?: number
+}
+
+export async function filterEmployees(options: FilterOptions = {}): Promise<{
+  employees: Employee[]
+  total: number
+}> {
+  const tenantId = getCurrentTenantId();
+  const { search = '', sort, page = 1, pageSize = 10 } = options;
+
+  let employees = await db.employees.where('tenantId').equals(tenantId).toArray();
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    employees = employees.filter(e =>
+      e.userId?.toLowerCase().includes(searchLower) ||
+      e.role?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  if (sort) {
+    employees.sort((a, b) => {
+      let comparison = 0;
+      switch (sort.field) {
+        case 'userId':
+          comparison = (a.userId || '').localeCompare(b.userId || '');
+          break;
+        case 'role':
+          comparison = (a.role || '').localeCompare(b.role || '');
+          break;
+        case 'createdAt':
+          comparison = a.createdAt.getTime() - b.createdAt.getTime();
+          break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  }
+
+  const total = employees.length;
+  const startIndex = (page - 1) * pageSize;
+  const paginatedEmployees = employees.slice(startIndex, startIndex + pageSize);
+
+  return { employees: paginatedEmployees, total };
 }
