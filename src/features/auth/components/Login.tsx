@@ -67,7 +67,7 @@ export default function Login() {
               />
             </div>
           </div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-(--text-primary) font-inter">
+          <h2 className="text-4xl font-bold tracking-tight text-(--text-primary) font-mono bg-linear-to-r from-(--brand-400) to-(--brand-600) bg-clip-text">
             LogisCore
           </h2>
           <p className="mt-2 text-(--text-secondary) font-medium">
@@ -204,12 +204,6 @@ export default function Login() {
             )}
           </form>
         )}
-
-        <div className="text-center pt-4 border-t border-(--border-color)">
-          <p className="text-xs font-semibold text-(--text-muted) uppercase tracking-widest bg-clip-text">
-            LogisCore ERP Solution
-          </p>
-        </div>
       </div>
     </div>
   );
