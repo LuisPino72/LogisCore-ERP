@@ -141,7 +141,7 @@ export default function CustomersList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2" title="Gestionar clientes registrados">
             <Users className="w-6 h-6" />
             Clientes
           </h2>
@@ -149,6 +149,7 @@ export default function CustomersList() {
         </div>
         <button
           onClick={() => setShowForm(true)}
+          title="Agregar un nuevo cliente"
           className="flex items-center gap-2 px-4 py-2.5 bg-(--brand-500) hover:bg-(--brand-400) text-white rounded-lg transition-colors shadow-lg shadow-(--brand-500)/20"
         >
           <Plus className="w-4 h-4" />
@@ -163,6 +164,7 @@ export default function CustomersList() {
             <input
               type="text"
               placeholder="Buscar por nombre, RIF o email..."
+              title="Buscar clientes por nombre, RIF o email"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
@@ -173,6 +175,7 @@ export default function CustomersList() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              title="Filtrar por estado del cliente"
               className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer"
             >
               <option value="all">Todos</option>
@@ -229,6 +232,7 @@ export default function CustomersList() {
                             setSearchQuery('');
                             setStatusFilter('all');
                           }}
+                          title="Limpiar búsqueda y filtros"
                           className="mt-4 text-(--brand-400) hover:text-(--brand-300) text-sm font-medium transition-colors"
                         >
                           Limpiar filtros
@@ -236,6 +240,7 @@ export default function CustomersList() {
                       ) : (
                         <button
                           onClick={() => setShowForm(true)}
+                          title="Agregar el primer cliente"
                           className="mt-4 text-(--brand-400) hover:text-(--brand-300) text-sm font-medium flex items-center gap-1 mx-auto transition-colors"
                         >
                           <Plus className="w-4 h-4" />
@@ -340,6 +345,7 @@ export default function CustomersList() {
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
+                title="Página anterior"
                 className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -350,6 +356,7 @@ export default function CustomersList() {
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
+                title="Página siguiente"
                 className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -369,6 +376,7 @@ export default function CustomersList() {
               </h3>
               <button
                 onClick={() => setSelectedCustomer(null)}
+                title="Cerrar"
                 className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-slate-400" />
@@ -445,6 +453,7 @@ export default function CustomersList() {
               <div className="border-t border-(--border-color) pt-4 mt-4">
                 <button
                   onClick={handleToggleHistory}
+                  title={showHistory ? "Ocultar historial de facturas" : "Ver historial de facturas"}
                   className="w-full flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
                 >
                   <div className="flex items-center gap-2">
@@ -669,6 +678,7 @@ function CustomerFormModal({ customer, onClose, onSave }: CustomerFormModalProps
           </h3>
           <button
             onClick={onClose}
+            title="Cerrar"
             className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
           >
             <X className="w-5 h-5 text-slate-400" />
@@ -676,32 +686,34 @@ function CustomerFormModal({ customer, onClose, onSave }: CustomerFormModalProps
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">
-              Nombre o Razón Social *
-            </label>
-            <input
-              type="text"
-              value={form.nombreRazonSocial}
-              onChange={(e) => setForm({ ...form, nombreRazonSocial: e.target.value })}
-              placeholder="Ej: Distribuidora ABC, C.A."
-              className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
-              required
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">
+                Nombre o Razón Social *
+              </label>
+              <input
+                type="text"
+                title="Nombre o razón social del cliente"
+                value={form.nombreRazonSocial}
+                onChange={(e) => setForm({ ...form, nombreRazonSocial: e.target.value })}
+                placeholder="Ej: Distribuidora ABC, C.A."
+                className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">
-              RIF / Cédula *
-            </label>
-            <input
-              type="text"
-              value={form.rifCedula}
-              onChange={(e) => setForm({ ...form, rifCedula: e.target.value.toUpperCase() })}
-              placeholder="Ej: J-12345678-9"
-              className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500) font-mono"
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">
+                RIF / Cédula *
+              </label>
+              <input
+                type="text"
+                title="RIF o cédula de identidad del cliente"
+                value={form.rifCedula}
+                onChange={(e) => setForm({ ...form, rifCedula: e.target.value.toUpperCase() })}
+                placeholder="Ej: J-12345678-9"
+                className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500) font-mono"
+                required
+              />
             <p className="text-xs text-slate-500 mt-1">Formato: J/G/V/E/P + número + dígito verificador</p>
           </div>
 
@@ -711,6 +723,7 @@ function CustomerFormModal({ customer, onClose, onSave }: CustomerFormModalProps
             </label>
             <input
               type="tel"
+              title="Número de teléfono de contacto"
               value={form.telefono}
               onChange={(e) => setForm({ ...form, telefono: e.target.value })}
               placeholder="Ej: 0412-1234567"
@@ -724,6 +737,7 @@ function CustomerFormModal({ customer, onClose, onSave }: CustomerFormModalProps
             </label>
             <input
               type="email"
+              title="Correo electrónico de contacto"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               placeholder="Ej: contacto@empresa.com"
@@ -736,6 +750,7 @@ function CustomerFormModal({ customer, onClose, onSave }: CustomerFormModalProps
               Dirección
             </label>
             <textarea
+              title="Dirección fiscal o de entrega"
               value={form.direccion}
               onChange={(e) => setForm({ ...form, direccion: e.target.value })}
               placeholder="Ej: Av. Libertador, Edif. Centro Comercial, Piso 3, Of. 5"
@@ -749,6 +764,7 @@ function CustomerFormModal({ customer, onClose, onSave }: CustomerFormModalProps
               Notas
             </label>
             <textarea
+              title="Notas o recordatorios sobre el cliente"
               value={form.notas}
               onChange={(e) => setForm({ ...form, notas: e.target.value })}
               placeholder="Recordatorios sobre este cliente..."

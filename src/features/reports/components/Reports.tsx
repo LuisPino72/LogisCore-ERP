@@ -108,7 +108,7 @@ export default function Reports() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2"><BarChart3 className="w-6 h-6" />Reportes</h2>
+          <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2" title="Reportes y análisis del negocio"><BarChart3 className="w-6 h-6" />Reportes</h2>
           <p className="text-(--text-secondary)">Análisis de tu negocio</p>
         </div>
         <div className="flex items-center gap-2">
@@ -118,6 +118,7 @@ export default function Reports() {
                 <button 
                   key={range.value} 
                   onClick={() => { setDateRange(range.value); }}
+                  title={`Ver reporte de ${range.label.toLowerCase()}`}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${dateRange === range.value ? "bg-(--brand-600) text-white" : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-tertiary)"}`}>
                   {range.label}
                 </button>
@@ -126,16 +127,16 @@ export default function Reports() {
             {dateRange === "custom" && (
               <div className="absolute top-full mt-2 right-0 bg-(--bg-secondary) border border-(--border-color) rounded-lg shadow-xl z-20 p-3 min-w-[200px]">
                 <div className="space-y-1">
-                  <button onClick={() => handleCustomDate(0)} className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Hoy</button>
-                  <button onClick={() => handleCustomDate(7)} className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Últimos 7 días</button>
-                  <button onClick={() => handleCustomDate(30)} className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Últimos 30 días</button>
-                  <button onClick={() => handleCustomDate(90)} className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Últimos 3 meses</button>
-                  <button onClick={() => handleCustomDate(365)} className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Último año</button>
+                  <button onClick={() => handleCustomDate(0)} title="Ver reporte de hoy" className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Hoy</button>
+                  <button onClick={() => handleCustomDate(7)} title="Ver reporte de los últimos 7 días" className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Últimos 7 días</button>
+                  <button onClick={() => handleCustomDate(30)} title="Ver reporte de los últimos 30 días" className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Últimos 30 días</button>
+                  <button onClick={() => handleCustomDate(90)} title="Ver reporte de los últimos 3 meses" className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Últimos 3 meses</button>
+                  <button onClick={() => handleCustomDate(365)} title="Ver reporte del último año" className="w-full text-left px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg">Último año</button>
                 </div>
               </div>
             )}
           </div>
-          <Button variant="secondary" onClick={handleExportCSV}>
+          <Button variant="secondary" onClick={handleExportCSV} title="Exportar reporte a CSV">
             <Download className="w-4 h-4 mr-2" />
             Exportar
           </Button>
@@ -185,15 +186,16 @@ export default function Reports() {
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-white">Productos</h3>
-            {stats.productsLowStock > 0 && (
-              <button 
-                onClick={() => setShowLowStockModal(true)}
-                className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
-              >
-                <AlertTriangle className="w-3 h-3" />
-                {stats.productsLowStock} bajo stock
-              </button>
-            )}
+              {stats.productsLowStock > 0 && (
+                <button 
+                  onClick={() => setShowLowStockModal(true)}
+                  title="Ver productos con stock bajo"
+                  className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  {stats.productsLowStock} bajo stock
+                </button>
+              )}
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Package className="w-4 h-4 text-(--text-muted)" /><span className="text-(--text-secondary)">Total</span></div><span className="text-(--text-primary) font-bold">{stats.totalProducts}</span></div>
@@ -297,7 +299,7 @@ export default function Reports() {
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
                 Productos bajo stock
               </h3>
-              <button onClick={() => setShowLowStockModal(false)} className="p-1 hover:bg-(--bg-tertiary) rounded">
+              <button onClick={() => setShowLowStockModal(false)} title="Cerrar" className="p-1 hover:bg-(--bg-tertiary) rounded">
                 <PackageX className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>

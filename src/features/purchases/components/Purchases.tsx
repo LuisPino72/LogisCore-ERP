@@ -293,6 +293,7 @@ export default function Purchases() {
                 expandedPurchase === purchase.localId ? null : purchase.localId,
               )
             }
+            title={expandedPurchase === purchase.localId ? "Ocultar detalles" : "Ver detalles de la compra"}
             className="text-(--brand-400) text-sm hover:underline">
             {expandedPurchase === purchase.localId ? "Ocultar" : "Ver detalles"}
           </button>
@@ -319,7 +320,7 @@ export default function Purchases() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2" title="Historial de compras a proveedores">
             <ShoppingBasket className="w-6 h-6" />
             Compras
           </h2>
@@ -333,11 +334,13 @@ export default function Purchases() {
               <div className="flex items-center bg-(--bg-tertiary)/50 rounded-lg p-1 border border-(--border-color)">
                 <button
                   onClick={() => setViewMode("table")}
+                  title="Ver como tabla"
                   className={`p-2 rounded-md transition-colors ${viewMode === "table" ? "bg-(--brand-600) text-white" : "text-(--text-muted) hover:text-(--text-primary)"}`}>
                   <List className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode("grid")}
+                  title="Ver como tarjetas"
                   className={`p-2 rounded-md transition-colors ${viewMode === "grid" ? "bg-(--brand-600) text-white" : "text-(--text-muted) hover:text-(--text-primary)"}`}>
                   <LayoutGrid className="w-4 h-4" />
                 </button>
@@ -365,6 +368,7 @@ export default function Purchases() {
       <div className="flex border-b border-(--border-color)">
         <button
           onClick={() => setActiveTab("purchases")}
+          title="Ver historial de compras"
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             activeTab === "purchases"
               ? "border-(--brand-500) text-(--brand-400)"
@@ -377,6 +381,7 @@ export default function Purchases() {
         </button>
         <button
           onClick={() => setActiveTab("suppliers")}
+          title="Gestionar proveedores"
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             activeTab === "suppliers"
               ? "border-(--brand-500) text-(--brand-400)"
@@ -450,6 +455,7 @@ export default function Purchases() {
               <input
                 type="text"
                 placeholder="Buscar compras..."
+                title="Buscar por proveedor o número de factura"
                 value={filters.search}
                 onChange={(e) => setFilters({ search: e.target.value })}
                 className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
@@ -459,6 +465,7 @@ export default function Purchases() {
             <select
               value={filters.status}
               onChange={(e) => handleStatusFilter(e.target.value as PurchaseStatus | "all")}
+              title="Filtrar por estado"
               className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500)">
               <option value="all">Todos los estados</option>
               <option value="completed">Completado</option>
@@ -469,6 +476,7 @@ export default function Purchases() {
             <div className="relative">
               <button
                 onClick={() => setShowDatePicker(!showDatePicker)}
+                title="Filtrar por rango de fechas"
                 className="flex items-center gap-2 px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) hover:bg-(--bg-secondary) transition-colors">
                 <Calendar className="w-4 h-4" />
                 {filters.dateRange.start || filters.dateRange.end
@@ -499,7 +507,7 @@ export default function Purchases() {
               )}
             </div>
 
-            <Button variant="secondary" onClick={exportCSV}>
+            <Button variant="secondary" onClick={exportCSV} title="Exportar compras a CSV">
               <Download className="w-4 h-4 mr-2" />
               Exportar
             </Button>
@@ -524,17 +532,20 @@ export default function Purchases() {
                     <tr className="border-b border-(--border-color)">
                       <th
                         className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
-                        onClick={() => handleSort("createdAt")}>
+                        onClick={() => handleSort("createdAt")}
+                        title="Ordenar por fecha">
                         Fecha <SortIcon field="createdAt" />
                       </th>
                       <th
                         className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
-                        onClick={() => handleSort("supplier")}>
+                        onClick={() => handleSort("supplier")}
+                        title="Ordenar por proveedor">
                         Proveedor <SortIcon field="supplier" />
                       </th>
                       <th
                         className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
-                        onClick={() => handleSort("invoiceNumber")}>
+                        onClick={() => handleSort("invoiceNumber")}
+                        title="Ordenar por número de factura">
                         Factura <SortIcon field="invoiceNumber" />
                       </th>
                       <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
@@ -542,12 +553,14 @@ export default function Purchases() {
                       </th>
                       <th
                         className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
-                        onClick={() => handleSort("total")}>
+                        onClick={() => handleSort("total")}
+                        title="Ordenar por total">
                         Total <SortIcon field="total" />
                       </th>
                       <th
                         className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
-                        onClick={() => handleSort("status")}>
+                        onClick={() => handleSort("status")}
+                        title="Ordenar por estado">
                         Estado <SortIcon field="status" />
                       </th>
                     </tr>
@@ -646,6 +659,7 @@ export default function Purchases() {
                   <button
                     onClick={() => setPage(currentPage - 1)}
                     disabled={currentPage === 1}
+                    title="Página anterior"
                     className="p-2 rounded-lg hover:bg-(--bg-tertiary) disabled:opacity-50 disabled:cursor-not-allowed">
                     <ChevronLeft className="w-5 h-5 text-(--text-secondary)" />
                   </button>
@@ -676,6 +690,7 @@ export default function Purchases() {
                   <button
                     onClick={() => setPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
+                    title="Página siguiente"
                     className="p-2 rounded-lg hover:bg-(--bg-tertiary) disabled:opacity-50 disabled:cursor-not-allowed">
                     <ChevronRight className="w-5 h-5 text-(--text-secondary)" />
                   </button>
@@ -760,6 +775,7 @@ export default function Purchases() {
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 onClick={() => editSupplier(supplier)}
+                                title="Editar proveedor"
                                 className="p-2 hover:bg-(--bg-tertiary) rounded-lg text-(--text-muted) hover:text-(--text-primary) transition-all">
                                 <Edit2 className="w-4 h-4" />
                               </button>
@@ -767,6 +783,7 @@ export default function Purchases() {
                                 onClick={() =>
                                   handleDeleteSupplier(supplier.localId)
                                 }
+                                title="Eliminar proveedor"
                                 className="p-2 hover:bg-red-500/10 rounded-lg text-(--text-muted) hover:text-red-400 transition-all">
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -791,6 +808,7 @@ export default function Purchases() {
               </h3>
               <button
                 onClick={() => setShowModal(false)}
+                title="Cerrar"
                 className="p-1 hover:bg-(--bg-tertiary) rounded">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
@@ -858,6 +876,7 @@ export default function Purchases() {
                         </span>
                         <button
                           onClick={() => removeItem(index)}
+                          title="Eliminar item"
                           className="p-1 hover:bg-(--bg-primary) rounded">
                           <X className="w-4 h-4 text-red-400" />
                         </button>
@@ -954,6 +973,7 @@ export default function Purchases() {
                   setShowSupplierModal(false);
                   setEditingSupplier(null);
                 }}
+                title="Cerrar"
                 className="p-1 hover:bg-(--bg-tertiary) rounded">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>

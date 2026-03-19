@@ -137,7 +137,7 @@ export default function InvoiceList({ onOpenSettings }: InvoiceListProps) {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2" title="Gestionar facturas y documentos fiscales">
               <FileText className="w-6 h-6" />
               Facturación
             </h2>
@@ -146,6 +146,7 @@ export default function InvoiceList({ onOpenSettings }: InvoiceListProps) {
           {onOpenSettings && (
             <button
               onClick={onOpenSettings}
+              title="Configurar datos fiscales"
               className="flex items-center gap-2 px-4 py-2.5 bg-(--brand-500) hover:bg-(--brand-400) text-white rounded-lg transition-colors"
             >
               <Settings className="w-4 h-4" />
@@ -185,7 +186,7 @@ export default function InvoiceList({ onOpenSettings }: InvoiceListProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2" title="Gestionar facturas y documentos fiscales">
             <FileText className="w-6 h-6" />
             Facturación
           </h2>
@@ -195,6 +196,7 @@ export default function InvoiceList({ onOpenSettings }: InvoiceListProps) {
           {onOpenSettings && (
             <button
               onClick={onOpenSettings}
+              title="Configurar datos fiscales"
               className="flex items-center gap-2 px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors"
             >
               <Settings className="w-4 h-4" />
@@ -459,6 +461,7 @@ export default function InvoiceList({ onOpenSettings }: InvoiceListProps) {
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
+                title="Página anterior"
                 className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -469,6 +472,7 @@ export default function InvoiceList({ onOpenSettings }: InvoiceListProps) {
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
+                title="Página siguiente"
                 className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />

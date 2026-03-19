@@ -107,9 +107,10 @@ export default function Accounting() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-slate-800">Caja / Banco</h1>
+        <h1 className="text-2xl font-semibold text-slate-800" title="Gestionar movimientos de caja y banco">Caja / Banco</h1>
         <button
           onClick={() => setShowCreateModal(true)}
+          title="Registrar nuevo movimiento"
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -150,19 +151,20 @@ export default function Accounting() {
       <div className="bg-white rounded-xl border border-slate-200">
         <div className="border-b border-slate-200 px-4">
           <div className="flex gap-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-emerald-500 text-emerald-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  title={tab.id === 'movements' ? 'Ver todos los movimientos' : tab.id === 'reports' ? 'Ver reportes' : 'Ver balance'}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-emerald-500 text-emerald-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
           </div>
         </div>
 
@@ -172,6 +174,7 @@ export default function Accounting() {
               <select
                 value={filters.type}
                 onChange={(e) => setFilters({ ...filters, type: e.target.value as any })}
+                title="Filtrar por tipo de movimiento"
                 className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
               >
                 <option value="all">Todos los tipos</option>
@@ -183,6 +186,7 @@ export default function Accounting() {
               <select
                 value={filters.category}
                 onChange={(e) => setFilters({ ...filters, category: e.target.value as any })}
+                title="Filtrar por categoría"
                 className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
               >
                 <option value="all">Todas las categorías</option>
@@ -194,6 +198,7 @@ export default function Accounting() {
               <input
                 type="text"
                 placeholder="Buscar..."
+                title="Buscar movimientos"
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                 className="px-3 py-2 border border-slate-200 rounded-lg text-sm flex-1 min-w-[200px]"
@@ -359,6 +364,7 @@ export default function Accounting() {
                   <button
                     type="button"
                     onClick={() => setNewMovement({ ...newMovement, type: 'income' })}
+                    title="Marcar como ingreso"
                     className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
                       newMovement.type === 'income'
                         ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
@@ -370,6 +376,7 @@ export default function Accounting() {
                   <button
                     type="button"
                     onClick={() => setNewMovement({ ...newMovement, type: 'expense' })}
+                    title="Marcar como gasto"
                     className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
                       newMovement.type === 'expense'
                         ? 'border-rose-500 bg-rose-50 text-rose-700'
@@ -386,6 +393,7 @@ export default function Accounting() {
                 <select
                   value={newMovement.category}
                   onChange={(e) => setNewMovement({ ...newMovement, category: e.target.value as MovementCategory })}
+                  title="Seleccionar categoría"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                 >
                   {CATEGORIES.map((cat) => (
@@ -402,6 +410,7 @@ export default function Accounting() {
                   min="0"
                   value={newMovement.amount}
                   onChange={(e) => setNewMovement({ ...newMovement, amount: e.target.value })}
+                  title="Ingrese el monto del movimiento"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                   placeholder="0.00"
                 />
@@ -412,6 +421,7 @@ export default function Accounting() {
                 <select
                   value={newMovement.paymentMethod}
                   onChange={(e) => setNewMovement({ ...newMovement, paymentMethod: e.target.value as MovementPaymentMethod })}
+                  title="Seleccionar método de pago"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                 >
                   {PAYMENT_METHODS.map((pm) => (
@@ -426,6 +436,7 @@ export default function Accounting() {
                   type="text"
                   value={newMovement.description}
                   onChange={(e) => setNewMovement({ ...newMovement, description: e.target.value })}
+                  title="Descripción del movimiento"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                   placeholder="Descripción del movimiento"
                 />

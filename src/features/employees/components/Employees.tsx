@@ -75,7 +75,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, isEditing }: Employe
           <h3 className="text-lg font-semibold text-(--text-primary)">
             {isEditing ? 'Editar Permisos' : 'Nuevo Empleado'}
           </h3>
-          <button onClick={onClose} className="p-1 hover:bg-(--bg-tertiary) rounded-lg">
+          <button onClick={onClose} title="Cerrar" className="p-1 hover:bg-(--bg-tertiary) rounded-lg">
             <X className="w-5 h-5 text-(--text-muted)" />
           </button>
         </div>
@@ -87,6 +87,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, isEditing }: Employe
                 <label className="block text-sm font-medium text-(--text-secondary) mb-1">Email</label>
                 <input
                   type="email"
+                  title="Correo electrónico del empleado"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
@@ -97,6 +98,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, isEditing }: Employe
                 <label className="block text-sm font-medium text-(--text-secondary) mb-1">Contraseña Temporal</label>
                 <input
                   type="password"
+                  title="Contraseña temporal para el primer acceso"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
@@ -265,7 +267,7 @@ export default function Employees() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-(--text-primary)">Empleados</h2>
+          <h2 className="text-2xl font-bold text-(--text-primary)" title="Gestionar empleados y sus permisos">Empleados</h2>
           <p className="text-(--text-secondary)">{total} empleados</p>
         </div>
         <Button onClick={openCreateModal}>
@@ -280,19 +282,20 @@ export default function Employees() {
           <input
             type="text"
             placeholder="Buscar empleados..."
+            title="Buscar por email de empleado"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             className="w-full pl-10 pr-4 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
           />
         </div>
         <div className="flex gap-1">
-          <button onClick={() => handleSort('userId')} className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === 'userId' ? 'bg-(--brand-600) text-white' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
+          <button onClick={() => handleSort('userId')} title="Ordenar por email" className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === 'userId' ? 'bg-(--brand-600) text-white' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
             Email <SortIcon field="userId" />
           </button>
-          <button onClick={() => handleSort('role')} className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === 'role' ? 'bg-(--brand-600) text-white' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
+          <button onClick={() => handleSort('role')} title="Ordenar por rol" className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === 'role' ? 'bg-(--brand-600) text-white' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
             Rol <SortIcon field="role" />
           </button>
-          <button onClick={() => handleSort('createdAt')} className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === 'createdAt' ? 'bg-(--brand-600) text-white' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
+          <button onClick={() => handleSort('createdAt')} title="Ordenar por fecha" className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === 'createdAt' ? 'bg-(--brand-600) text-white' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
             Fecha <SortIcon field="createdAt" />
           </button>
         </div>
@@ -329,6 +332,7 @@ export default function Employees() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => toggleEmployeeExpanded(employee.localId)}
+                        title={isExpanded ? "Ocultar permisos" : "Ver permisos del empleado"}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs text-(--text-muted) hover:text-(--text-secondary) hover:bg-(--bg-tertiary) rounded-lg transition-colors">
                         <Shield className="w-3.5 h-3.5" />
                         {permCount} permisos
@@ -336,12 +340,14 @@ export default function Employees() {
                       </button>
                       <button
                         onClick={() => openEditModal(employee)}
+                        title="Editar permisos del empleado"
                         className="p-2 text-(--text-muted) hover:text-(--brand-400) hover:bg-(--bg-tertiary) rounded-lg transition-colors"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteEmployee(employee)}
+                        title="Eliminar empleado"
                         className="p-2 text-(--text-muted) hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -381,6 +387,7 @@ export default function Employees() {
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
+                title="Página anterior"
                 className="p-2 rounded-lg hover:bg-(--bg-tertiary) disabled:opacity-50 disabled:cursor-not-allowed">
                 <ChevronLeft className="w-5 h-5 text-(--text-secondary)" />
               </button>
@@ -411,6 +418,7 @@ export default function Employees() {
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
+                title="Página siguiente"
                 className="p-2 rounded-lg hover:bg-(--bg-tertiary) disabled:opacity-50 disabled:cursor-not-allowed">
                 <ChevronRight className="w-5 h-5 text-(--text-secondary)" />
               </button>

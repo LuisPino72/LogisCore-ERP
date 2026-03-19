@@ -248,7 +248,7 @@ export default function POS() {
       )}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-3">
-          <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2" title="Punto de venta - Realizar cobros">
             <ShoppingCart className="w-6 h-6" />
             Punto de Venta
           </h2>
@@ -276,6 +276,7 @@ export default function POS() {
                 ref={searchInputRef}
                 type="text" 
                 placeholder="Buscar producto o escanear SKU..." 
+                title="Buscar productos por nombre o escanear código SKU"
                 value={search} 
                 onChange={e => setSearch(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSkuSearch()}
@@ -283,6 +284,7 @@ export default function POS() {
               />
             </div>
             <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}
+              title="Filtrar productos por categoría"
               className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) appearance-none focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer min-w-[180px]">
               <option value="">Todas las categorías</option>
               {categories.map(cat => <option key={cat.localId} value={cat.id}>{cat.name}</option>)}
@@ -292,22 +294,26 @@ export default function POS() {
           <div className="flex flex-wrap gap-2 items-center">
             <button
               onClick={() => handleSort('name')}
+              title="Ordenar por nombre"
               className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === 'name' ? 'bg-(--brand-600) text-white' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
               Nombre <SortIcon field="name" />
             </button>
             <button
               onClick={() => handleSort('price')}
+              title="Ordenar por precio"
               className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === 'price' ? 'bg-(--brand-600) text-white' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
               Precio <SortIcon field="price" />
             </button>
             <button
               onClick={() => handleSort('stock')}
+              title="Ordenar por stock"
               className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === 'stock' ? 'bg-(--brand-600) text-white' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
               Stock <SortIcon field="stock" />
             </button>
             <div className="w-px h-6 bg-(--border-color) mx-1" />
             <button
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              title={showFavoritesOnly ? "Mostrar todos los productos" : "Mostrar solo favoritos"}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${showFavoritesOnly ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)'}`}>
               <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />
               Favoritos
@@ -315,6 +321,7 @@ export default function POS() {
             <div className="flex-1" />
             <button
               onClick={() => { loadSuspended(); setShowSuspendedModal(true); }}
+              title="Ver ventas suspendidas"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary) transition-colors">
               <Pause className="w-3.5 h-3.5" />
               Suspendidas ({suspendedSales.length})
@@ -330,7 +337,7 @@ export default function POS() {
                   className="bg-(--bg-secondary) border border-(--border-color) rounded-xl overflow-hidden text-left hover:border-(--brand-500) hover:bg-(--bg-tertiary)/50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed aspect-square flex flex-col cursor-pointer">
                   <div className="relative h-[60%] bg-(--bg-tertiary) flex items-center justify-center overflow-hidden">
                     {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" /> : <Package className="w-10 h-10 text-(--text-muted)" />}
-                    <button onClick={e => toggleFavorite(e, product)} className={`absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-sm transition-colors ${product.isFavorite ? 'text-amber-400' : 'text-slate-400 hover:text-amber-200'}`}>
+                    <button onClick={e => toggleFavorite(e, product)} title={product.isFavorite ? "Quitar de favoritos" : "Agregar a favoritos"} className={`absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-sm transition-colors ${product.isFavorite ? 'text-amber-400' : 'text-slate-400 hover:text-amber-200'}`}>
                       <Star className={`w-4 h-4 ${product.isFavorite ? 'fill-current' : ''}`} />
                     </button>
                   </div>
@@ -360,10 +367,11 @@ export default function POS() {
                 <div className="flex gap-2">
                   <button 
                     onClick={() => setShowSuspendModal(true)}
+                    title="Suspender venta para continuar después"
                     className="text-xs text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1">
                     <Pause className="w-3 h-3" />Suspender
                   </button>
-                  <button onClick={() => setCart([])} className="text-xs text-red-400 hover:text-red-300 transition-colors">Limpiar</button>
+                  <button onClick={() => setCart([])} title="Limpiar carrito" className="text-xs text-red-400 hover:text-red-300 transition-colors">Limpiar</button>
                 </div>
               )}
             </div>
@@ -419,12 +427,12 @@ export default function POS() {
                       </select>
                     ) : (
                       <div className="flex items-center gap-1.5">
-                        <button onClick={() => updateQuantity(item.product.localId, -1)} className="p-1.5 hover:bg-(--bg-primary) rounded-lg transition-colors"><Minus className="w-3.5 h-3.5 text-(--text-secondary)" /></button>
+                        <button onClick={() => updateQuantity(item.product.localId, -1)} title="Reducir cantidad" className="p-1.5 hover:bg-(--bg-primary) rounded-lg transition-colors"><Minus className="w-3.5 h-3.5 text-(--text-secondary)" /></button>
                         <span className="w-6 text-center text-(--text-primary) font-medium text-sm">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.product.localId, 1)} className="p-1.5 hover:bg-(--bg-primary) rounded-lg transition-colors"><Plus className="w-3.5 h-3.5 text-(--text-secondary)" /></button>
+                        <button onClick={() => updateQuantity(item.product.localId, 1)} title="Aumentar cantidad" className="p-1.5 hover:bg-(--bg-primary) rounded-lg transition-colors"><Plus className="w-3.5 h-3.5 text-(--text-secondary)" /></button>
                       </div>
                     )}
-                    <button onClick={() => removeFromCart(item.product.localId)} className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4 text-red-400" /></button>
+                    <button onClick={() => removeFromCart(item.product.localId)} title="Eliminar del carrito" className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4 text-red-400" /></button>
                   </div>
                 );
               })
@@ -439,19 +447,19 @@ export default function POS() {
               {showCheckout ? (
                 <div className="space-y-3">
                   <div className="flex gap-2">
-                    <button onClick={() => setPaymentMethod("cash")} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-colors ${paymentMethod === "cash" ? "bg-green-500/20 border-green-500 text-green-400" : "border-(--border-color) text-(--text-secondary) hover:bg-(--bg-tertiary)"}`}>
+                    <button onClick={() => setPaymentMethod("cash")} title="Pagar en efectivo" className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-colors ${paymentMethod === "cash" ? "bg-green-500/20 border-green-500 text-green-400" : "border-(--border-color) text-(--text-secondary) hover:bg-(--bg-tertiary)"}`}>
                       <Banknote className="w-5 h-5" />Efectivo
                     </button>
-                    <button onClick={() => setPaymentMethod("card")} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-colors ${paymentMethod === "card" ? "bg-(--brand-500)/20 border-(--brand-500) text-(--brand-400)" : "border-(--border-color) text-(--text-secondary) hover:bg-(--bg-tertiary)"}`}>
+                    <button onClick={() => setPaymentMethod("card")} title="Pagar con tarjeta" className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-colors ${paymentMethod === "card" ? "bg-(--brand-500)/20 border-(--brand-500) text-(--brand-400)" : "border-(--border-color) text-(--text-secondary) hover:bg-(--bg-tertiary)"}`}>
                       <CreditCard className="w-5 h-5" />Tarjeta
                     </button>
-                    <button onClick={() => setPaymentMethod("pago_movil")} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-colors ${paymentMethod === "pago_movil" ? "bg-purple-500/20 border-purple-500 text-purple-400" : "border-(--border-color) text-(--text-secondary) hover:bg-(--bg-tertiary)"}`}>
+                    <button onClick={() => setPaymentMethod("pago_movil")} title="Pagar por pago móvil" className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-colors ${paymentMethod === "pago_movil" ? "bg-purple-500/20 border-purple-500 text-purple-400" : "border-(--border-color) text-(--text-secondary) hover:bg-(--bg-tertiary)"}`}>
                       <Smartphone className="w-5 h-5" />Pago Móvil
                     </button>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setShowCheckout(false)} className="flex-1 py-3 border border-(--border-color) text-(--text-secondary) rounded-lg hover:bg-(--bg-tertiary) transition-colors"> Cancelar</button>
-                    <button onClick={handleCheckout} className="flex-1 py-3 bg-green-500 hover:bg-green-400 text-white font-bold rounded-lg transition-colors">Confirmar</button>
+                    <button onClick={() => setShowCheckout(false)} title="Cancelar cobro" className="flex-1 py-3 border border-(--border-color) text-(--text-secondary) rounded-lg hover:bg-(--bg-tertiary) transition-colors"> Cancelar</button>
+                    <button onClick={handleCheckout} title="Confirmar y registrar venta" className="flex-1 py-3 bg-green-500 hover:bg-green-400 text-white font-bold rounded-lg transition-colors">Confirmar</button>
                   </div>
                 </div>
               ) : (
@@ -471,7 +479,7 @@ export default function POS() {
               <h3 className="text-lg font-semibold text-(--text-primary) flex items-center gap-2">
                 <Pause className="w-5 h-5" />Ventas Suspendidas
               </h3>
-              <button onClick={() => setShowSuspendedModal(false)} className="p-1 hover:bg-(--bg-tertiary) rounded">
+              <button onClick={() => setShowSuspendedModal(false)} title="Cerrar" className="p-1 hover:bg-(--bg-tertiary) rounded">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
@@ -491,10 +499,10 @@ export default function POS() {
                         {sale.note && <p className="text-xs text-(--text-secondary) mt-1">Nota: {sale.note}</p>}
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => handleResumeSale(sale)}>
+                        <Button size="sm" variant="secondary" onClick={() => handleResumeSale(sale)} title="Restaurar esta venta al carrito">
                           <Play className="w-3 h-3 mr-1" />Restaurar
                         </Button>
-                        <button onClick={() => handleDeleteSuspended(sale.localId)} className="p-2 hover:bg-red-500/20 rounded-lg">
+                        <button onClick={() => handleDeleteSuspended(sale.localId)} title="Eliminar venta suspendida" className="p-2 hover:bg-red-500/20 rounded-lg">
                           <Trash2 className="w-4 h-4 text-red-400" />
                         </button>
                       </div>
@@ -527,39 +535,7 @@ export default function POS() {
                   value={suspendNote}
                   onChange={(e) => setSuspendNote(e.target.value)}
                   placeholder="Ej: Cliente vuelve en 30 minutos..."
-                  rows={3}
-                  className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500) resize-none"
-                />
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="secondary" onClick={() => setShowSuspendModal(false)}>Cancelar</Button>
-                <Button onClick={handleSuspend}>Suspender</Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {showSuspendModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-(--bg-primary) border border-(--border-color) rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-(--border-color)">
-              <h3 className="text-lg font-semibold text-(--text-primary) flex items-center gap-2">
-                <Pause className="w-5 h-5" />Suspender Venta
-              </h3>
-              <button onClick={() => setShowSuspendModal(false)} className="p-1 hover:bg-(--bg-tertiary) rounded">
-                <X className="w-5 h-5 text-(--text-muted)" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-(--text-secondary) mb-1.5">
-                  Nota (opcional)
-                </label>
-                <textarea
-                  value={suspendNote}
-                  onChange={(e) => setSuspendNote(e.target.value)}
-                  placeholder="Ej: Cliente vuelve en 30 minutos..."
+                  title="Agregar una nota para identificar esta venta"
                   rows={3}
                   className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500) resize-none"
                 />

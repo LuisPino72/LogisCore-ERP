@@ -324,14 +324,14 @@ export default function Recipes() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2" title="Gestionar recetas de producción">
             <ChefHat className="w-6 h-6" />
             Recetas
           </h2>
           <p className="text-(--text-secondary)">{total} recetas</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => { loadHistory(); setShowHistoryModal(true); }}>
+          <Button variant="secondary" onClick={() => { loadHistory(); setShowHistoryModal(true); }} title="Ver historial de producción">
             <History className="w-4 h-4 mr-2" />
             Historial
           </Button>
@@ -347,7 +347,8 @@ export default function Recipes() {
                 isActive: true,
               });
               setShowModal(true);
-            }}>
+            }}
+            title="Crear nueva receta">
             <Plus className="w-4 h-4 mr-2" />
             Nueva Receta
           </Button>
@@ -360,6 +361,7 @@ export default function Recipes() {
           <input
             type="text"
             placeholder="Buscar recetas..."
+            title="Buscar recetas por nombre"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
             className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
@@ -368,19 +370,20 @@ export default function Recipes() {
         <select
           value={filterStatus}
           onChange={(e) => { setFilterStatus(e.target.value as FilterStatus); setCurrentPage(1); }}
+          title="Filtrar por estado"
           className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer">
           <option value="all">Todas</option>
           <option value="active">Activas</option>
           <option value="inactive">Inactivas</option>
         </select>
         <div className="flex gap-1">
-          <button onClick={() => handleSort("name")} className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === "name" ? "bg-(--brand-600) text-white" : "bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)"}`}>
+          <button onClick={() => handleSort("name")} title="Ordenar por nombre" className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === "name" ? "bg-(--brand-600) text-white" : "bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)"}`}>
             Nombre <SortIcon field="name" />
           </button>
-          <button onClick={() => handleSort("createdAt")} className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === "createdAt" ? "bg-(--brand-600) text-white" : "bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)"}`}>
+          <button onClick={() => handleSort("createdAt")} title="Ordenar por fecha" className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === "createdAt" ? "bg-(--brand-600) text-white" : "bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)"}`}>
             Fecha <SortIcon field="createdAt" />
           </button>
-          <button onClick={() => handleSort("yield")} className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === "yield" ? "bg-(--brand-600) text-white" : "bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)"}`}>
+          <button onClick={() => handleSort("yield")} title="Ordenar por rendimiento" className={`flex items-center px-3 py-1.5 rounded-lg text-xs transition-colors ${sort.field === "yield" ? "bg-(--brand-600) text-white" : "bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary)"}`}>
             Rinde <SortIcon field="yield" />
           </button>
         </div>
@@ -431,6 +434,7 @@ export default function Recipes() {
                 <div className="mb-4">
                   <button
                     onClick={() => toggleRecipeExpanded(recipe.localId)}
+                    title={isExpanded ? "Ocultar ingredientes" : "Ver ingredientes"}
                     className="flex items-center gap-2 text-xs text-(--text-muted) mb-2 hover:text-(--text-secondary)">
                     <Scale className="w-3.5 h-3.5" />
                     <span>Ingredientes ({recipe.ingredients.length})</span>
@@ -468,11 +472,13 @@ export default function Recipes() {
                   <div className="flex gap-1">
                     <button
                       onClick={() => openEditModal(recipe)}
+                      title="Editar receta"
                       className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg text-(--text-muted) hover:text-(--text-primary)">
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteRecipe(recipe.localId)}
+                      title="Eliminar receta"
                       className="p-1.5 hover:bg-red-500/20 rounded-lg text-(--text-muted) hover:text-red-400">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -480,7 +486,8 @@ export default function Recipes() {
                       variant={canProd ? "primary" : "secondary"}
                       size="sm"
                       onClick={() => setSelectedRecipe(recipe)}
-                      disabled={!canProd}>
+                      disabled={!canProd}
+                      title={canProd ? "Iniciar producción" : "Sin stock suficiente"}>
                       <Play className="w-3.5 h-3.5 mr-1" />
                       Producir
                     </Button>
@@ -501,6 +508,7 @@ export default function Recipes() {
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
+              title="Página anterior"
               className="p-2 rounded-lg hover:bg-(--bg-tertiary) disabled:opacity-50 disabled:cursor-not-allowed">
               <ChevronLeft className="w-5 h-5 text-(--text-secondary)" />
             </button>
@@ -531,6 +539,7 @@ export default function Recipes() {
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
+              title="Página siguiente"
               className="p-2 rounded-lg hover:bg-(--bg-tertiary) disabled:opacity-50 disabled:cursor-not-allowed">
               <ChevronRight className="w-5 h-5 text-(--text-secondary)" />
             </button>
@@ -546,7 +555,7 @@ export default function Recipes() {
                 <ChefHat className="w-5 h-5 text-(--brand-400)" />
                 Producir: {selectedRecipe.name}
               </h3>
-              <button onClick={() => setSelectedRecipe(null)} className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
+              <button onClick={() => setSelectedRecipe(null)} title="Cerrar" className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
@@ -613,7 +622,7 @@ export default function Recipes() {
                 <History className="w-5 h-5 text-(--brand-400)" />
                 Historial de Producción
               </h3>
-              <button onClick={() => setShowHistoryModal(false)} className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
+              <button onClick={() => setShowHistoryModal(false)} title="Cerrar" className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
@@ -655,7 +664,7 @@ export default function Recipes() {
                 <Plus className="w-5 h-5 text-green-400" />
                 {editingRecipe ? "Editar Receta" : "Nueva Receta"}
               </h3>
-              <button onClick={() => { setShowModal(false); setEditingRecipe(null); }} className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
+              <button onClick={() => { setShowModal(false); setEditingRecipe(null); }} title="Cerrar" className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
@@ -758,6 +767,7 @@ export default function Recipes() {
                       <button
                         type="button"
                         onClick={() => setForm({ ...form, ingredients: form.ingredients.filter((_, idx) => idx !== i) })}
+                        title="Eliminar ingrediente"
                         className="p-2 text-red-400 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
                         <X className="w-4 h-4" />
                       </button>

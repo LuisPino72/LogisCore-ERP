@@ -82,7 +82,7 @@ export default function Sales() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2" title="Historial de todas las ventas registradas">
             <ShoppingBag className="w-6 h-6" />
             Ventas
           </h2>
@@ -92,6 +92,7 @@ export default function Sales() {
         </div>
         <button
           onClick={exportCSV}
+          title="Exportar lista de ventas a archivo CSV"
           className="flex items-center gap-2 px-4 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-secondary) hover:text-white hover:bg-(--brand-500)/20 transition-colors"
         >
           <Download className="w-4 h-4" />
@@ -100,7 +101,7 @@ export default function Sales() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card>
+        <Card title="Total de ingresos por ventas completadas">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-green-500/10 rounded-lg">
               <DollarSign className="w-5 h-5 text-green-400" />
@@ -113,7 +114,7 @@ export default function Sales() {
             ${stats.totalRevenue.toFixed(2)}
           </p>
         </Card>
-        <Card>
+        <Card title="Número total de transacciones de venta">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-(--brand-500)/10 rounded-lg">
               <Receipt className="w-5 h-5 text-(--brand-400)" />
@@ -126,7 +127,7 @@ export default function Sales() {
             {stats.totalTransactions}
           </p>
         </Card>
-        <Card>
+        <Card title="Valor promedio por venta">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-purple-500/10 rounded-lg">
               <TrendingUp className="w-5 h-5 text-purple-400" />
@@ -139,7 +140,7 @@ export default function Sales() {
             ${stats.avgOrder.toFixed(2)}
           </p>
         </Card>
-        <Card>
+        <Card title="Total de ventas pagadas en efectivo">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-amber-500/10 rounded-lg">
               <Banknote className="w-5 h-5 text-amber-400" />
@@ -152,7 +153,7 @@ export default function Sales() {
             ${stats.cashTotal.toFixed(2)}
           </p>
         </Card>
-        <Card>
+        <Card title="Total de ventas pagadas con tarjeta">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-indigo-500/10 rounded-lg">
               <CreditCard className="w-5 h-5 text-indigo-400" />
@@ -165,7 +166,7 @@ export default function Sales() {
             ${stats.cardTotal.toFixed(2)}
           </p>
         </Card>
-        <Card>
+        <Card title="Total de ventas pagadas por pago móvil">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-purple-500/10 rounded-lg">
               <Smartphone className="w-5 h-5 text-purple-400" />
@@ -194,6 +195,7 @@ export default function Sales() {
         <div className="relative">
           <button
             onClick={() => setShowDatePicker(!showDatePicker)}
+            title="Filtrar ventas por rango de fechas"
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors ${filters.dateRange === 'custom' ? 'bg-(--brand-500)/10 border-(--brand-500)/50 text-(--brand-400)' : 'bg-(--bg-tertiary) border border-(--border-color) text-(--text-secondary)'}`}
           >
             <Calendar className="w-4 h-4" />
@@ -205,10 +207,10 @@ export default function Sales() {
           {showDatePicker && (
             <div className="absolute top-full right-0 mt-2 bg-(--bg-secondary) border border-(--border-color) rounded-xl p-4 shadow-xl z-20">
               <div className="flex gap-2 mb-3">
-                <button onClick={() => { setDateRange('today'); setShowDatePicker(false) }} className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">Hoy</button>
-                <button onClick={() => { setDateRange('week'); setShowDatePicker(false) }} className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">7 días</button>
-                <button onClick={() => { setDateRange('month'); setShowDatePicker(false) }} className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">30 días</button>
-                <button onClick={() => { setDateRange('all'); setShowDatePicker(false) }} className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">Todo</button>
+                <button onClick={() => { setDateRange('today'); setShowDatePicker(false) }} title="Ver ventas de hoy" className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">Hoy</button>
+                <button onClick={() => { setDateRange('week'); setShowDatePicker(false) }} title="Ver ventas de los últimos 7 días" className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">7 días</button>
+                <button onClick={() => { setDateRange('month'); setShowDatePicker(false) }} title="Ver ventas de los últimos 30 días" className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">30 días</button>
+                <button onClick={() => { setDateRange('all'); setShowDatePicker(false) }} title="Ver todas las ventas sin filtro" className="px-3 py-1.5 text-xs bg-(--bg-tertiary) hover:bg-(--brand-500)/20 rounded-lg">Todo</button>
               </div>
               <div className="flex gap-2">
                 <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm" />
@@ -221,6 +223,7 @@ export default function Sales() {
         <select
           value={filters.paymentFilter}
           onChange={(e) => setPaymentFilter(e.target.value as PaymentFilter)}
+          title="Filtrar por método de pago"
           className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer">
           <option value="all">Todos los métodos</option>
           <option value="cash">Efectivo</option>
@@ -230,6 +233,7 @@ export default function Sales() {
         <select
           value={filters.statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as SalesStatusFilter)}
+          title="Filtrar por estado de venta"
           className="px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-(--brand-500) cursor-pointer">
           <option value="all">Todos los estados</option>
           <option value="completed">Completadas</option>
@@ -372,6 +376,7 @@ export default function Sales() {
                             )}
                             <button
                               onClick={() => setSelectedSale(sale)}
+                              title="Ver detalles de la venta"
                               className="p-2 hover:bg-(--bg-tertiary) rounded-lg text-(--text-secondary) hover:text-(--text-primary) transition-colors"
                             >
                               <Eye className="w-4 h-4" />
@@ -394,6 +399,7 @@ export default function Sales() {
                   <button
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
+                    title="Página anterior"
                     className="p-2 hover:bg-(--bg-tertiary) rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronLeft className="w-4 h-4 text-(--text-secondary)" />
@@ -404,6 +410,7 @@ export default function Sales() {
                   <button
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
+                    title="Página siguiente"
                     className="p-2 hover:bg-(--bg-tertiary) rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronRight className="w-4 h-4 text-(--text-secondary)" />
