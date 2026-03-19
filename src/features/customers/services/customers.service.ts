@@ -1,5 +1,6 @@
 import { db, Customer } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
+import { EventBus, Events } from '@/lib/events/EventBus';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
@@ -146,6 +147,8 @@ export async function createCustomer(data: CreateCustomerInput): Promise<Result<
       localId
     );
 
+    EventBus.emit(Events.CUSTOMER_CREATED, { customer });
+
     logger.info('Customer created', { customerId: localId, name: data.nombreRazonSocial, category: logCategories.SALES });
 
     return Ok(localId);
@@ -178,17 +181,6 @@ export async function updateCustomer(
       if (!validateRif(data.rifCedula)) {
         return Err(new ValidationError('El formato del RIF/Cédula no es válido'));
       }
-
-      const newRif = data.rifCedula.trim();
-      const existing = await db.customers
-        .where('tenantId')
-        .equals(tenantSlug)
-        .filter((c) => c.rifCedula === newRif && c.localId !== localId)
-        .first();
-
-      if (existing) {
-        return Err(new ValidationError('Ya existe otro cliente con este RIF/Cédula'));
-      }
     }
 
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
@@ -206,7 +198,22 @@ export async function updateCustomer(
       updatedAt: new Date(),
     };
 
-    await db.customers.put(updated);
+    await db.transaction('rw', db.customers, async () => {
+      if (data.rifCedula && data.rifCedula !== customer.rifCedula) {
+        const newRif = data.rifCedula.trim();
+        const existing = await db.customers
+          .where('tenantId')
+          .equals(tenantSlug)
+          .filter((c) => c.rifCedula === newRif && c.localId !== localId)
+          .first();
+
+        if (existing) {
+          throw new ValidationError('Ya existe otro cliente con este RIF/Cédula');
+        }
+      }
+
+      await db.customers.put(updated);
+    });
 
     await SyncEngine.addToQueue('customers', 'update', updated as unknown as Record<string, unknown>, localId);
 
