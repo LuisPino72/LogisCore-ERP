@@ -8,10 +8,12 @@ import { getDailyStats } from "@/features/sales/services/sales.service";
 import { isOk, Result, AppError } from "@/lib/types/result";
 import { useToast } from "@/providers/ToastProvider";
 import { loadPOSData, filterProducts, addToCart as addToCartUtil, updateCartQuantity, removeFromCart as removeFromCartUtil, calculateCartTotals, prepareSaleItems, CartItem, saveSuspendedSale, getSuspendedSales, deleteSuspendedSale, findProductBySku } from "../services/pos.service";
+import { useInvoicingForPOS } from "@/features/invoicing";
+import { CustomerSelector, InvoicePreview } from "@/features/invoicing";
 import { logger, logCategories } from "@/lib/logger";
 import Card from "@/common/Card";
 import Button from "@/common/Button";
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Package, Search, Star, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Pause, Play, X, Clock, TrendingUp } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Package, Search, Star, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Pause, Play, X, Clock, TrendingUp, FileText } from "lucide-react";
 import type { SortField, PaymentMethod } from "../types/pos.types";
 
 export default function POS() {
@@ -34,6 +36,21 @@ export default function POS() {
   
   const tenant = useTenantStore((state) => state.currentTenant);
   const { showError, showSuccess } = useToast();
+
+  const {
+    isEnabled: invoicingEnabled,
+    showCustomerSelector,
+    showInvoicePreview,
+    invoice: currentInvoice,
+    taxpayerInfo,
+    prepareAndOpen,
+    closeCustomerSelector,
+    onCustomerSelected,
+    closeInvoicePreview,
+  } = useInvoicingForPOS();
+
+  const [lastSaleId, setLastSaleId] = useState<string>('');
+  const [lastSaleCart, setLastSaleCart] = useState<CartItem[]>([]);
 
   useEffect(() => {
     getExchangeRate().then((result) => {
@@ -135,14 +152,31 @@ export default function POS() {
       const failed = results.filter((r: Result<void, AppError>) => !isOk(r));
       if (failed.length > 0) logger.warn(`${failed.length} stock updates failed`, { category: logCategories.INVENTORY });
 
+      const saleId = saleResult.value;
       setCart([]);
       setShowCheckout(false);
       showSuccess("Venta registrada exitosamente!");
       loadDailyStats();
       const data = await loadPOSData(tenant.slug);
       setProducts(data.products);
+
+      if (invoicingEnabled) {
+        setLastSaleId(saleId);
+        setLastSaleCart([...cart]);
+      }
     } catch { showError("Error al registrar la venta"); }
-  }, [tenant, cart, cartTotal, paymentMethod, exchangeRate, showError, showSuccess]);
+  }, [tenant, cart, cartTotal, paymentMethod, exchangeRate, showError, showSuccess, invoicingEnabled]);
+
+  const handleGenerateInvoice = useCallback(() => {
+    if (lastSaleId && lastSaleCart.length > 0) {
+      prepareAndOpen(lastSaleCart, lastSaleId);
+    }
+  }, [lastSaleId, lastSaleCart, prepareAndOpen]);
+
+  const handleInvoiceSuccess = useCallback(() => {
+    setLastSaleId('');
+    setLastSaleCart([]);
+  }, []);
 
   const handleSuspend = useCallback(async () => {
     if (!tenant?.slug || cart.length === 0) return;
@@ -475,6 +509,81 @@ export default function POS() {
             </div>
           </div>
         </div>
+      )}
+      
+      {showSuspendModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-(--bg-primary) border border-(--border-color) rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-(--border-color)">
+              <h3 className="text-lg font-semibold text-(--text-primary) flex items-center gap-2">
+                <Pause className="w-5 h-5" />Suspender Venta
+              </h3>
+              <button onClick={() => setShowSuspendModal(false)} className="p-1 hover:bg-(--bg-tertiary) rounded">
+                <X className="w-5 h-5 text-(--text-muted)" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-(--text-secondary) mb-1.5">
+                  Nota (opcional)
+                </label>
+                <textarea
+                  value={suspendNote}
+                  onChange={(e) => setSuspendNote(e.target.value)}
+                  placeholder="Ej: Cliente vuelve en 30 minutos..."
+                  rows={3}
+                  className="w-full px-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500) resize-none"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="secondary" onClick={() => setShowSuspendModal(false)}>Cancelar</Button>
+                <Button onClick={handleSuspend}>Suspender</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {invoicingEnabled && lastSaleId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-(--bg-primary) border border-(--border-color) rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="p-6 text-center space-y-4">
+              <FileText className="w-12 h-12 mx-auto text-blue-400" />
+              <h3 className="text-lg font-semibold text-(--text-primary)">¿Desea generar una factura?</h3>
+              <p className="text-sm text-(--text-secondary)">
+                La venta se completó exitosamente. ¿Desea generar la factura fiscal?
+              </p>
+              <div className="flex gap-3">
+                <Button variant="secondary" onClick={handleInvoiceSuccess} className="flex-1">
+                  No, gracias
+                </Button>
+                <Button onClick={handleGenerateInvoice} className="flex-1">
+                  Generar Factura
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCustomerSelector && (
+        <CustomerSelector
+          isOpen={showCustomerSelector}
+          onClose={closeCustomerSelector}
+          onSelect={onCustomerSelected}
+        />
+      )}
+
+      {showInvoicePreview && currentInvoice && taxpayerInfo && (
+        <InvoicePreview
+          isOpen={showInvoicePreview}
+          invoice={currentInvoice}
+          taxpayerInfo={taxpayerInfo}
+          onClose={() => {
+            closeInvoicePreview();
+            handleInvoiceSuccess();
+          }}
+        />
       )}
     </div>
   );

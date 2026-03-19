@@ -164,6 +164,96 @@ export interface SuspendedSale {
   note?: string;
 }
 
+export interface TaxpayerInfo {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  rif: string;
+  razonSocial: string;
+  direccionFiscal: string;
+  numeroProvidencia: string;
+  logoUrl?: string;
+  syncedAt?: Date;
+}
+
+export interface Customer {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  nombreRazonSocial: string;
+  rifCedula: string;
+  direccion?: string;
+  telefono?: string;
+  email?: string;
+  notas?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt?: Date;
+  syncedAt?: Date;
+}
+
+export interface InvoiceSettings {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  sequentialType: 'daily' | 'monthly' | 'global';
+  lastInvoiceDate?: string;
+  lastInvoiceNumber: number;
+  lastControlPrefix: string;
+  igtfEnabled: boolean;
+  igtfPercentage: number;
+  syncedAt?: Date;
+}
+
+export interface InvoiceItem {
+  codigo: string;
+  descripcion: string;
+  cantidad: number;
+  unidad: string;
+  precioUnitarioUsd: number;
+  tasaBcvItem: number;
+  alicuotaIva: 0 | 8 | 16;
+  exento: boolean;
+  totalBs: number;
+}
+
+export interface Invoice {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  invoiceNumber: string;
+  controlNumber: string;
+  tipoDocumento: 'FACTURA' | 'NOTA_CREDITO' | 'NOTA_DEBITO';
+  estatus: 'EMITIDA' | 'ANULADA';
+  emisorRif: string;
+  emisorRazonSocial: string;
+  emisorDireccion: string;
+  emisorNumeroProvidencia?: string;
+  customerId?: string;
+  clienteNombre: string;
+  clienteRifCedula: string;
+  clienteDireccion?: string;
+  clienteTelefono?: string;
+  subtotalUsd: number;
+  tasaBcv: number;
+  baseImponibleBs: number;
+  montoIvaBs: number;
+  montoExentoBs: number;
+  totalBs: number;
+  aplicaIgtf: boolean;
+  montoIgtfBs?: number;
+  totalFinalBs: number;
+  saleId?: string;
+  createdBy?: string;
+  createdAt: Date;
+  annulledAt?: Date;
+  annulledBy?: string;
+  annulledReason?: string;
+  hashSeguridad?: string;
+  syncedAt?: Date;
+  items: InvoiceItem[];
+}
+
 class LogisCoreDB extends Dexie {
   syncQueue!: Table<SyncQueueItem>;
   products!: Table<Product>;
@@ -176,10 +266,14 @@ class LogisCoreDB extends Dexie {
   productionLogs!: Table<ProductionLog>;
   suppliers!: Table<Supplier>;
   suspendedSales!: Table<SuspendedSale>;
+  taxpayerInfo!: Table<TaxpayerInfo>;
+  customers!: Table<Customer>;
+  invoiceSettings!: Table<InvoiceSettings>;
+  invoices!: Table<Invoice>;
 
   constructor() {
     super('LogisCoreERP');
-    this.version(7).stores({
+    this.version(8).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
       products: '++id, localId, tenantId, sku, categoryId, isActive, name',
       categories: '++id, localId, tenantId, name, saleType',
@@ -191,6 +285,10 @@ class LogisCoreDB extends Dexie {
       suppliers: '++id, localId, tenantId, name, isActive',
       employees: '++id, localId, tenantId, role',
       suspendedSales: '++id, localId, tenantId, createdAt',
+      taxpayerInfo: '++id, localId, tenantId',
+      customers: '++id, localId, tenantId, rifCedula, isActive',
+      invoiceSettings: '++id, localId, tenantId',
+      invoices: '++id, localId, tenantId, invoiceNumber, controlNumber, estatus, createdAt, saleId',
     });
   }
 }

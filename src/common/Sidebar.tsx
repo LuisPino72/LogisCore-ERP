@@ -16,6 +16,8 @@ import {
   ChefHat,
   BarChart3,
   Users,
+  UserCircle,
+  FileText,
 } from "lucide-react";
 import Emblema from "@/assets/Emblema.ico";
 
@@ -45,6 +47,8 @@ const allModules = [
   { id: "recipes", label: "Recetas", icon: ChefHat },
   { id: "employees", label: "Empleados", icon: Users },
   { id: "reports", label: "Reportes", icon: BarChart3 },
+  { id: "customers", label: "Clientes", icon: UserCircle },
+  { id: "invoicing", label: "Facturación", icon: FileText },
 ] as const;
 
 export function Sidebar({

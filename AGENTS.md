@@ -12,7 +12,6 @@
 - **State**: Zustand
 
 ---
-
 ## Build Commands
 ```bash
 npm run dev        # Dev server
@@ -409,9 +408,9 @@ src/features/{modulo}/
 │   └── *.types.ts
 ├── hooks/               # Custom hooks reutilizables
 │   └── *.ts
-├── __tests__/          # Tests unitarios del módulo
+├── test/                # Tests unitarios del módulo
 │   └── *.test.ts
-└── index.ts            # Exports del módulo
+└── index.ts             # Exports del módulo
 ```
 
 ### 10.2 Reglas de Organización
@@ -422,7 +421,7 @@ src/features/{modulo}/
 | `services/` | Lógica de negocio, validaciones, DB | `products.service.ts`, `sales.service.ts` |
 | `types/` | Interfaces y tipos TypeScript | `Inventory.types.ts` |
 | `hooks/` | Custom hooks reutilizables | `useInventory.ts` |
-| `__tests__/` | Tests unitarios | `products-validation.test.ts` |
+| `test/` | Tests unitarios | `products-validation.test.ts` |
 
 ### 10.3 Responsabilidades
 
@@ -437,3 +436,65 @@ src/features/{modulo}/
 - Acceso a Dexie, Supabase, SyncEngine
 - Retorna `Result<T, AppError>`
 - Funciones async
+
+---
+
+## SECCIÓN 11: Patrones Comunes
+
+### 11.1 Campos Opcionales en Dexie
+
+> **No requieren migraciones.** Agregar campo opcional al interface TypeScript y usar `?.` al guardar.
+
+```typescript
+// 1. Agregar al interface en src/lib/db/index.ts
+interface Customer {
+  // ... campos existentes ...
+  notas?: string;
+}
+
+// 2. Usar con optional chaining al guardar
+await db.customers.put({ ...customer, notas: data.notas || undefined });
+```
+
+### 11.2 Datos Relacionados (Cliente → Facturas)
+
+Para obtener datos relacionados (ej: facturas de un cliente):
+
+```typescript
+// 1. En servicio de la entidad relacionada
+export async function getInvoicesByCustomer(customerId: string): Promise<Result<Invoice[], AppError>> {
+  const tenantSlug = getCurrentTenantSlug();
+  const invoices = await db.invoices
+    .where('tenantId').equals(tenantSlug)
+    .filter((inv) => inv.customerId === customerId)
+    .toArray();
+  invoices.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return Ok(invoices);
+}
+
+// 2. En hook del módulo consumidor
+const getCustomerHistory = useCallback(async (customerId: string) => {
+  const result = await getInvoicesByCustomer(customerId);
+  return result.ok ? result.value : [];
+}, []);
+```
+
+### 11.3 UI de Historial Collapsible
+
+```tsx
+const [showHistory, setShowHistory] = useState(false);
+const [customerHistory, setCustomerHistory] = useState<Invoice[]>([]);
+
+<button onClick={toggleHistory} className="...">
+  <ChevronDown className={showHistory ? 'rotate-180' : ''} />
+</button>
+{showHistory && customerHistory.map(inv => (/* lista */))}
+```
+
+### 11.4 Componentes Reutilizables
+
+| Componente | Ubicación | Uso |
+|------------|-----------|-----|
+| `TableSkeleton` | `@/common/Skeleton` | Skeleton loading en tablas |
+| `Card` | `@/common/Card` | Contenedor con borde suave |
+| Toast | `useToast()` | Notificaciones |

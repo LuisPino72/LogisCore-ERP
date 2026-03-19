@@ -45,6 +45,12 @@ const Dashboard = lazy(
 const Employees = lazy(
   () => import("@/features/employees/components/Employees"),
 );
+const Customers = lazy(
+  () => import("@/features/customers/components/CustomersList"),
+);
+const Invoicing = lazy(
+  () => import("@/features/invoicing/components/InvoiceList"),
+);
 
 type Module =
   | "dashboard"
@@ -54,7 +60,9 @@ type Module =
   | "recipes"
   | "reports"
   | "purchases"
-  | "employees";
+  | "employees"
+  | "customers"
+  | "invoicing";
 
 function App() {
   const role = useTenantStore((state) => state.role);
@@ -331,6 +339,8 @@ function App() {
     recipes: "Recetas",
     employees: "Empleados",
     reports: "Reportes",
+    customers: "Clientes",
+    invoicing: "Facturación",
   };
 
   const handleSetActiveModule = (module: string) => {
@@ -460,6 +470,24 @@ function App() {
               <div className="p-8 text-center text-slate-400">Cargando...</div>
             }>
             <Employees />
+          </Suspense>
+        );
+      case "customers":
+        return (
+          <Suspense
+            fallback={
+              <div className="p-8 text-center text-slate-400">Cargando...</div>
+            }>
+            <Customers />
+          </Suspense>
+        );
+      case "invoicing":
+        return (
+          <Suspense
+            fallback={
+              <div className="p-8 text-center text-slate-400">Cargando...</div>
+            }>
+            <Invoicing />
           </Suspense>
         );
       default:
