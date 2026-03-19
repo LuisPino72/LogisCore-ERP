@@ -11,8 +11,12 @@ export interface TenantModules {
   employees?: boolean
   customers?: boolean
   invoicing?: boolean
+  accounting?: boolean
   [key: string]: boolean | undefined
 }
+
+export const ALWAYS_ENABLED_MODULES = ['dashboard', 'reports', 'exchange-rate'] as const;
+export type AlwaysEnabledModule = typeof ALWAYS_ENABLED_MODULES[number];
 
 export interface TenantThemeConfig {
   themeColor: string
@@ -38,6 +42,35 @@ interface TenantState {
   startImpersonation: (tenant: TenantConfig) => void
   stopImpersonation: () => void
   clear: () => void
+}
+
+const MODULE_DEPENDENCIES: Record<string, string[]> = {
+  pos: ['inventory'],
+  invoicing: ['customers'],
+  recipes: ['inventory'],
+  purchases: ['inventory'],
+};
+
+export function isModuleEnabled(moduleId: string, tenant: TenantConfig | null): boolean {
+  if (ALWAYS_ENABLED_MODULES.includes(moduleId as AlwaysEnabledModule)) {
+    return true;
+  }
+  if (!tenant?.modules) return false;
+  return tenant.modules[moduleId] === true;
+}
+
+export function checkModuleDependencies(moduleId: string, tenant: TenantConfig | null): { 
+  enabled: boolean; 
+  missingDependencies: string[] 
+} {
+  const enabled = isModuleEnabled(moduleId, tenant);
+  const dependencies = MODULE_DEPENDENCIES[moduleId] || [];
+  const missingDependencies = dependencies.filter(dep => !isModuleEnabled(dep, tenant));
+  
+  return {
+    enabled,
+    missingDependencies,
+  };
 }
 
 /**

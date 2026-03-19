@@ -24,7 +24,7 @@ export interface CreateMovementInput {
   status?: 'pending' | 'completed' | 'cancelled';
 }
 
-function validateMovementInput(data: CreateMovementInput): string[] {
+export function validateMovementInput(data: CreateMovementInput): string[] {
   const errors: string[] = [];
 
   if (!['income', 'expense', 'transfer'].includes(data.type)) {

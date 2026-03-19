@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useTenantStore, TenantConfig, TenantModules } from '@/store/useTenantStore';
+import { useTenantStore, TenantConfig, TenantModules, isModuleEnabled, checkModuleDependencies } from '@/store/useTenantStore';
 
 const createMockTenant = (overrides?: Partial<TenantConfig>): TenantConfig => ({
   id: 'tenant-1',
@@ -91,6 +91,90 @@ describe('TenantStore', () => {
       
       expect(modules.sales).toBe(true);
       expect(modules.pos).toBe(false);
+    });
+  });
+
+  describe('isModuleEnabled', () => {
+    const tenant = createMockTenant();
+
+    it('debe retornar true para módulos siempre habilitados', () => {
+      expect(isModuleEnabled('dashboard', tenant)).toBe(true);
+      expect(isModuleEnabled('reports', tenant)).toBe(true);
+      expect(isModuleEnabled('exchange-rate', tenant)).toBe(true);
+    });
+
+    it('debe retornar true para módulo activo', () => {
+      expect(isModuleEnabled('inventory', tenant)).toBe(true);
+      expect(isModuleEnabled('pos', tenant)).toBe(true);
+    });
+
+    it('debe retornar false para módulo inactivo', () => {
+      const tenantWithPosDisabled = createMockTenant({
+        modules: { inventory: true, pos: false },
+      });
+      expect(isModuleEnabled('pos', tenantWithPosDisabled)).toBe(false);
+    });
+
+    it('debe retornar false para módulo no definido', () => {
+      const tenantWithNoModules = createMockTenant({ modules: {} });
+      expect(isModuleEnabled('pos', tenantWithNoModules)).toBe(false);
+    });
+
+    it('debe retornar false cuando no hay tenant', () => {
+      expect(isModuleEnabled('pos', null)).toBe(false);
+    });
+  });
+
+  describe('checkModuleDependencies', () => {
+    it('debe detectar dependencias faltantes para POS', () => {
+      const tenantWithoutInventory = createMockTenant({
+        modules: { pos: true, inventory: false },
+      });
+      
+      const result = checkModuleDependencies('pos', tenantWithoutInventory);
+      
+      expect(result.enabled).toBe(true);
+      expect(result.missingDependencies).toContain('inventory');
+    });
+
+    it('debe pasar sin dependencias faltantes', () => {
+      const tenant = createMockTenant({
+        modules: { pos: true, inventory: true },
+      });
+      
+      const result = checkModuleDependencies('pos', tenant);
+      
+      expect(result.enabled).toBe(true);
+      expect(result.missingDependencies).toHaveLength(0);
+    });
+
+    it('debe detectar dependencias faltantes para invoicing', () => {
+      const tenantWithoutCustomers = createMockTenant({
+        modules: { invoicing: true, customers: false },
+      });
+      
+      const result = checkModuleDependencies('invoicing', tenantWithoutCustomers);
+      
+      expect(result.enabled).toBe(true);
+      expect(result.missingDependencies).toContain('customers');
+    });
+
+    it('debe retornar enabled=false si el módulo está desactivado', () => {
+      const tenantWithPosDisabled = createMockTenant({
+        modules: { pos: false, inventory: true },
+      });
+      
+      const result = checkModuleDependencies('pos', tenantWithPosDisabled);
+      
+      expect(result.enabled).toBe(false);
+    });
+
+    it('debe retornar sin dependencias faltantes para módulo sin dependencias', () => {
+      const tenant = createMockTenant();
+      
+      const result = checkModuleDependencies('employees', tenant);
+      
+      expect(result.missingDependencies).toHaveLength(0);
     });
   });
 });

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { Product, Category, db, SuspendedSale } from "@/lib/db";
-import { useTenantStore } from "@/store/useTenantStore";
+import { useTenantStore, checkModuleDependencies } from "@/store/useTenantStore";
 import { createSale } from "@/features/sales/services/sales.service";
 import { updateStock } from "@/features/inventory/services/products.service";
 import { getExchangeRate, formatBs } from "@/features/exchange-rate/services/exchangeRate.service";
@@ -12,7 +12,7 @@ import { useInvoicingForPOS, CustomerSelector } from "@/features/invoicing";
 import { logger, logCategories } from "@/lib/logger";
 import Card from "@/common/Card";
 import Button from "@/common/Button";
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Package, Search, Star, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Pause, Play, X, Clock, TrendingUp, FileText, Loader2 } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Package, Search, Star, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Pause, Play, X, Clock, TrendingUp, FileText, Loader2, AlertTriangle } from "lucide-react";
 import type { SortField, PaymentMethod } from "../types/pos.types";
 
 const InvoicePreview = lazy(() => 
@@ -64,6 +64,8 @@ export default function POS() {
   const [lastSaleId, setLastSaleId] = useState<string>('');
   const [lastSaleCart, setLastSaleCart] = useState<CartItem[]>([]);
 
+  const { missingDependencies } = checkModuleDependencies('pos', tenant);
+
   useEffect(() => {
     getExchangeRate().then((result) => {
       if (isOk(result) && result.value) setExchangeRate(result.value.rate);
@@ -72,6 +74,10 @@ export default function POS() {
 
   useEffect(() => {
     if (!tenant?.slug) return;
+    
+    const { enabled } = checkModuleDependencies('pos', tenant);
+    if (!enabled) return;
+    
     loadPOSData(tenant.slug).then(data => {
       setProducts(data.products);
       setCategories(data.categories);
@@ -229,6 +235,17 @@ export default function POS() {
 
   return (
     <div className="space-y-4">
+      {missingDependencies.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-amber-400 font-medium">Módulo requerído desactivado</p>
+            <p className="text-amber-300/70 text-sm mt-1">
+              Para usar el Punto de Venta, necesitas activar el módulo: <span className="font-semibold">{missingDependencies.join(', ')}</span>
+            </p>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-3">
           <h2 className="text-2xl font-bold text-(--text-primary) flex items-center gap-2">

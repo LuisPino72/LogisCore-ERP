@@ -42,6 +42,7 @@ vi.mock('@/lib/db', () => ({
       put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     },
+    transaction: vi.fn((_mode, _tables, callback) => callback()),
   },
 }));
 
