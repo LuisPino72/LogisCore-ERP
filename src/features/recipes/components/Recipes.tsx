@@ -212,7 +212,8 @@ export default function Recipes() {
 
   const handleDeleteRecipe = useCallback(
     async (localId: string) => {
-      if (confirm("¿Estás seguro de eliminar esta receta?")) {
+      const confirmed = window.confirm("¿Estás seguro de eliminar esta receta?");
+      if (confirmed) {
         await db.recipes.where("localId").equals(localId).delete();
         await SyncEngine.addToQueue("recipes", "delete", { localId }, localId);
         showSuccess("Receta eliminada");

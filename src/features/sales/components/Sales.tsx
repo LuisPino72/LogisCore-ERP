@@ -59,7 +59,8 @@ export default function Sales() {
   }, [loadSales])
 
   const handleCancelSale = useCallback(async (localId: string) => {
-    if (!confirm("¿Estás seguro de cancelar esta venta?")) return
+    const confirmed = window.confirm("¿Estás seguro de cancelar esta venta?");
+    if (!confirmed) return
     
     setCancellingId(localId)
     try {

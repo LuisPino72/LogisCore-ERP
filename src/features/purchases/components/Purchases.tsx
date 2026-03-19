@@ -206,7 +206,8 @@ export default function Purchases() {
   }, [editingSupplier, supplierForm, createSupplier, updateSupplier]);
 
   const handleDeleteSupplier = useCallback(async (localId: string) => {
-    if (confirm("¿Estás seguro de eliminar este proveedor?")) {
+    const confirmed = window.confirm("¿Estás seguro de eliminar este proveedor?");
+    if (confirmed) {
       await deleteSupplier(localId);
     }
   }, [deleteSupplier]);

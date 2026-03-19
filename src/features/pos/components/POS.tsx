@@ -218,7 +218,8 @@ export default function POS() {
   }, [showSuccess]);
 
   const handleDeleteSuspended = useCallback(async (localId: string) => {
-    if (confirm("¿Eliminar esta venta suspendida?")) {
+    const confirmed = window.confirm("¿Eliminar esta venta suspendida?");
+    if (confirmed) {
       await deleteSuspendedSale(localId);
       loadSuspended();
       showSuccess("Venta eliminada");

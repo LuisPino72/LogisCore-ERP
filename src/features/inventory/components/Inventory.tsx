@@ -163,7 +163,8 @@ export default function Inventory() {
   }, [setForm, setImagePreview, setEditingId, setShowModal])
 
   const handleDelete = useCallback(async (localId: string) => {
-    if (confirm('¿Estás seguro de eliminar este producto?')) {
+    const confirmed = window.confirm('¿Estás seguro de eliminar este producto?');
+    if (confirmed) {
       await deleteProduct(localId)
     }
   }, [deleteProduct])
@@ -253,15 +254,16 @@ export default function Inventory() {
           <p className="text-slate-400">{filteredProducts.length} productos {selectedProducts.length > 0 && `(${selectedProducts.length} seleccionados)`}</p>
         </div>
         <div className="flex items-center gap-2">
-          {selectedProducts.length > 0 && (
-            <div className="flex items-center gap-2 pr-4 border-r border-(--border-color)">
-              <span className="text-sm text-slate-400">{selectedProducts.length} seleccionados</span>
-              <button
-                onClick={() => {
-                  if (confirm(`¿Eliminar ${selectedProducts.length} productos?`)) {
-                    deleteSelectedProducts()
-                  }
-                }}
+              {selectedProducts.length > 0 && (
+                <div className="flex items-center gap-2 pr-4 border-r border-(--border-color)">
+                  <span className="text-sm text-slate-400">{selectedProducts.length} seleccionados</span>
+                  <button
+                    onClick={() => {
+                      const confirmed = window.confirm(`¿Eliminar ${selectedProducts.length} productos?`);
+                      if (confirmed) {
+                        deleteSelectedProducts()
+                      }
+                    }}
                 className="flex items-center gap-1 px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
               >
                 <Trash className="w-4 h-4" />
