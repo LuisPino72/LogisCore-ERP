@@ -190,10 +190,10 @@ export default function Inventory() {
             )}
           </div>
           <div className="flex gap-1">
-            <button onClick={() => handleEdit(product)} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
+            <button onClick={() => handleEdit(product)} title="Editar producto" className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
               <Edit2 className="w-4 h-4" />
             </button>
-            <button onClick={() => handleDelete(product.localId)} className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-all">
+            <button onClick={() => handleDelete(product.localId)} title="Eliminar producto" className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-all">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -249,7 +249,7 @@ export default function Inventory() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Inventario</h2>
+          <h2 className="text-2xl font-bold text-white" title="Gestiona tu inventario de productos">Inventario</h2>
           <p className="text-slate-400">{filteredProducts.length} productos {selectedProducts.length > 0 && `(${selectedProducts.length} seleccionados)`}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -267,7 +267,7 @@ export default function Inventory() {
                 <Trash className="w-4 h-4" />
                 Eliminar
               </button>
-              <button onClick={clearSelection} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400">
+              <button onClick={clearSelection} title="Limpiar selección" className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -360,6 +360,7 @@ export default function Inventory() {
               <input
                 type="text"
                 placeholder="Buscar por nombre o SKU..."
+                title="Busca productos por nombre o código SKU"
                 value={filters.search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-500) transition-all font-sans"
@@ -378,7 +379,7 @@ export default function Inventory() {
           {showFilters && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-950/50 rounded-xl border border-slate-800">
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Categoría</label>
+                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide" title="Filtra productos por categoría">Categoría</label>
                 <select 
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={filters.selectedCategory}
@@ -391,7 +392,7 @@ export default function Inventory() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Stock</label>
+                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide" title="Filtra productos según nivel de stock">Stock</label>
                 <select 
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={filters.stockFilter}
@@ -404,7 +405,7 @@ export default function Inventory() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Estado</label>
+                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide" title="Filtra por estado del producto">Estado</label>
                 <select 
                   className="w-full px-3 py-2 bg-(--bg-tertiary) border border-(--border-color) rounded-lg text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--brand-500)"
                   value={filters.statusFilter}
@@ -416,7 +417,7 @@ export default function Inventory() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Rango Precio</label>
+                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide" title="Filtra productos dentro de un rango de precio">Rango Precio</label>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -457,23 +458,25 @@ export default function Inventory() {
                 <div className="col-span-full flex justify-center mt-4">
                   {totalPages > 1 && (
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                        disabled={currentPage === 1}
-                        className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <span className="text-sm text-slate-400">
-                        {currentPage} / {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                        disabled={currentPage === totalPages}
-                        className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    title="Página anterior"
+                    className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm text-slate-400">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    title="Página siguiente"
+                    className="p-2 hover:bg-slate-700 rounded-lg disabled:opacity-50"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                     </div>
                   )}
                 </div>
@@ -576,10 +579,10 @@ export default function Inventory() {
                           </td>
                           <td className="py-4 px-4 text-right">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => handleEdit(product)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all">
+                              <button onClick={() => handleEdit(product)} title="Editar producto" className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all">
                                 <Edit2 className="w-4 h-4" />
                               </button>
-                              <button onClick={() => handleDelete(product.localId)} className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-all">
+                              <button onClick={() => handleDelete(product.localId)} title="Eliminar producto" className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-all">
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
@@ -600,6 +603,7 @@ export default function Inventory() {
                   <button
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
+                    title="Página anterior"
                     className="flex items-center gap-1 px-3 py-1.5 bg-(--bg-tertiary) hover:bg-(--brand-500)/20 disabled:opacity-50 rounded-lg text-sm"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -611,6 +615,7 @@ export default function Inventory() {
                   <button
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
+                    title="Página siguiente"
                     className="flex items-center gap-1 px-3 py-1.5 bg-(--bg-tertiary) hover:bg-(--brand-500)/20 disabled:opacity-50 rounded-lg text-sm"
                   >
                     Siguiente
@@ -684,19 +689,21 @@ export default function Inventory() {
                     </div>
                   </div>
                   <div className="flex-1">
-                    <Input
-                      label="Nombre del Producto"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      placeholder="Ej: Hamburguesa Especial"
-                      required
-                    />
-                  </div>
+                  <Input
+                    label="Nombre del Producto"
+                    title="Nombre visible del producto"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Ej: Hamburguesa Especial"
+                    required
+                  />
+                </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <Input
                     label="SKU / Código"
+                    title="Código único de identificación del producto"
                     value={form.sku}
                     onChange={(e) => setForm({ ...form, sku: e.target.value })}
                     placeholder="Ene-001"
@@ -757,6 +764,7 @@ export default function Inventory() {
                 <div className="grid grid-cols-3 gap-4">
                   <Input
                     label="Precio Venta"
+                    title="Precio al que se venderá el producto"
                     type="number"
                     step="0.01"
                     value={form.price}
@@ -767,6 +775,7 @@ export default function Inventory() {
                   />
                   <Input
                     label="Costo Unitario"
+                    title="Costo de adquisición del producto"
                     type="number"
                     step="0.01"
                     value={form.cost}
@@ -776,6 +785,7 @@ export default function Inventory() {
                   />
                   <Input
                     label="Stock Inicial"
+                    title="Cantidad inicial en inventario"
                     type="number"
                     value={form.stock}
                     placeholder="0"
@@ -932,7 +942,7 @@ export default function Inventory() {
                 Gestionar Categorías
               </h3>
               <button onClick={() => { setShowCategoryModal(false); setEditingCategory(null); }} className="p-2 hover:bg-slate-700 rounded-full transition-colors">
-                <X className="w-5 h-5 text-slate-400" />
+                <X className="w-5 h-5 text-black" />
               </button>
             </div>
             <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
@@ -977,12 +987,14 @@ export default function Inventory() {
                           setEditingCategory(cat)
                           setNewCategoryForm({ name: cat.name, saleType: cat.saleType || 'unit' })
                         }}
+                        title="Editar categoría"
                         className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setCategoryToDelete(cat)}
+                        title="Eliminar categoría"
                         className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400"
                       >
                         <Trash2 className="w-4 h-4" />
