@@ -8,6 +8,7 @@ export interface PurchaseItem {
 
 export interface CreatePurchaseInput {
   supplier: string
+  supplierId?: string
   invoiceNumber: string
   items: PurchaseItem[]
   subtotal: number

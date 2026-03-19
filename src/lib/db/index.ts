@@ -82,6 +82,7 @@ export interface Sale {
   exchangeRateSource: 'api' | 'manual';
   paymentMethod: 'cash' | 'card' | 'pago_movil';
   status: 'completed' | 'cancelled' | 'refunded';
+  customerId?: string;
   createdAt: Date;
   syncedAt?: Date;
 }
@@ -91,6 +92,7 @@ export interface Purchase {
   localId: string;
   tenantId: string;
   supplier: string;
+  supplierId?: string;
   invoiceNumber: string;
   items: { productId: string; productName: string; quantity: number; cost: number; total: number }[];
   subtotal: number;
@@ -255,6 +257,39 @@ export interface Invoice {
   items: InvoiceItem[];
 }
 
+export type MovementType = 'income' | 'expense' | 'transfer';
+export type MovementCategory = 
+  | 'sale' 
+  | 'purchase' 
+  | 'production' 
+  | 'refund' 
+  | 'adjustment' 
+  | 'salary' 
+  | 'rent' 
+  | 'utilities' 
+  | 'investment' 
+  | 'transfer'
+  | 'other';
+export type MovementStatus = 'pending' | 'completed' | 'cancelled';
+export type MovementPaymentMethod = 'cash' | 'card' | 'pago_movil' | 'bank_transfer';
+
+export interface Movement {
+  id?: number;
+  localId: string;
+  tenantId: string;
+  type: MovementType;
+  category: MovementCategory;
+  referenceType?: string;
+  referenceId?: string;
+  amount: number;
+  currency: string;
+  paymentMethod?: MovementPaymentMethod;
+  description?: string;
+  status: MovementStatus;
+  createdAt: Date;
+  syncedAt?: Date;
+}
+
 class LogisCoreDB extends Dexie {
   syncQueue!: Table<SyncQueueItem>;
   products!: Table<Product>;
@@ -271,10 +306,11 @@ class LogisCoreDB extends Dexie {
   customers!: Table<Customer>;
   invoiceSettings!: Table<InvoiceSettings>;
   invoices!: Table<Invoice>;
+  movements!: Table<Movement>;
 
   constructor() {
     super('LogisCoreERP');
-    this.version(9).stores({
+    this.version(10).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
       products: '++id, localId, tenantId, sku, categoryId, isActive, name',
       categories: '++id, localId, tenantId, name, saleType',
@@ -290,6 +326,7 @@ class LogisCoreDB extends Dexie {
       customers: '++id, localId, tenantId, rifCedula, isActive',
       invoiceSettings: '++id, localId, tenantId',
       invoices: '++id, localId, tenantId, customerId, invoiceNumber, controlNumber, estatus, createdAt, saleId',
+      movements: '++id, localId, tenantId, type, category, status, createdAt',
     });
   }
 }

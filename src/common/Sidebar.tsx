@@ -18,6 +18,7 @@ import {
   Users,
   UserCircle,
   FileText,
+  Wallet,
 } from "lucide-react";
 import Emblema from "@/assets/Emblema.ico";
 
@@ -49,6 +50,7 @@ const allModules = [
   { id: "reports", label: "Reportes", icon: BarChart3 },
   { id: "customers", label: "Clientes", icon: UserCircle },
   { id: "invoicing", label: "Facturación", icon: FileText },
+  { id: "accounting", label: "Caja/Banco", icon: Wallet },
 ] as const;
 
 export function Sidebar({

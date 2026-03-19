@@ -229,7 +229,34 @@ export async function produce(localId: string, quantity: number): Promise<Result
           updatedAt: new Date(),
         });
         
+        await SyncEngine.addToQueue('products', 'update', { ...product, stock: product.stock - usedQuantity } as unknown as Record<string, unknown>, product.localId);
+        
         ingredientsUsed.push({ productId: ing.productId, quantity: usedQuantity });
+      }
+      
+      const producedQuantity = quantity;
+      
+      const finishedProduct = await db.products
+        .where('localId')
+        .equals(recipe.productId)
+        .filter(p => p.tenantId === getCurrentTenantId())
+        .first();
+      
+      if (finishedProduct) {
+        const newStock = finishedProduct.stock + producedQuantity;
+        await db.products.put({
+          ...finishedProduct,
+          stock: newStock,
+          updatedAt: new Date(),
+        });
+        await SyncEngine.addToQueue('products', 'update', { ...finishedProduct, stock: newStock } as unknown as Record<string, unknown>, finishedProduct.localId);
+        
+        logger.info('Stock de producto terminado actualizado', {
+          productId: recipe.productId,
+          addedStock: producedQuantity,
+          newStock,
+          category: logCategories.INVENTORY
+        });
       }
       
       const productionLog: ProductionLog = {

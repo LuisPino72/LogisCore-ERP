@@ -4,6 +4,7 @@ import { EventBus, Events } from '@/lib/events/EventBus';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
+import * as movementsService from '@/features/accounting/services/movements.service';
 
 function getCurrentTenantId(): string {
   const { currentTenant } = useTenantStore.getState();
@@ -153,7 +154,17 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
     });
     
     await SyncEngine.addToQueue('sales', 'create', sale as unknown as Record<string, unknown>, localId);
-    
+
+    await movementsService.createMovement({
+      type: 'income',
+      category: 'sale',
+      amount: data.total,
+      paymentMethod: data.paymentMethod,
+      description: `Venta #${localId.slice(0, 8)}`,
+      referenceType: 'sale',
+      referenceId: localId,
+    }).catch(err => logger.error('Error creando movimiento de venta', err, { category: logCategories.SALES }));
+
     EventBus.emit(Events.SALE_COMPLETED, { sale });
     logger.info('Venta creada', { saleId: localId, total: data.total, category: logCategories.SALES });
     

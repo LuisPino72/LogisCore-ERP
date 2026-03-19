@@ -50,6 +50,7 @@ export const ALL_MODULES = [
   { id: 'employees', label: 'Empleados' },
   { id: 'customers', label: 'Clientes' },
   { id: 'invoicing', label: 'Facturación' },
+  { id: 'accounting', label: 'Caja/Banco' },
 ] as const
 
 export const DEFAULT_THEME_CONFIG: TenantThemeConfig = {

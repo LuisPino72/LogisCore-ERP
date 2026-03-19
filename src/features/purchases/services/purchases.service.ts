@@ -3,6 +3,8 @@ import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
+import { EventBus, Events } from '@/lib/events/EventBus';
+import * as movementsService from '@/features/accounting/services/movements.service';
 import type { SortConfig, DateRange, PurchaseStatus, PurchaseStats } from '../types/purchases.types';
 
 function getCurrentTenantId(): string {
@@ -144,10 +146,55 @@ export async function updatePurchaseStatus(localId: string, status: 'pending' | 
     if (!purchase) {
       return Err(new AppError('Compra no encontrada', 'NOT_FOUND', 404));
     }
-    
+
+    const wasCompleted = purchase.status === 'completed';
+    const isNowCompleted = status === 'completed';
+
     const updated = { ...purchase, status };
     await db.purchases.put(updated);
     await SyncEngine.addToQueue('purchases', 'update', updated as unknown as Record<string, unknown>, localId);
+
+    if (!wasCompleted && isNowCompleted) {
+      const inventoryUpdates = purchase.items.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        cost: item.cost,
+      }));
+
+      for (const item of inventoryUpdates) {
+        const product = await db.products
+          .where('localId')
+          .equals(item.productId)
+          .filter(p => p.tenantId === tenantId)
+          .first();
+
+        if (product) {
+          const newStock = product.stock + item.quantity;
+          const updatedProduct = { ...product, stock: newStock };
+          await db.products.put(updatedProduct);
+          await SyncEngine.addToQueue('products', 'update', updatedProduct as unknown as Record<string, unknown>, item.productId);
+
+          logger.info('Inventario actualizado por compra', { 
+            productId: item.productId, 
+            addedStock: item.quantity,
+            newStock,
+            category: logCategories.INVENTORY 
+          });
+        }
+      }
+
+      EventBus.emit(Events.INVENTORY_UPDATED, { action: 'purchase_completed', purchase });
+
+      await movementsService.createMovement({
+        type: 'expense',
+        category: 'purchase',
+        amount: purchase.total,
+        description: `Compra ${purchase.invoiceNumber || localId.slice(0, 8)}`,
+        referenceType: 'purchase',
+        referenceId: localId,
+      }).catch(err => logger.error('Error creando movimiento de compra', err, { category: logCategories.DATABASE }));
+    }
     
     logger.info('Estado de compra actualizado', { purchaseId: localId, status, category: logCategories.DATABASE });
     

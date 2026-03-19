@@ -55,4 +55,11 @@ export const Events = {
   CONFLICT_DETECTED: 'conflict.detected',
   TENANT_CHANGED: 'tenant.changed',
   EXCHANGE_RATE_UPDATED: 'exchange.rate.updated',
+  PURCHASE_COMPLETED: 'purchase.completed',
+  PURCHASE_CANCELLED: 'purchase.cancelled',
+  PRODUCTION_COMPLETED: 'production.completed',
+  CUSTOMER_CREATED: 'customer.created',
+  SUPPLIER_CREATED: 'supplier.created',
+  INVOICE_CREATED: 'invoice.created',
+  INVOICE_CANCELLED: 'invoice.cancelled',
 } as const;

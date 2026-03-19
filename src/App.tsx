@@ -51,6 +51,9 @@ const Customers = lazy(
 const Invoicing = lazy(
   () => import("@/features/invoicing/components/InvoiceList"),
 );
+const Accounting = lazy(
+  () => import("@/features/accounting/components/Accounting"),
+);
 
 type Module =
   | "dashboard"
@@ -62,7 +65,8 @@ type Module =
   | "purchases"
   | "employees"
   | "customers"
-  | "invoicing";
+  | "invoicing"
+  | "accounting";
 
 function App() {
   const role = useTenantStore((state) => state.role);
@@ -602,6 +606,15 @@ function App() {
               <div className="p-8 text-center text-slate-400">Cargando...</div>
             }>
             <Invoicing />
+          </Suspense>
+        );
+      case "accounting":
+        return (
+          <Suspense
+            fallback={
+              <div className="p-8 text-center text-slate-400">Cargando...</div>
+            }>
+            <Accounting />
           </Suspense>
         );
       default:
