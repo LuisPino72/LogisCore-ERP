@@ -1,3 +1,4 @@
+import { Table } from 'dexie';
 import { db, SyncQueueItem } from '../db';
 import { supabase } from '../supabase';
 import { EventBus, Events } from '../events/EventBus';
@@ -217,8 +218,11 @@ class SyncEngineClass {
           this.recordSuccess();
           result.synced++;
         } catch (error) {
-          this.recordFailure();
           const isConflict = this.isConflictError(error);
+          
+          if (!isConflict) {
+            this.recordFailure();
+          }
           
           await db.syncQueue.update(item.id!, {
             status: isConflict ? 'conflict' : 'failed',
@@ -322,9 +326,106 @@ class SyncEngineClass {
 
     if (resolution === 'local') {
       await this.processItem(item);
+    } else {
+      try {
+        const { data, error } = await supabase
+          .from(item.tableName)
+          .select()
+          .eq('local_id', item.localId)
+          .single();
+
+        if (error || !data) {
+          logger.error('Failed to fetch server data for conflict resolution', error as Error, {
+            tableName: item.tableName,
+            localId: item.localId,
+            category: logCategories.SYNC,
+          });
+          return;
+        }
+
+        const serverData = this.sanitizeServerData(data);
+
+        const table = db[item.tableName as keyof typeof db] as Table<Record<string, unknown>>;
+        await table.where('localId').equals(item.localId).modify(serverData);
+        
+        logger.info('Conflict resolved with server data', {
+          tableName: item.tableName,
+          localId: item.localId,
+          category: logCategories.SYNC,
+        });
+      } catch (error) {
+        logger.error('Error resolving conflict with server data', error as Error, {
+          tableName: item.tableName,
+          localId: item.localId,
+          category: logCategories.SYNC,
+        });
+        return;
+      }
     }
 
     await db.syncQueue.delete(itemId);
+  }
+
+  private sanitizeServerData(data: Record<string, unknown>): Record<string, unknown> {
+    const ignoredFields = ['tenant_id', 'tenant_slug', 'created_at', 'updated_at', 'synced_at'];
+    const result: Record<string, unknown> = {};
+    
+    for (const key in data) {
+      if (ignoredFields.includes(key)) continue;
+      
+      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      result[camelKey] = data[key];
+    }
+    
+    return result;
+  }
+
+  reset(): void {
+    this.circuitBreaker = {
+      status: 'closed',
+      failures: 0,
+      lastFailureTime: 0,
+      successCount: 0,
+    };
+    this.isSyncing = false;
+    logger.info('SyncEngine reset', { category: logCategories.SYNC });
+  }
+
+  async retryFailedItems(): Promise<SyncResult> {
+    const failedItems = await db.syncQueue
+      .where('status')
+      .equals('failed')
+      .toArray();
+
+    for (const item of failedItems) {
+      await db.syncQueue.update(item.id!, { status: 'pending', retryCount: 0 });
+    }
+
+    logger.info(`Marked ${failedItems.length} failed items for retry`, { category: logCategories.SYNC });
+    
+    return this.syncPending();
+  }
+
+  async getSyncStats(): Promise<{
+    pending: number;
+    failed: number;
+    conflicts: number;
+    synced: number;
+    circuitStatus: CircuitBreakerState;
+  }> {
+    const [pending, failed, conflicts] = await Promise.all([
+      db.syncQueue.where('status').equals('pending').count(),
+      db.syncQueue.where('status').equals('failed').count(),
+      db.syncQueue.where('status').equals('conflict').count(),
+    ]);
+
+    return {
+      pending,
+      failed,
+      conflicts,
+      synced: 0,
+      circuitStatus: this.getCircuitStatus(),
+    };
   }
 
   async getConflicts(): Promise<SyncQueueItem[]> {

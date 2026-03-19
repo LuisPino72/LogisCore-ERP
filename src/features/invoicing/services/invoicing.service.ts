@@ -368,9 +368,35 @@ export async function createInvoice(data: CreateInvoiceInput): Promise<Result<st
       items,
     };
 
-    await db.invoices.add(invoice);
+    await db.transaction('rw', db.invoices, db.invoiceSettings, async () => {
+      await db.invoices.add(invoice);
 
-    await updateLastInvoiceNumber(invoiceNumber, controlNumber);
+      const today = new Date().toISOString().split('T')[0];
+      const num = parseInt(invoiceNumber, 10);
+      const prefix = controlNumber.split('-')[0];
+
+      const existingSettings = await db.invoiceSettings.where('tenantId').equals(tenantSlug).first();
+
+      if (existingSettings) {
+        await db.invoiceSettings.put({
+          ...existingSettings,
+          lastInvoiceNumber: num,
+          lastInvoiceDate: today,
+          lastControlPrefix: prefix,
+        });
+      } else {
+        await db.invoiceSettings.add({
+          localId: crypto.randomUUID(),
+          tenantId: tenantSlug,
+          sequentialType: 'daily',
+          lastInvoiceNumber: num,
+          lastInvoiceDate: today,
+          lastControlPrefix: prefix,
+          igtfEnabled: true,
+          igtfPercentage: IGTF_PERCENTAGE,
+        });
+      }
+    });
 
     await SyncEngine.addToQueue(
       'invoices',

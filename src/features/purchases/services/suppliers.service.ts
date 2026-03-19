@@ -72,6 +72,7 @@ export async function updateSupplier(localId: string, data: Partial<Supplier>): 
     return Ok(undefined);
   } catch (error) {
     if (error instanceof AppError) return Err(error);
+    logger.error('Error al actualizar proveedor', error as Error, { category: logCategories.DATABASE });
     return Err(new AppError('Error al actualizar proveedor', 'UPDATE_SUPPLIER_ERROR', 500));
   }
 }
@@ -101,6 +102,7 @@ export async function deleteSupplier(localId: string): Promise<Result<void, AppE
     return Ok(undefined);
   } catch (error) {
     if (error instanceof AppError) return Err(error);
+    logger.error('Error al eliminar proveedor', error as Error, { category: logCategories.DATABASE });
     return Err(new AppError('Error al eliminar proveedor', 'DELETE_SUPPLIER_ERROR', 500));
   }
 }

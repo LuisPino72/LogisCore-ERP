@@ -23,10 +23,11 @@ export default defineConfig({
           'vendor-dexie': ['dexie', 'dexie-react-hooks'],
           'vendor-zustand': ['zustand'],
           'vendor-lucide': ['lucide-react'],
+          'vendor-reactpdf': ['@react-pdf/renderer'],
         },
       },
     },
-    chunkSizeWarningLimit: 400,
+    chunkSizeWarningLimit: 600,
   },
   test: {
     globals: true,

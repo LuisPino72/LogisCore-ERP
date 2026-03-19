@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { Product, Category, db, SuspendedSale } from "@/lib/db";
 import { useTenantStore } from "@/store/useTenantStore";
 import { createSale } from "@/features/sales/services/sales.service";
@@ -8,13 +8,25 @@ import { getDailyStats } from "@/features/sales/services/sales.service";
 import { isOk, Result, AppError } from "@/lib/types/result";
 import { useToast } from "@/providers/ToastProvider";
 import { loadPOSData, filterProducts, addToCart as addToCartUtil, updateCartQuantity, removeFromCart as removeFromCartUtil, calculateCartTotals, prepareSaleItems, CartItem, saveSuspendedSale, getSuspendedSales, deleteSuspendedSale, findProductBySku } from "../services/pos.service";
-import { useInvoicingForPOS } from "@/features/invoicing";
-import { CustomerSelector, InvoicePreview } from "@/features/invoicing";
+import { useInvoicingForPOS, CustomerSelector } from "@/features/invoicing";
 import { logger, logCategories } from "@/lib/logger";
 import Card from "@/common/Card";
 import Button from "@/common/Button";
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Package, Search, Star, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Pause, Play, X, Clock, TrendingUp, FileText } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Package, Search, Star, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Pause, Play, X, Clock, TrendingUp, FileText, Loader2 } from "lucide-react";
 import type { SortField, PaymentMethod } from "../types/pos.types";
+
+const InvoicePreview = lazy(() => 
+  import("@/features/invoicing/components/InvoicePreview").then(m => ({ default: m.InvoicePreview }))
+);
+
+const InvoicePreviewFallback = () => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="flex items-center gap-3 bg-(--bg-secondary) px-6 py-4 rounded-xl shadow-2xl">
+      <Loader2 className="w-6 h-6 text-(--brand-500) animate-spin" />
+      <span className="text-(--text-primary)">Cargando factura...</span>
+    </div>
+  </div>
+);
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -575,15 +587,17 @@ export default function POS() {
       )}
 
       {showInvoicePreview && currentInvoice && taxpayerInfo && (
-        <InvoicePreview
-          isOpen={showInvoicePreview}
-          invoice={currentInvoice}
-          taxpayerInfo={taxpayerInfo}
-          onClose={() => {
-            closeInvoicePreview();
-            handleInvoiceSuccess();
-          }}
-        />
+        <Suspense fallback={<InvoicePreviewFallback />}>
+          <InvoicePreview
+            isOpen={showInvoicePreview}
+            invoice={currentInvoice}
+            taxpayerInfo={taxpayerInfo}
+            onClose={() => {
+              closeInvoicePreview();
+              handleInvoiceSuccess();
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

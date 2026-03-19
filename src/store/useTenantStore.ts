@@ -9,6 +9,8 @@ export interface TenantModules {
   reports?: boolean
   pos?: boolean
   employees?: boolean
+  customers?: boolean
+  invoicing?: boolean
   [key: string]: boolean | undefined
 }
 

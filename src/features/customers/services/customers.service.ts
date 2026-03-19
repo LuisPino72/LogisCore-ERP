@@ -108,16 +108,6 @@ export async function createCustomer(data: CreateCustomerInput): Promise<Result<
       return Err(new ValidationError(errors.join(', ')));
     }
 
-    const existing = await db.customers
-      .where('tenantId')
-      .equals(tenantSlug)
-      .filter((c) => c.rifCedula === data.rifCedula.trim())
-      .first();
-
-    if (existing) {
-      return Err(new ValidationError('Ya existe un cliente con este RIF/Cédula'));
-    }
-
     const localId = crypto.randomUUID();
     const customer: Customer = {
       localId,
@@ -131,7 +121,19 @@ export async function createCustomer(data: CreateCustomerInput): Promise<Result<
       createdAt: new Date(),
     };
 
-    await db.customers.add(customer);
+    await db.transaction('rw', db.customers, async () => {
+      const existing = await db.customers
+        .where('tenantId')
+        .equals(tenantSlug)
+        .filter((c) => c.rifCedula === data.rifCedula.trim())
+        .first();
+
+      if (existing) {
+        throw new ValidationError('Ya existe un cliente con este RIF/Cédula');
+      }
+
+      await db.customers.add(customer);
+    });
 
     await SyncEngine.addToQueue(
       'customers',

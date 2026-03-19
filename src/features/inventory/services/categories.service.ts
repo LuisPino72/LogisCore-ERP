@@ -2,6 +2,7 @@ import { db, Category } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/lib/types/result';
+import { logger, logCategories } from '@/lib/logger';
 
 function getCurrentTenantId(): string {
   const { currentTenant } = useTenantStore.getState();
@@ -38,6 +39,7 @@ export async function createCategory(data: Omit<Category, 'id' | 'localId' | 'te
     return Ok(localId);
   } catch (error) {
     if (error instanceof AppError) return Err(error);
+    logger.error('Error al crear categoría', error as Error, { category: logCategories.INVENTORY });
     return Err(new AppError('Error al crear categoría', 'CREATE_CATEGORY_ERROR', 500));
   }
 }
@@ -62,6 +64,7 @@ export async function updateCategory(localId: string, data: Partial<Category>): 
     return Ok(undefined);
   } catch (error) {
     if (error instanceof AppError) return Err(error);
+    logger.error('Error al actualizar categoría', error as Error, { category: logCategories.INVENTORY });
     return Err(new AppError('Error al actualizar categoría', 'UPDATE_CATEGORY_ERROR', 500));
   }
 }
@@ -93,6 +96,7 @@ export async function deleteCategory(localId: string): Promise<Result<void, AppE
     return Ok(undefined);
   } catch (error) {
     if (error instanceof AppError) return Err(error);
+    logger.error('Error al eliminar categoría', error as Error, { category: logCategories.INVENTORY });
     return Err(new AppError('Error al eliminar categoría', 'DELETE_CATEGORY_ERROR', 500));
   }
 }

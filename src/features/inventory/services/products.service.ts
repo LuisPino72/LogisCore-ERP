@@ -3,6 +3,7 @@ import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { EventBus, Events } from '@/lib/events/EventBus';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/lib/types/result';
+import { logger, logCategories } from '@/lib/logger';
 
 function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
@@ -80,6 +81,7 @@ export async function createProduct(data: Omit<Product, 'id' | 'localId' | 'tena
     if (error instanceof AppError) {
       return Err(error);
     }
+    logger.error('Error al crear producto', error as Error, { category: logCategories.INVENTORY });
     return Err(new AppError('Error al crear producto', 'CREATE_PRODUCT_ERROR', 500));
   }
 }
@@ -105,6 +107,7 @@ export async function updateProduct(localId: string, data: Partial<Product>): Pr
     if (error instanceof AppError) {
       return Err(error);
     }
+    logger.error('Error al actualizar producto', error as Error, { category: logCategories.INVENTORY });
     return Err(new AppError('Error al actualizar producto', 'UPDATE_PRODUCT_ERROR', 500));
   }
 }
@@ -127,6 +130,7 @@ export async function deleteProduct(localId: string): Promise<Result<void, AppEr
     if (error instanceof AppError) {
       return Err(error);
     }
+    logger.error('Error al eliminar producto', error as Error, { category: logCategories.INVENTORY });
     return Err(new AppError('Error al eliminar producto', 'DELETE_PRODUCT_ERROR', 500));
   }
 }
@@ -161,6 +165,7 @@ export async function updateStock(localId: string, quantity: number): Promise<Re
     if (error instanceof AppError) {
       return Err(error);
     }
+    logger.error('Error al actualizar stock', error as Error, { category: logCategories.INVENTORY });
     return Err(new AppError('Error al actualizar stock', 'UPDATE_STOCK_ERROR', 500));
   }
 }

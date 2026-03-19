@@ -7,6 +7,8 @@ export interface TenantModules {
   dashboard?: boolean
   pos?: boolean
   employees?: boolean
+  customers?: boolean
+  invoicing?: boolean
   [key: string]: boolean | undefined
 }
 
@@ -46,6 +48,8 @@ export const ALL_MODULES = [
   { id: 'recipes', label: 'Recetas' },
   { id: 'pos', label: 'Punto de Venta' },
   { id: 'employees', label: 'Empleados' },
+  { id: 'customers', label: 'Clientes' },
+  { id: 'invoicing', label: 'Facturación' },
 ] as const
 
 export const DEFAULT_THEME_CONFIG: TenantThemeConfig = {

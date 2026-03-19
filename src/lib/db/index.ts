@@ -161,6 +161,7 @@ export interface SuspendedSale {
   tenantId: string;
   cart: { productId: string; productName: string; quantity: number; unit: 'kg' | 'g' | 'unit' | 'carton' | 'half'; unitPrice: number; total: number; productSnapshot: Product }[];
   createdAt: Date;
+  updatedAt: Date;
   note?: string;
 }
 
@@ -273,7 +274,7 @@ class LogisCoreDB extends Dexie {
 
   constructor() {
     super('LogisCoreERP');
-    this.version(8).stores({
+    this.version(9).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
       products: '++id, localId, tenantId, sku, categoryId, isActive, name',
       categories: '++id, localId, tenantId, name, saleType',
@@ -288,7 +289,7 @@ class LogisCoreDB extends Dexie {
       taxpayerInfo: '++id, localId, tenantId',
       customers: '++id, localId, tenantId, rifCedula, isActive',
       invoiceSettings: '++id, localId, tenantId',
-      invoices: '++id, localId, tenantId, invoiceNumber, controlNumber, estatus, createdAt, saleId',
+      invoices: '++id, localId, tenantId, customerId, invoiceNumber, controlNumber, estatus, createdAt, saleId',
     });
   }
 }

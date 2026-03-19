@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, AppError } from '@/lib/types/result';
+import { logger, logCategories } from '@/lib/logger';
 
 export async function uploadProductImage(
   file: File,
@@ -30,6 +31,7 @@ export async function uploadProductImage(
     if (error instanceof AppError) {
       return Err(error);
     }
+    logger.error('Error al subir imagen', error as Error, { category: logCategories.INVENTORY });
     return Err(new AppError('Error al subir imagen', 'UPLOAD_ERROR', 500));
   }
 }

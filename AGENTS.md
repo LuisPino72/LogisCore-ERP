@@ -146,8 +146,9 @@ interface SuspendedSale {
   localId: string;
   tenantId: string;
   cart: CartItem[];  // Incluye productSnapshot para persistencia
-  note?: string;
   createdAt: Date;
+  updatedAt: Date;  // Para tracking de última modificación
+  note?: string;
 }
 
 // Servicios en pos.service.ts
@@ -228,11 +229,31 @@ La función RPC recibe:
 3. Agregar `tenant_slug` en operaciones create/update
 4. Eliminar `tenant_slug` del payload si existe (evitar duplicado)
 
-## 4.2 Circuit Breaker
+## 4.2 Circuit Breaker y Utilidades
 
 ```typescript
+// Estado del circuit breaker
 const state = SyncEngine.getCircuitStatus();
 // { status: 'closed' | 'open' | 'half-open', failures: number, ... }
+
+// Resolver conflictos (local = mantener cambios locales, server = usar datos del servidor)
+await SyncEngine.resolveConflict(itemId, 'local' | 'server');
+
+// Obtener conflictos pendientes
+const conflicts = await SyncEngine.getConflicts();
+
+// Reintentar elementos fallidos
+const result = await SyncEngine.retryFailedItems();
+
+// Resetear el engine
+SyncEngine.reset();
+
+// Estadísticas de sincronización
+const stats = await SyncEngine.getSyncStats();
+// { pending, failed, conflicts, circuitStatus }
+
+// Contar pendientes
+const pending = await SyncEngine.getPendingCount();
 ```
 
 ---
@@ -442,59 +463,26 @@ src/features/{modulo}/
 ## SECCIÓN 11: Patrones Comunes
 
 ### 11.1 Campos Opcionales en Dexie
+> **No requieren migraciones.** Agregar campo opcional al interface y usar `?.` al guardar.
 
-> **No requieren migraciones.** Agregar campo opcional al interface TypeScript y usar `?.` al guardar.
-
+### 11.2 Datos Relacionados
+Para obtener datos relacionados (ej: facturas de un cliente), usar `filter()` con `customerId`:
 ```typescript
-// 1. Agregar al interface en src/lib/db/index.ts
-interface Customer {
-  // ... campos existentes ...
-  notas?: string;
-}
-
-// 2. Usar con optional chaining al guardar
-await db.customers.put({ ...customer, notas: data.notas || undefined });
+db.invoices.where('tenantId').equals(tenantSlug).filter((inv) => inv.customerId === customerId)
 ```
 
-### 11.2 Datos Relacionados (Cliente → Facturas)
-
-Para obtener datos relacionados (ej: facturas de un cliente):
-
-```typescript
-// 1. En servicio de la entidad relacionada
-export async function getInvoicesByCustomer(customerId: string): Promise<Result<Invoice[], AppError>> {
-  const tenantSlug = getCurrentTenantSlug();
-  const invoices = await db.invoices
-    .where('tenantId').equals(tenantSlug)
-    .filter((inv) => inv.customerId === customerId)
-    .toArray();
-  invoices.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  return Ok(invoices);
-}
-
-// 2. En hook del módulo consumidor
-const getCustomerHistory = useCallback(async (customerId: string) => {
-  const result = await getInvoicesByCustomer(customerId);
-  return result.ok ? result.value : [];
-}, []);
-```
-
-### 11.3 UI de Historial Collapsible
-
+### 11.3 UI Collapsible
 ```tsx
 const [showHistory, setShowHistory] = useState(false);
-const [customerHistory, setCustomerHistory] = useState<Invoice[]>([]);
-
-<button onClick={toggleHistory} className="...">
+<button onClick={() => setShowHistory(!showHistory)}>
   <ChevronDown className={showHistory ? 'rotate-180' : ''} />
 </button>
-{showHistory && customerHistory.map(inv => (/* lista */))}
+{showHistory && items.map(item => (...))}
 ```
 
 ### 11.4 Componentes Reutilizables
-
 | Componente | Ubicación | Uso |
 |------------|-----------|-----|
-| `TableSkeleton` | `@/common/Skeleton` | Skeleton loading en tablas |
-| `Card` | `@/common/Card` | Contenedor con borde suave |
+| `TableSkeleton` | `@/common/Skeleton` | Skeleton loading |
+| `Card` | `@/common/Card` | Contenedor |
 | Toast | `useToast()` | Notificaciones |

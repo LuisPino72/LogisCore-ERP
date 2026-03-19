@@ -156,6 +156,7 @@ export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], no
     tenantId: tenantSlug,
     cart: cartData,
     createdAt: new Date(),
+    updatedAt: new Date(),
     note,
   });
   

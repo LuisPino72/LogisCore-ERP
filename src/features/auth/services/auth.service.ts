@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Result, Ok, Err, AppError, ValidationError, UnauthorizedError } from '@/lib/types/result';
+import { logger, logCategories } from '@/lib/logger';
 import type { AuthUser, LoginCredentials, TenantInfo } from '../types/auth.types';
 
 interface UserRoleResponse {
@@ -9,57 +10,62 @@ interface UserRoleResponse {
 }
 
 async function fetchUserRoles(userId: string): Promise<Result<AuthUser, AppError>> {
-  const { data: roles, error: rolesError } = await supabase
-    .from('user_roles')
-    .select(`
-      role,
-      permissions,
-      tenants (
-        id,
-        name,
-        slug,
-        modules,
-        config
-      )
-    `)
-    .eq('user_id', userId);
+  try {
+    const { data: roles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select(`
+        role,
+        permissions,
+        tenants (
+          id,
+          name,
+          slug,
+          modules,
+          config
+        )
+      `)
+      .eq('user_id', userId);
 
-  if (rolesError) {
-    return Err(new AppError('Error al obtener roles', 'FETCH_ROLES_ERROR', 500, { detail: rolesError.message }));
-  }
+    if (rolesError) {
+      return Err(new AppError('Error al obtener roles', 'FETCH_ROLES_ERROR', 500, { detail: rolesError.message }));
+    }
 
-  if (!roles || roles.length === 0) {
-    return Err(new UnauthorizedError('Tu usuario no tiene un rol o empresa asignada'));
-  }
+    if (!roles || roles.length === 0) {
+      return Err(new UnauthorizedError('Tu usuario no tiene un rol o empresa asignada'));
+    }
 
-  const roleData = roles[0] as UserRoleResponse;
-  const rawTenant = roleData.tenants;
-  let tenantData: TenantInfo | undefined;
+    const roleData = roles[0] as UserRoleResponse;
+    const rawTenant = roleData.tenants;
+    let tenantData: TenantInfo | undefined;
 
-  if (roleData.role !== 'super_admin') {
-    const tenantArr = Array.isArray(rawTenant) ? rawTenant[0] : rawTenant;
-    if (tenantArr) {
-      const { data: tenantRows } = await supabase
-        .from('tenants')
-        .select('id')
-        .eq('slug', tenantArr.slug)
-        .single();
+    if (roleData.role !== 'super_admin') {
+      const tenantArr = Array.isArray(rawTenant) ? rawTenant[0] : rawTenant;
+      if (tenantArr) {
+        const { data: tenantRows } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('slug', tenantArr.slug)
+          .single();
 
-      if (tenantRows) {
-        tenantData = { ...tenantArr, id: tenantRows.id };
+        if (tenantRows) {
+          tenantData = { ...tenantArr, id: tenantRows.id };
+        }
       }
     }
+
+    const authUser: AuthUser = {
+      id: userId,
+      email: '',
+      role: roleData.role,
+      tenant: tenantData,
+      permissions: roleData.role === 'employee' ? (roleData.permissions || {}) : undefined,
+    };
+
+    return Ok(authUser);
+  } catch (error) {
+    logger.error('Error al obtener roles', error as Error, { category: logCategories.AUTH });
+    return Err(new AppError('Error al obtener roles', 'FETCH_ROLES_ERROR', 500));
   }
-
-  const authUser: AuthUser = {
-    id: userId,
-    email: '',
-    role: roleData.role,
-    tenant: tenantData,
-    permissions: roleData.role === 'employee' ? (roleData.permissions || {}) : undefined,
-  };
-
-  return Ok(authUser);
 }
 
 export async function signIn(credentials: LoginCredentials): Promise<Result<AuthUser, AppError>> {

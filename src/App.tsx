@@ -143,25 +143,41 @@ function App() {
     async (tenantSlug: string, _tenantUuid?: string) => {
       const tenantFilter = tenantSlug;
       
-      const [localProducts, localSales, localCategories] = await Promise.all([
+      const [localProducts, localSales, localCategories, localCustomers, localInvoices] = await Promise.all([
         db.products.where('tenantId').equals(tenantFilter).count(),
         db.sales.where('tenantId').equals(tenantFilter).count(),
         db.categories.where('tenantId').equals(tenantFilter).count(),
+        db.customers.where('tenantId').equals(tenantFilter).count(),
+        db.invoices.where('tenantId').equals(tenantFilter).count(),
       ]);
 
-      if (localProducts > 0 || localSales > 0 || localCategories > 0) {
+      if (localProducts > 0 || localSales > 0 || localCategories > 0 || localCustomers > 0 || localInvoices > 0) {
         setIsLoadingData(false);
         return;
       }
 
       setIsLoadingData(true);
       try {
-        const [productsRes, categoriesRes, salesRes, recipesRes, purchasesRes] = await Promise.all([
+        const [
+          productsRes,
+          categoriesRes,
+          salesRes,
+          recipesRes,
+          purchasesRes,
+          customersRes,
+          invoicesRes,
+          taxpayerInfoRes,
+          invoiceSettingsRes
+        ] = await Promise.all([
           supabase.from("products").select("*").eq('tenant_slug', tenantSlug),
           supabase.from("categories").select("*").eq('tenant_slug', tenantSlug),
           supabase.from("sales").select("*").eq('tenant_slug', tenantSlug),
           supabase.from("recipes").select("*").eq('tenant_slug', tenantSlug),
           supabase.from("purchases").select("*").eq('tenant_slug', tenantSlug),
+          supabase.from("customers").select("*").eq('tenant_slug', tenantSlug),
+          supabase.from("invoices").select("*").eq('tenant_slug', tenantSlug),
+          supabase.from("taxpayer_info").select("*").eq('tenant_slug', tenantSlug),
+          supabase.from("invoice_settings").select("*").eq('tenant_slug', tenantSlug),
         ]);
 
         const productsData = productsRes.data || [];
@@ -169,6 +185,10 @@ function App() {
         const salesData = salesRes.data || [];
         const recipesData = recipesRes.data || [];
         const purchasesData = purchasesRes.data || [];
+        const customersData = customersRes.data || [];
+        const invoicesData = invoicesRes.data || [];
+        const taxpayerInfoData = taxpayerInfoRes.data || [];
+        const invoiceSettingsData = invoiceSettingsRes.data || [];
 
         const sanitizeCategory = (c: Record<string, unknown>) => ({
           localId: String(c.local_id ?? c.id ?? ""),
@@ -262,6 +282,80 @@ function App() {
           syncedAt: p.created_at ? new Date(p.created_at as string) : undefined,
         });
 
+        const sanitizeCustomer = (c: Record<string, unknown>) => ({
+          localId: String(c.local_id ?? c.id ?? ""),
+          tenantId: tenantSlug,
+          nombreRazonSocial: String(c.nombre_razon_social ?? c.name ?? ""),
+          rifCedula: String(c.rif_cedula ?? ""),
+          direccion: c.direccion ? String(c.direccion) : undefined,
+          telefono: c.telefono ? String(c.telefono) : undefined,
+          email: c.email ? String(c.email).toLowerCase() : undefined,
+          notas: c.notas ? String(c.notas) : undefined,
+          isActive: Boolean(c.is_active ?? true),
+          createdAt: c.created_at ? new Date(c.created_at as string) : new Date(),
+          updatedAt: c.updated_at ? new Date(c.updated_at as string) : undefined,
+          syncedAt: c.created_at ? new Date(c.created_at as string) : undefined,
+        });
+
+        const sanitizeInvoice = (i: Record<string, unknown>) => ({
+          localId: String(i.local_id ?? i.id ?? ""),
+          tenantId: tenantSlug,
+          invoiceNumber: String(i.invoice_number ?? ""),
+          controlNumber: String(i.control_number ?? ""),
+          tipoDocumento: (i.tipo_documento as 'FACTURA' | 'NOTA_CREDITO' | 'NOTA_DEBITO') || 'FACTURA',
+          estatus: (i.estatus as 'EMITIDA' | 'ANULADA') || 'EMITIDA',
+          emisorRif: String(i.emisor_rif ?? ""),
+          emisorRazonSocial: String(i.emisor_razon_social ?? ""),
+          emisorDireccion: String(i.emisor_direccion ?? ""),
+          emisorNumeroProvidencia: i.emisor_numero_providencia ? String(i.emisor_numero_providencia) : undefined,
+          customerId: i.customer_id ? String(i.customer_id) : undefined,
+          clienteNombre: String(i.cliente_nombre ?? ""),
+          clienteRifCedula: String(i.cliente_rif_cedula ?? ""),
+          clienteDireccion: i.cliente_direccion ? String(i.cliente_direccion) : undefined,
+          clienteTelefono: i.cliente_telefono ? String(i.cliente_telefono) : undefined,
+          subtotalUsd: Number(i.subtotal_usd) || 0,
+          tasaBcv: Number(i.tasa_bcv) || 0,
+          baseImponibleBs: Number(i.base_imponible_bs) || 0,
+          montoIvaBs: Number(i.monto_iva_bs) || 0,
+          montoExentoBs: Number(i.monto_exento_bs) || 0,
+          totalBs: Number(i.total_bs) || 0,
+          aplicaIgtf: Boolean(i.aplica_igtf ?? false),
+          montoIgtfBs: Number(i.monto_igtf_bs) || 0,
+          totalFinalBs: Number(i.total_final_bs) || 0,
+          saleId: i.sale_id ? String(i.sale_id) : undefined,
+          createdBy: i.created_by ? String(i.created_by) : undefined,
+          createdAt: i.created_at ? new Date(i.created_at as string) : new Date(),
+          annulledAt: i.annulled_at ? new Date(i.annulled_at as string) : undefined,
+          annulledBy: i.annulled_by ? String(i.annulled_by) : undefined,
+          annulledReason: i.annulled_reason ? String(i.annulled_reason) : undefined,
+          hashSeguridad: i.hash_seguridad ? String(i.hash_seguridad) : undefined,
+          syncedAt: i.created_at ? new Date(i.created_at as string) : undefined,
+          items: Array.isArray(i.items) ? i.items : [],
+        });
+
+        const sanitizeTaxpayerInfo = (t: Record<string, unknown>) => ({
+          localId: String(t.local_id ?? t.id ?? ""),
+          tenantId: tenantSlug,
+          rif: String(t.rif ?? ""),
+          razonSocial: String(t.razon_social ?? t.name ?? ""),
+          direccionFiscal: String(t.direccion_fiscal ?? ""),
+          numeroProvidencia: t.numero_providencia ? String(t.numero_providencia) : undefined,
+          logoUrl: t.logo_url ? String(t.logo_url) : undefined,
+          syncedAt: t.created_at ? new Date(t.created_at as string) : undefined,
+        });
+
+        const sanitizeInvoiceSettings = (s: Record<string, unknown>) => ({
+          localId: String(s.local_id ?? s.id ?? ""),
+          tenantId: tenantSlug,
+          sequentialType: (s.sequential_type as 'daily' | 'monthly' | 'global') || 'daily',
+          lastInvoiceDate: s.last_invoice_date ? String(s.last_invoice_date) : undefined,
+          lastInvoiceNumber: Number(s.last_invoice_number) || 0,
+          lastControlPrefix: s.last_control_prefix ? String(s.last_control_prefix) : '',
+          igtfEnabled: Boolean(s.igtf_enabled ?? true),
+          igtfPercentage: Number(s.igtf_percentage) || 3,
+          syncedAt: s.created_at ? new Date(s.created_at as string) : undefined,
+        });
+
         if (categoriesData) {
           await db.categories.bulkPut(categoriesData.map(sanitizeCategory));
         }
@@ -283,6 +377,26 @@ function App() {
         if (purchasesData) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await db.purchases.bulkPut(purchasesData.map(sanitizePurchase) as any);
+        }
+
+        if (customersData) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await db.customers.bulkPut(customersData.map(sanitizeCustomer) as any);
+        }
+
+        if (invoicesData) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await db.invoices.bulkPut(invoicesData.map(sanitizeInvoice) as any);
+        }
+
+        if (taxpayerInfoData.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await db.taxpayerInfo.bulkPut(taxpayerInfoData.map(sanitizeTaxpayerInfo) as any);
+        }
+
+        if (invoiceSettingsData.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await db.invoiceSettings.bulkPut(invoiceSettingsData.map(sanitizeInvoiceSettings) as any);
         }
       } catch (error) {
         logger.error("Error loading tenant data", error instanceof Error ? error : undefined, { category: logCategories.DATABASE });

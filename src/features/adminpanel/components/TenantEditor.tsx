@@ -174,6 +174,8 @@ export function TenantEditor({ tenant, onClose, onSave, onUploadLogo, onCreateOw
               { id: 'recipes', label: 'Recetas' },
               { id: 'pos', label: 'Punto de Venta' },
               { id: 'employees', label: 'Empleados' },
+              { id: 'customers', label: 'Clientes' },
+              { id: 'invoicing', label: 'Facturación' },
             ].map(mod => (
               <label
                 key={mod.id}
