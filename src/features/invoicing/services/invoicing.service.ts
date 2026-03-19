@@ -3,6 +3,7 @@ import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
+import { EventBus, Events } from '@/lib/events/EventBus';
 import { getExchangeRate } from '@/features/exchange-rate/services/exchangeRate.service';
 import {
   CreateInvoiceInput,
@@ -408,6 +409,8 @@ export async function createInvoice(data: CreateInvoiceInput): Promise<Result<st
       } as unknown as Record<string, unknown>,
       invoice.localId
     );
+
+    EventBus.emit(Events.INVOICE_CREATED, { invoice, invoiceNumber, total: totals.totalFinalBs });
 
     logger.info('Invoice created', {
       invoiceId: invoice.localId,
