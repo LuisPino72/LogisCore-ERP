@@ -489,33 +489,33 @@ export default function Inventory() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-800">
-                    <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <button onClick={() => setSort({ field: 'name', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1 hover:text-white">
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wider">
+                      <button onClick={() => setSort({ field: 'name', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1">
                         Producto
                         {filters.sort.field === 'name' && (filters.sort.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </button>
                     </th>
-                    <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <button onClick={() => setSort({ field: 'sku', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1 hover:text-white">
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wider">
+                      <button onClick={() => setSort({ field: 'sku', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1">
                         SKU
                         {filters.sort.field === 'sku' && (filters.sort.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </button>
                     </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Categoría</th>
-                    <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <button onClick={() => setSort({ field: 'price', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1 hover:text-white">
+                    <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">Categoría</th>
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wider">
+                      <button onClick={() => setSort({ field: 'price', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1">
                         Precio
                         {filters.sort.field === 'price' && (filters.sort.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </button>
                     </th>
-                    <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <button onClick={() => setSort({ field: 'stock', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1 hover:text-white">
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wider">
+                      <button onClick={() => setSort({ field: 'stock', direction: filters.sort.direction === 'asc' ? 'desc' : 'asc' })} className="flex items-center gap-1">
                         Stock
                         {filters.sort.field === 'stock' && (filters.sort.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </button>
                     </th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sync</th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                    <th className="text-center py-3 px-4 text-xs font-semibold uppercase tracking-wider">Sync</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>

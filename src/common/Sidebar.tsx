@@ -45,12 +45,12 @@ const allModules = [
   { id: "sales", label: "Ventas", icon: ShoppingBag },
   { id: "purchases", label: "Compras", icon: ShoppingBasket },
   { id: "pos", label: "Punto de Venta", icon: ShoppingCart },
-  { id: "recipes", label: "Recetas", icon: ChefHat },
   { id: "employees", label: "Empleados", icon: Users },
-  { id: "reports", label: "Reportes", icon: BarChart3 },
   { id: "customers", label: "Clientes", icon: UserCircle },
+  { id: "recipes", label: "Recetas", icon: ChefHat },
   { id: "invoicing", label: "Facturación", icon: FileText },
   { id: "accounting", label: "Caja/Banco", icon: Wallet },
+  { id: "reports", label: "Reportes", icon: BarChart3 },
 ] as const;
 
 export function Sidebar({
@@ -171,7 +171,7 @@ export function Sidebar({
           <div className="bg-(--bg-tertiary)/50 rounded-xl p-3 border border-(--border-color)">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-4 h-4 text-green-400" />
-              <span className="text-xs font-medium text-slate-400 uppercase">Tasa BCV</span>
+              <span className="text-xs font-medium text-slate-600 uppercase">Tasa BCV</span>
             </div>
             {exchangeRate ? (
               <>
@@ -184,7 +184,7 @@ export function Sidebar({
                 <button
                   onClick={handleUpdateRate}
                   disabled={isUpdatingRate}
-                  className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-(--brand-500)/20 hover:bg-(--brand-500)/30 text-(--brand-400) text-xs rounded-lg transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-(--brand-500)/20 hover:bg-(--brand-500)/30 text-xs rounded-lg transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3 h-3 ${isUpdatingRate ? 'animate-spin' : ''}`} />
                   {isUpdatingRate ? 'Actualizando...' : 'Actualizar'}

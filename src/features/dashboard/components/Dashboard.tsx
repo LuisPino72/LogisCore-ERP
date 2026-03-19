@@ -357,7 +357,7 @@ export default function Dashboard({ isLoadingData: _isLoadingData, onNavigate }:
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-(--text-primary) mb-1">{getCurrentGreeting()} 👋</h2>
             <p className="text-(--text-secondary)">Bienvenido a <span className="text-(--brand-400) font-medium">{tenant?.name}</span></p>
-            <p className="text-sm text-slate-500 mt-1 capitalize">{formatDate()}</p>
+            <p className="text-s mt-1 capitalize">{formatDate()}</p>
           </div>
           {exchangeRate && (
             <button

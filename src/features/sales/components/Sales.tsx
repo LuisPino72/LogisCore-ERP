@@ -101,7 +101,7 @@ export default function Sales() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card title="Total de ingresos por ventas completadas">
+        <Card title="Total de ingresos">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-green-500/10 rounded-lg">
               <DollarSign className="w-5 h-5 text-green-400" />
@@ -114,20 +114,20 @@ export default function Sales() {
             ${stats.totalRevenue.toFixed(2)}
           </p>
         </Card>
-        <Card title="Número total de transacciones de venta">
+        <Card title="Número de transacciones">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-(--brand-500)/10 rounded-lg">
               <Receipt className="w-5 h-5 text-(--brand-400)" />
             </div>
             <span className="text-xs text-(--text-muted) uppercase">
-              Transacciones
+              Tratos
             </span>
           </div>
           <p className="text-2xl font-bold text-(--text-primary)">
             {stats.totalTransactions}
           </p>
         </Card>
-        <Card title="Valor promedio por venta">
+        <Card title="promedio por venta">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-purple-500/10 rounded-lg">
               <TrendingUp className="w-5 h-5 text-purple-400" />
@@ -140,7 +140,7 @@ export default function Sales() {
             ${stats.avgOrder.toFixed(2)}
           </p>
         </Card>
-        <Card title="Total de ventas pagadas en efectivo">
+        <Card title="Total en efectivo">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-amber-500/10 rounded-lg">
               <Banknote className="w-5 h-5 text-amber-400" />
@@ -153,7 +153,7 @@ export default function Sales() {
             ${stats.cashTotal.toFixed(2)}
           </p>
         </Card>
-        <Card title="Total de ventas pagadas con tarjeta">
+        <Card title="Total con tarjeta">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-indigo-500/10 rounded-lg">
               <CreditCard className="w-5 h-5 text-indigo-400" />
@@ -166,7 +166,7 @@ export default function Sales() {
             ${stats.cardTotal.toFixed(2)}
           </p>
         </Card>
-        <Card title="Total de ventas pagadas por pago móvil">
+        <Card title="Total con pago móvil">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-purple-500/10 rounded-lg">
               <Smartphone className="w-5 h-5 text-purple-400" />
@@ -254,25 +254,25 @@ export default function Sales() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-(--border-color)">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                    <th className="text-left py-3 px-4 text-xs font-semibold uppercase">
                       ID
                     </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                    <th className="text-left py-3 px-4 text-xs font-semibold uppercase">
                       Fecha
                     </th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                    <th className="text-center py-3 px-4 text-xs font-semibold uppercase">
                       Items
                     </th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                    <th className="text-right py-3 px-4 text-xs font-semibold uppercase">
                       Total
                     </th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                    <th className="text-center py-3 px-4 text-xs font-semibold uppercase">
                       Método
                     </th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                    <th className="text-center py-3 px-4 text-xs font-semibold uppercase">
                       Estado
                     </th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                    <th className="text-right py-3 px-4 text-xs font-semibold uppercase">
                       Acción
                     </th>
                   </tr>

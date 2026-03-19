@@ -149,7 +149,7 @@ export default function Reports() {
             <div className="flex items-start justify-between mb-3">
               <div className={`p-2.5 rounded-xl ${colorClasses[kpi.color]}`}><kpi.icon className="w-5 h-5" /></div>
             </div>
-            <p className="text-xs text-(--text-muted) uppercase tracking-wide mb-1">{kpi.label}</p>
+            <p className="text-xs uppercase tracking-wide mb-1">{kpi.label}</p>
             <p className="text-2xl font-bold text-(--text-primary)">{kpi.value}</p>
           </Card>
         ))}
@@ -170,14 +170,14 @@ export default function Reports() {
                       ${day.total.toFixed(2)}
                     </div>
                   </div>
-                  <span className="text-[10px] text-(--text-muted)">
+                  <span className="text-[10px]">
                     {new Date(day.date).getDate()}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="h-40 flex items-center justify-center text-(--text-muted)">
+            <div className="h-40 flex items-center justify-center">
               <BarChart3 className="w-10 h-10 opacity-50 mr-2" />
               Sin datos en este período
             </div>
@@ -198,7 +198,7 @@ export default function Reports() {
               )}
           </div>
           <div className="space-y-3">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Package className="w-4 h-4 text-(--text-muted)" /><span className="text-(--text-secondary)">Total</span></div><span className="text-(--text-primary) font-bold">{stats.totalProducts}</span></div>
+            <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Package className="w-4 h-4 " /><span className="text-(--text-secondary)">Total</span></div><span className="text-(--text-primary) font-bold">{stats.totalProducts}</span></div>
             <div className="flex items-center justify-between"><div className="flex items-center gap-2"><PackageX className="w-4 h-4 text-red-400" /><span className="text-(--text-secondary)">Sin Stock</span></div><span className="text-red-400 font-bold">{stats.productsLowStock}</span></div>
             <div className="flex items-center justify-between"><div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-(--brand-400)" /><span className="text-(--text-secondary)">Compras</span></div><span className="text-(--text-primary) font-bold">${stats.totalPurchases.toFixed(2)}</span></div>
             <div className="flex items-center justify-between border-t border-(--border-color) pt-3"><div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-400" /><span className="text-(--text-secondary)">Ganancia</span></div><span className={`font-bold ${stats.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>${stats.totalProfit.toFixed(2)}</span></div>
@@ -259,10 +259,10 @@ export default function Reports() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-(--border-color)">
-                <th className="text-left py-3 px-2 text-xs font-semibold text-(--text-muted) uppercase">Fecha</th>
-                <th className="text-center py-3 px-2 text-xs font-semibold text-(--text-muted) uppercase">Items</th>
-                <th className="text-right py-3 px-2 text-xs font-semibold text-(--text-muted) uppercase">Total</th>
-                <th className="text-right py-3 px-2 text-xs font-semibold text-(--text-muted) uppercase">Método</th>
+                <th className="text-left py-3 px-2 text-xs font-semibold uppercase">Fecha</th>
+                <th className="text-center py-3 px-2 text-xs font-semibold uppercase">Items</th>
+                <th className="text-right py-3 px-2 text-xs font-semibold uppercase">Total</th>
+                <th className="text-right py-3 px-2 text-xs font-semibold uppercase">Método</th>
               </tr>
             </thead>
             <tbody>
@@ -300,12 +300,12 @@ export default function Reports() {
                 Productos bajo stock
               </h3>
               <button onClick={() => setShowLowStockModal(false)} title="Cerrar" className="p-1 hover:bg-(--bg-tertiary) rounded">
-                <PackageX className="w-5 h-5 text-(--text-muted)" />
+                <PackageX className="w-5 h-5" />
               </button>
             </div>
             <div className="p-4 overflow-y-auto max-h-[60vh]">
               {lowStockProducts.length === 0 ? (
-                <div className="text-center text-(--text-muted) py-8">
+                <div className="text-center py-8">
                   <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No hay productos bajo stock</p>
                 </div>

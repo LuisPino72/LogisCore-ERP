@@ -256,12 +256,12 @@ export default function POS() {
         <Card className="bg-linear-to-br from-green-900/30 to-green-800/20 border-green-500/30">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-green-400/70 uppercase tracking-wide">Hoy</p>
-              <p className="text-xl font-bold text-green-400">${dailyStats?.totalAmount.toFixed(2) || "0.00"}</p>
-              <p className="text-xs text-(--text-muted)">{dailyStats?.transactionCount || 0} ventas</p>
+              <p className="text-x uppercase tracking-wide">Hoy</p>
+              <p className="text-xl font-bold">${dailyStats?.totalAmount.toFixed(2) || "0.00"}</p>
+              <p className="text-xs">{dailyStats?.transactionCount || 0} ventas</p>
             </div>
             <div className="p-2 bg-green-500/20 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-green-400" />
+              <TrendingUp className="w-5 h-5" />
             </div>
           </div>
         </Card>

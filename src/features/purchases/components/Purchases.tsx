@@ -400,7 +400,7 @@ export default function Purchases() {
             <Card>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-(--text-muted)">
+                  <p className="text-sm text">
                     Total Completado
                   </p>
                   <p className="text-2xl font-bold text-green-400">
@@ -418,7 +418,7 @@ export default function Purchases() {
             <Card>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-(--text-muted)">Pendiente</p>
+                  <p className="text-sm text">Pendiente</p>
                   <p className="text-2xl font-bold text-yellow-400">
                     ${stats?.totalPending.toFixed(2) || "0.00"}
                   </p>
@@ -434,7 +434,7 @@ export default function Purchases() {
             <Card>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-(--text-muted)">Total Compras</p>
+                  <p className="text-sm text">Total Compras</p>
                   <p className="text-2xl font-bold text-(--text-primary)">
                     ${((stats?.totalCompleted || 0) + (stats?.totalPending || 0)).toFixed(2)}
                   </p>
@@ -531,34 +531,34 @@ export default function Purchases() {
                   <thead>
                     <tr className="border-b border-(--border-color)">
                       <th
-                        className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        className="text-left py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:text-(--text-primary)"
                         onClick={() => handleSort("createdAt")}
                         title="Ordenar por fecha">
                         Fecha <SortIcon field="createdAt" />
                       </th>
                       <th
-                        className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        className="text-left py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:text-(--text-primary)"
                         onClick={() => handleSort("supplier")}
                         title="Ordenar por proveedor">
                         Proveedor <SortIcon field="supplier" />
                       </th>
                       <th
-                        className="text-left py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        className="text-left py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:text-(--text-primary)"
                         onClick={() => handleSort("invoiceNumber")}
                         title="Ordenar por número de factura">
                         Factura <SortIcon field="invoiceNumber" />
                       </th>
-                      <th className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase">
+                      <th className="text-center py-3 px-4 text-xs font-semibold uppercase">
                         Items
                       </th>
                       <th
-                        className="text-right py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        className="text-right py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:text-(--text-primary)"
                         onClick={() => handleSort("total")}
                         title="Ordenar por total">
                         Total <SortIcon field="total" />
                       </th>
                       <th
-                        className="text-center py-3 px-4 text-xs font-semibold text-(--text-muted) uppercase cursor-pointer hover:text-(--text-primary)"
+                        className="text-center py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:text-(--text-primary)"
                         onClick={() => handleSort("status")}
                         title="Ordenar por estado">
                         Estado <SortIcon field="status" />
