@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { db, Product, Recipe, ProductionLog } from "../../../lib/db";
+import { Product, Recipe, ProductionLog, db } from "../../../lib/db";
 import { useTenantStore } from "../../../store/useTenantStore";
 import { useToast } from "../../../providers/ToastProvider";
-import { SyncEngine } from "../../../lib/sync/SyncEngine";
-import { filterRecipes, getProductionHistory } from "../services/recipes.service";
+import { filterRecipes, getProductionHistory, createRecipe, updateRecipe, deleteRecipe, produce } from "../services/recipes.service";
+import { isOk } from "@/lib/types/result";
 import Card from "../../../common/Card";
 import Button from "../../../common/Button";
 import Input from "../../../common/Input";
@@ -138,28 +138,20 @@ export default function Recipes() {
   );
 
   const handleCreateRecipe = useCallback(async () => {
-    if (!tenant?.slug || !form.name || !form.productId) return;
+    if (!form.name || !form.productId) return;
 
-    const newRecipe: Recipe = {
-      localId: crypto.randomUUID(),
-      tenantId: tenant.slug,
+    const result = await createRecipe({
       name: form.name,
       description: form.description || undefined,
       productId: form.productId,
       ingredients: form.ingredients,
       yield: form.yield,
       isActive: form.isActive,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    });
 
-    await db.recipes.add(newRecipe);
-    await SyncEngine.addToQueue(
-      "recipes",
-      "create",
-      newRecipe as unknown as Record<string, unknown>,
-      newRecipe.localId
-    );
+    if (!isOk(result)) {
+      return;
+    }
 
     showSuccess("Receta creada correctamente");
     setShowModal(false);
@@ -172,29 +164,23 @@ export default function Recipes() {
       isActive: true,
     });
     loadRecipes();
-  }, [tenant?.slug, form, showSuccess, loadRecipes]);
+  }, [form, showSuccess, loadRecipes]);
 
   const handleUpdateRecipe = useCallback(async () => {
-    if (!tenant?.slug || !editingRecipe || !form.name || !form.productId) return;
+    if (!editingRecipe || !form.name || !form.productId) return;
 
-    const updated: Recipe = {
-      ...editingRecipe,
+    const result = await updateRecipe(editingRecipe.localId, {
       name: form.name,
       description: form.description || undefined,
       productId: form.productId,
       ingredients: form.ingredients,
       yield: form.yield,
       isActive: form.isActive,
-      updatedAt: new Date(),
-    };
+    });
 
-    await db.recipes.put(updated);
-    await SyncEngine.addToQueue(
-      "recipes",
-      "update",
-      updated as unknown as Record<string, unknown>,
-      updated.localId
-    );
+    if (!isOk(result)) {
+      return;
+    }
 
     showSuccess("Receta actualizada correctamente");
     setShowModal(false);
@@ -208,14 +194,16 @@ export default function Recipes() {
       isActive: true,
     });
     loadRecipes();
-  }, [tenant?.slug, editingRecipe, form, showSuccess, loadRecipes]);
+  }, [editingRecipe, form, showSuccess, loadRecipes]);
 
   const handleDeleteRecipe = useCallback(
     async (localId: string) => {
       const confirmed = window.confirm("¿Estás seguro de eliminar esta receta?");
       if (confirmed) {
-        await db.recipes.where("localId").equals(localId).delete();
-        await SyncEngine.addToQueue("recipes", "delete", { localId }, localId);
+        const result = await deleteRecipe(localId);
+        if (!isOk(result)) {
+          return;
+        }
         showSuccess("Receta eliminada");
         loadRecipes();
       }
@@ -224,46 +212,12 @@ export default function Recipes() {
   );
 
   const handleProduce = useCallback(async () => {
-    if (!tenant?.slug || !selectedRecipe) return;
+    if (!selectedRecipe) return;
 
-    const ingredientsUsed = selectedRecipe.ingredients.map((ing) => ({
-      productId: ing.productId,
-      quantity: (ing.quantity * produceQty) / selectedRecipe.yield,
-    }));
+    const result = await produce(selectedRecipe.localId, produceQty);
 
-    const log: ProductionLog = {
-      localId: crypto.randomUUID(),
-      tenantId: tenant.slug,
-      recipeId: selectedRecipe.localId,
-      quantity: produceQty,
-      ingredientsUsed,
-      createdAt: new Date(),
-    };
-
-    await db.productionLogs.add(log);
-    await SyncEngine.addToQueue(
-      "productionLogs",
-      "create",
-      log as unknown as Record<string, unknown>,
-      log.localId
-    );
-
-    for (const ing of ingredientsUsed) {
-      const product = products.find((p) => p.localId === ing.productId);
-      if (product) {
-        await db.products.update(product.localId, {
-          stock: product.stock - ing.quantity,
-          updatedAt: new Date(),
-        });
-      }
-    }
-
-    const productResult = products.find((p) => p.localId === selectedRecipe.productId);
-    if (productResult) {
-      await db.products.update(productResult.localId, {
-        stock: productResult.stock + produceQty,
-        updatedAt: new Date(),
-      });
+    if (!isOk(result)) {
+      return;
     }
 
     showSuccess(
@@ -273,7 +227,7 @@ export default function Recipes() {
     setProduceQty(1);
     loadRecipes();
     loadData();
-  }, [tenant?.slug, selectedRecipe, produceQty, products, showSuccess, loadRecipes, loadData]);
+  }, [selectedRecipe, produceQty, showSuccess, loadRecipes, loadData]);
 
   const addIngredient = useCallback(() => {
     setForm((prev) => ({
