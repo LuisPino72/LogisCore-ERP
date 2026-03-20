@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 
 const VALID_TABLES = [
   'products',
@@ -14,7 +15,8 @@ const VALID_TABLES = [
   'suspended_sales',
   'taxpayer_info',
   'invoice_settings',
-  'settings'
+  'settings',
+  'security_audit_log'
 ] as const;
 
 type ValidTable = typeof VALID_TABLES[number];
@@ -41,13 +43,60 @@ const TABLE_COLUMN_MAPPING: Record<string, string[]> = {
   taxpayer_info: ['rif', 'razon_social', 'direccion_fiscal', 'numero_providencia', 'logo_url'],
   invoice_settings: ['sequential_type', 'last_invoice_date', 'last_invoice_number', 'last_control_prefix', 'igtf_enabled', 'igtf_percentage'],
   settings: ['key', 'value'],
+  security_audit_log: [
+    'event_type', 'user_id', 'user_email', 'tenant_id', 'tenant_uuid',
+    'ip_address', 'user_agent', 'resource_type', 'resource_id', 'details', 'success'
+  ],
 };
+
+interface JwtPayload {
+  sub: string;
+  role: string;
+  exp: number;
+}
+
+async function verifyCallerAccess(
+  adminClient: SupabaseClient,
+  authHeader: string,
+  tenantUuid: string
+): Promise<{ valid: boolean; error?: string; userId?: string }> {
+  try {
+    const token = authHeader.replace('Bearer ', '');
+    const payload = JSON.parse(atob(token.split('.')[1])) as JwtPayload;
+    
+    const { data: userRole, error: roleError } = await adminClient
+      .from('user_roles')
+      .select('tenant_id, role')
+      .eq('user_id', payload.sub)
+      .single();
+    
+    if (roleError || !userRole) {
+      return { valid: false, error: 'Access denied: no tenant role found' };
+    }
+    
+    if (userRole.tenant_id !== tenantUuid) {
+      return { valid: false, error: 'Access denied: tenant mismatch' };
+    }
+    
+    return { valid: true, userId: payload.sub };
+  } catch {
+    return { valid: false, error: 'Invalid authorization token' };
+  }
+}
 
 Deno.serve(async (req: Request) => {
   try {
+    const authHeader = req.headers.get('Authorization');
+    
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization required', code: 'UNAUTHORIZED' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { p_table, p_operation, p_data, p_local_id, p_tenant_uuid, p_tenant_slug } = await req.json();
 
-    // Validation
     if (!p_table || !p_operation || !p_data || !p_local_id || !p_tenant_uuid || !p_tenant_slug) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameters', code: 'MISSING_PARAMS' }),
@@ -72,9 +121,16 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    const adminClient = new SupabaseClient(supabaseUrl, serviceRoleKey);
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Build data payload
+    const accessCheck = await verifyCallerAccess(adminClient, authHeader, p_tenant_uuid);
+    if (!accessCheck.valid) {
+      return new Response(
+        JSON.stringify({ error: accessCheck.error || 'Access denied', code: 'FORBIDDEN' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const allowedColumns = TABLE_COLUMN_MAPPING[p_table] || [];
     const payload: Record<string, unknown> = {
       local_id: p_local_id,
@@ -88,7 +144,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Handle operations
     if (p_operation === 'delete') {
       const { error } = await adminClient
         .from(p_table)
@@ -109,7 +164,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Upsert logic for create/update
     const { data: existing } = await adminClient
       .from(p_table)
       .select('id')
@@ -119,7 +173,6 @@ Deno.serve(async (req: Request) => {
     let result;
 
     if (existing) {
-      // Update existing record
       if (p_operation === 'update') {
         const { data, error } = await adminClient
           .from(p_table)
@@ -143,11 +196,9 @@ Deno.serve(async (req: Request) => {
 
         result = data;
       } else {
-        // create but exists - return existing
         result = existing;
       }
     } else {
-      // Insert new record
       const { data, error } = await adminClient
         .from(p_table)
         .insert(payload)
@@ -175,9 +226,9 @@ Deno.serve(async (req: Request) => {
       { headers: { 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch {
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error', code: 'UNKNOWN_ERROR' }),
+      JSON.stringify({ error: 'Internal server error', code: 'UNKNOWN_ERROR' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

@@ -5,7 +5,7 @@ import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, ValidationError, AppError, isOk } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 
-function getCurrentTenantId(): string {
+function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
     throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
@@ -60,13 +60,13 @@ function validateRecipeInput(data: CreateRecipeInput): string[] {
 }
 
 export async function getRecipes(): Promise<Recipe[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.recipes.where('tenantId').equals(tenantId).toArray();
 }
 
 export async function getRecipeById(localId: string): Promise<Result<Recipe, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const recipe = await db.recipes
       .where('localId')
       .equals(localId)
@@ -86,7 +86,7 @@ export async function getRecipeById(localId: string): Promise<Result<Recipe, App
 
 export async function createRecipe(data: CreateRecipeInput): Promise<Result<string, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     
     const errors = validateRecipeInput(data);
     if (errors.length > 0) {
@@ -172,7 +172,7 @@ export async function deleteRecipe(localId: string): Promise<Result<void, AppErr
 }
 
 export async function canProduce(recipe: Recipe, quantity: number): Promise<Result<{ canProduce: boolean; insufficientIngredients: string[] }, AppError>> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   const products = await db.products.where('tenantId').equals(tenantId).toArray();
   
   const insufficient: string[] = [];
@@ -216,7 +216,7 @@ export async function produce(localId: string, quantity: number): Promise<Result
         const product = await db.products
           .where('localId')
           .equals(ing.productId)
-          .filter(p => p.tenantId === getCurrentTenantId())
+          .filter(p => p.tenantId === getCurrentTenantSlug())
           .first();
         
         if (!product || product.stock < usedQuantity) {
@@ -239,7 +239,7 @@ export async function produce(localId: string, quantity: number): Promise<Result
       const finishedProduct = await db.products
         .where('localId')
         .equals(recipe.productId)
-        .filter(p => p.tenantId === getCurrentTenantId())
+        .filter(p => p.tenantId === getCurrentTenantSlug())
         .first();
       
       if (finishedProduct) {
@@ -261,7 +261,7 @@ export async function produce(localId: string, quantity: number): Promise<Result
       
       const productionLog: ProductionLog = {
         localId: crypto.randomUUID(),
-        tenantId: getCurrentTenantId(),
+        tenantId: getCurrentTenantSlug(),
         recipeId: localId,
         quantity,
         ingredientsUsed,
@@ -302,7 +302,7 @@ export async function filterRecipes(options: FilterOptions = {}): Promise<{
   recipes: Recipe[]
   total: number
 }> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   const { search = '', status = 'all', sort, page = 1, pageSize = 12 } = options;
 
   let recipes = await db.recipes.where('tenantId').equals(tenantId).toArray();
@@ -345,7 +345,7 @@ export async function filterRecipes(options: FilterOptions = {}): Promise<{
 }
 
 export async function getProductionHistory(): Promise<ProductionLog[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.productionLogs
     .where('tenantId')
     .equals(tenantId)

@@ -248,8 +248,19 @@ export async function createOwner(
       return Err(new ValidationError('El email es requerido'))
     }
 
-    if (!password || password.length < 6) {
-      return Err(new ValidationError('La contraseña debe tener al menos 6 caracteres'))
+    if (!password || password.length < 12) {
+      return Err(new ValidationError('La contraseña debe tener al menos 12 caracteres'))
+    }
+
+    const hasUpperCase = /[A-Z]/.test(password)
+    const hasLowerCase = /[a-z]/.test(password)
+    const hasNumber = /\d/.test(password)
+    const hasSpecial = /[@$!%*?&._-]/.test(password)
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecial) {
+      return Err(new ValidationError(
+        'La contraseña debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&._-)'
+      ))
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

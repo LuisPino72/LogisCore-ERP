@@ -4,7 +4,7 @@ import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 
-function getCurrentTenantId(): string {
+function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
     throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
@@ -47,13 +47,13 @@ export function validateMovementInput(data: CreateMovementInput): string[] {
 }
 
 export async function getMovements(): Promise<Movement[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.movements.where('tenantId').equals(tenantId).toArray();
 }
 
 export async function getMovementById(localId: string): Promise<Result<Movement, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const movement = await db.movements
       .where('localId')
       .equals(localId)
@@ -73,7 +73,7 @@ export async function getMovementById(localId: string): Promise<Result<Movement,
 
 export async function createMovement(data: CreateMovementInput): Promise<Result<string, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const { currentTenant: _currentTenant } = useTenantStore.getState();
 
     const errors = validateMovementInput(data);
@@ -113,7 +113,7 @@ export async function createMovement(data: CreateMovementInput): Promise<Result<
 }
 
 export async function getMovementsByDateRange(startDate: Date, endDate: Date): Promise<Movement[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.movements
     .where('tenantId')
     .equals(tenantId)
@@ -122,7 +122,7 @@ export async function getMovementsByDateRange(startDate: Date, endDate: Date): P
 }
 
 export async function getMovementsByCategory(category: MovementCategory): Promise<Movement[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.movements
     .where('tenantId')
     .equals(tenantId)
@@ -140,7 +140,7 @@ export interface MovementStats {
 }
 
 export async function getMovementStats(startDate?: Date, endDate?: Date): Promise<MovementStats> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   
   let movements = await db.movements
     .where('tenantId')
@@ -200,7 +200,7 @@ export async function getMovementStats(startDate?: Date, endDate?: Date): Promis
 }
 
 export async function getCashBalance(): Promise<number> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   const movements = await db.movements
     .where('tenantId')
     .equals(tenantId)

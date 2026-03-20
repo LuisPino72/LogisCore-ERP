@@ -5,6 +5,10 @@ import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 
+/**
+ * Obtiene el slug del tenant activo desde el store.
+ * @throws {AppError} Si no hay tenant activo
+ */
 function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
@@ -13,6 +17,10 @@ function getCurrentTenantSlug(): string {
   return currentTenant.slug;
 }
 
+/**
+ * Obtiene el ID (UUID) del tenant activo desde el store.
+ * @throws {AppError} Si no hay tenant activo
+ */
 function getCurrentTenantId(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
@@ -21,11 +29,20 @@ function getCurrentTenantId(): string {
   return currentTenant.id;
 }
 
+/**
+ * Obtiene todos los productos del tenant activo.
+ * @returns Lista de productos ordenados por nombre
+ */
 export async function getProducts(): Promise<Product[]> {
   const tenantSlug = getCurrentTenantSlug();
   return db.products.where('tenantId').equals(tenantSlug).toArray();
 }
 
+/**
+ * Obtiene un producto por su localId.
+ * @param localId - ID único del producto
+ * @returns Result con el producto o error si no se encuentra
+ */
 export async function getProductById(localId: string): Promise<Result<Product, AppError>> {
   try {
     const tenantSlug = getCurrentTenantSlug();
@@ -45,6 +62,11 @@ export async function getProductById(localId: string): Promise<Result<Product, A
   }
 }
 
+/**
+ * Crea un nuevo producto.
+ * @param data - Datos del producto sin campos generados automáticamente
+ * @returns Result con el localId del producto creado o error de validación
+ */
 export async function createProduct(data: Omit<Product, 'id' | 'localId' | 'tenantId' | 'createdAt' | 'updatedAt' | 'syncedAt'>): Promise<Result<string, AppError>> {
   try {
     const tenantId = getCurrentTenantId();

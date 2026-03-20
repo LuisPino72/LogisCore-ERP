@@ -2,16 +2,16 @@ import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } fro
 import { Product, Category, db, SuspendedSale } from "@/lib/db";
 import { useTenantStore, checkModuleDependencies } from "@/store/useTenantStore";
 import { createSale } from "@/features/sales/services/sales.service";
-import { updateStock } from "@/features/inventory/services/products.service";
 import { getExchangeRate, formatBs } from "@/features/exchange-rate/services/exchangeRate.service";
 import { getDailyStats } from "@/features/sales/services/sales.service";
-import { isOk, Result, AppError } from "@/lib/types/result";
+import { isOk } from "@/lib/types/result";
 import { useToast } from "@/providers/ToastProvider";
 import { loadPOSData, filterProducts, addToCart as addToCartUtil, updateCartQuantity, removeFromCart as removeFromCartUtil, calculateCartTotals, prepareSaleItems, CartItem, saveSuspendedSale, getSuspendedSales, deleteSuspendedSale, findProductBySku } from "../services/pos.service";
 import { useInvoicingForPOS, CustomerSelector } from "@/features/invoicing";
 import { logger, logCategories } from "@/lib/logger";
 import Card from "@/common/Card";
 import Button from "@/common/Button";
+import { ConfirmationModal } from "@/common/ConfirmationModal";
 import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Package, Search, Star, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Pause, Play, X, Clock, TrendingUp, FileText, Loader2, AlertTriangle } from "lucide-react";
 import type { SortField, PaymentMethod } from "../types/pos.types";
 
@@ -39,11 +39,12 @@ export default function POS() {
   const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [sort, setSort] = useState<{ field: SortField; direction: 'asc' | 'desc' }>({ field: 'name', direction: 'asc' });
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [showSuspendedModal, setShowSuspendedModal] = useState(false);
+  const [showSuspendedListModal, setShowSuspendedListModal] = useState(false);
   const [suspendedSales, setSuspendedSales] = useState<SuspendedSale[]>([]);
   const [dailyStats, setDailyStats] = useState<{ totalSales: number; totalAmount: number; transactionCount: number; averageTicket: number; paymentMethodBreakdown: { cash: number; card: number; pago_movil: number } } | null>(null);
   const [suspendNote, setSuspendNote] = useState("");
-  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [showSuspendInputModal, setShowSuspendInputModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; localId: string | null }>({ isOpen: false, localId: null });
   const searchInputRef = useRef<HTMLInputElement>(null);
   
   const tenant = useTenantStore((state) => state.currentTenant);
@@ -85,7 +86,7 @@ export default function POS() {
     loadDailyStats();
     loadSuspended();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenant?.slug]); // loadSuspended and loadDailyStats are stable functions
+  }, [tenant?.slug]);
 
   const loadDailyStats = async () => {
     try {
@@ -94,11 +95,16 @@ export default function POS() {
     } catch { /* ignore */ }
   };
 
-  const loadSuspended = async () => {
+  const loadSuspended = useCallback(async () => {
     if (!tenant?.slug) return;
-    const sales = await getSuspendedSales(tenant.slug);
-    setSuspendedSales(sales);
-  };
+    try {
+      const sales = await getSuspendedSales(tenant.slug);
+      setSuspendedSales(sales);
+    } catch (error) {
+      logger.error('Error loading suspended sales', error as Error, { category: logCategories.SYNC });
+      showError('Error al cargar ventas suspendidas');
+    }
+  }, [tenant?.slug, showError]);
 
   const filteredProducts = useMemo(() => 
     filterProducts(products, search, selectedCategory, sort, showFavoritesOnly), 
@@ -119,7 +125,21 @@ export default function POS() {
     setProducts(prev => prev.map(p => p.localId === product.localId ? { ...p, isFavorite: newFavorite } : p));
   }, []);
 
-  const addToCart = useCallback((product: Product) => setCart(prev => addToCartUtil(prev, product)), []);
+  const addToCart = useCallback((product: Product) => {
+    const existingInCart = cart.find(item => item.product.localId === product.localId);
+    if (existingInCart) {
+      if (existingInCart.quantity >= product.stock) {
+        showError('No hay suficiente stock disponible');
+        return;
+      }
+    }
+    if (product.stock <= 0) {
+      showError('Producto sin stock');
+      return;
+    }
+    setCart(prev => addToCartUtil(prev, product));
+  }, [cart, showError]);
+  
   const updateQuantity = useCallback((localId: string, delta: number) => setCart(prev => updateCartQuantity(prev, localId, delta)), []);
   const removeFromCart = useCallback((localId: string) => setCart(prev => removeFromCartUtil(prev, localId)), []);
 
@@ -165,11 +185,6 @@ export default function POS() {
       const saleResult = await createSale({ items: saleItems, subtotal: cartTotal, tax: 0, total: cartTotal, paymentMethod, exchangeRate: exchangeRate > 0 ? exchangeRate : undefined, exchangeRateSource: exchangeRate > 0 ? 'api' : undefined });
       if (!isOk(saleResult)) { showError(saleResult.error.message); return; }
 
-      const stockUpdates = cart.map(item => updateStock(item.product.localId, -item.quantity));
-      const results = await Promise.all(stockUpdates);
-      const failed = results.filter((r: Result<void, AppError>) => !isOk(r));
-      if (failed.length > 0) logger.warn(`${failed.length} stock updates failed`, { category: logCategories.INVENTORY });
-
       const saleId = saleResult.value;
       setCart([]);
       setShowCheckout(false);
@@ -201,11 +216,11 @@ export default function POS() {
     await saveSuspendedSale(tenant.slug, cart, suspendNote || undefined);
     setCart([]);
     setSuspendNote("");
-    setShowSuspendModal(false);
+    setShowSuspendInputModal(false);
     showSuccess("Venta suspendida");
     loadSuspended();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenant, cart, suspendNote, showSuccess]); // loadSuspended is stable
+  }, [tenant, cart, suspendNote, showSuccess]);
 
   const handleResumeSale = useCallback(async (sale: SuspendedSale) => {
     const cartItems: CartItem[] = sale.cart.map(item => ({
@@ -213,19 +228,21 @@ export default function POS() {
       quantity: item.quantity,
     }));
     setCart(cartItems);
-    setShowSuspendedModal(false);
+    setShowSuspendedListModal(false);
     showSuccess("Venta restaurada");
   }, [showSuccess]);
 
-  const handleDeleteSuspended = useCallback(async (localId: string) => {
-    const confirmed = window.confirm("¿Eliminar esta venta suspendida?");
-    if (confirmed) {
-      await deleteSuspendedSale(localId);
-      loadSuspended();
-      showSuccess("Venta eliminada");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSuccess]); // loadSuspended is stable
+  const handleDeleteSuspended = useCallback((localId: string) => {
+    setConfirmDelete({ isOpen: true, localId });
+  }, []);
+
+  const confirmDeleteSuspended = useCallback(async () => {
+    if (!confirmDelete.localId) return;
+    await deleteSuspendedSale(confirmDelete.localId);
+    loadSuspended();
+    showSuccess("Venta eliminada");
+    setConfirmDelete({ isOpen: false, localId: null });
+  }, [confirmDelete.localId, loadSuspended, showSuccess]);
 
   const getStockStatus = (stock: number) => stock === 0 || stock <= 5 ? "text-red-400" : stock <= 10 ? "text-amber-400" : "text-slate-500";
 
@@ -321,7 +338,7 @@ export default function POS() {
             </button>
             <div className="flex-1" />
             <button
-              onClick={() => { loadSuspended(); setShowSuspendedModal(true); }}
+              onClick={() => { loadSuspended(); setShowSuspendedListModal(true); }}
               title="Ver ventas suspendidas"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-(--bg-tertiary) text-(--text-secondary) hover:bg-(--bg-secondary) transition-colors">
               <Pause className="w-3.5 h-3.5" />
@@ -367,7 +384,7 @@ export default function POS() {
               {cart.length > 0 && (
                 <div className="flex gap-2">
                   <button 
-                    onClick={() => setShowSuspendModal(true)}
+                    onClick={() => setShowSuspendInputModal(true)}
                     title="Suspender venta para continuar después"
                     className="text-xs text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1">
                     <Pause className="w-3 h-3" />Suspender
@@ -473,14 +490,14 @@ export default function POS() {
         </div>
       </div>
 
-      {showSuspendedModal && (
+      {showSuspendedListModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-(--bg-primary) border border-(--border-color) rounded-2xl w-full max-w-lg shadow-2xl max-h-[80vh] overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-(--border-color)">
               <h3 className="text-lg font-semibold text-(--text-primary) flex items-center gap-2">
                 <Pause className="w-5 h-5" />Ventas Suspendidas
               </h3>
-              <button onClick={() => setShowSuspendedModal(false)} title="Cerrar" className="p-1 hover:bg-(--bg-tertiary) rounded">
+                <button onClick={() => setShowSuspendedListModal(false)} title="Cerrar" className="p-1 hover:bg-(--bg-tertiary) rounded" aria-label="Cerrar modal">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
@@ -503,7 +520,7 @@ export default function POS() {
                         <Button size="sm" variant="secondary" onClick={() => handleResumeSale(sale)} title="Restaurar esta venta al carrito">
                           <Play className="w-3 h-3 mr-1" />Restaurar
                         </Button>
-                        <button onClick={() => handleDeleteSuspended(sale.localId)} title="Eliminar venta suspendida" className="p-2 hover:bg-red-500/20 rounded-lg">
+                        <button onClick={() => handleDeleteSuspended(sale.localId)} title="Eliminar venta suspendida" aria-label="Eliminar venta suspendida" className="p-2 hover:bg-red-500/20 rounded-lg">
                           <Trash2 className="w-4 h-4 text-red-400" />
                         </button>
                       </div>
@@ -516,14 +533,14 @@ export default function POS() {
         </div>
       )}
 
-      {showSuspendModal && (
+      {showSuspendInputModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-(--bg-primary) border border-(--border-color) rounded-2xl w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-(--border-color)">
               <h3 className="text-lg font-semibold text-(--text-primary) flex items-center gap-2">
                 <Pause className="w-5 h-5" />Suspender Venta
               </h3>
-              <button onClick={() => setShowSuspendModal(false)} className="p-1 hover:bg-(--bg-tertiary) rounded">
+              <button onClick={() => setShowSuspendInputModal(false)} className="p-1 hover:bg-(--bg-tertiary) rounded" aria-label="Cerrar modal">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
@@ -542,7 +559,7 @@ export default function POS() {
                 />
               </div>
               <div className="flex justify-end gap-3">
-                <Button variant="secondary" onClick={() => setShowSuspendModal(false)}>Cancelar</Button>
+                <Button variant="secondary" onClick={() => setShowSuspendInputModal(false)}>Cancelar</Button>
                 <Button onClick={handleSuspend}>Suspender</Button>
               </div>
             </div>
@@ -593,6 +610,15 @@ export default function POS() {
           />
         </Suspense>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmDelete.isOpen}
+        message="¿Eliminar esta venta suspendida?"
+        title="Eliminar Venta Suspendida"
+        confirmText="Eliminar"
+        onConfirm={confirmDeleteSuspended}
+        onCancel={() => setConfirmDelete({ isOpen: false, localId: null })}
+      />
     </div>
   );
 }

@@ -93,9 +93,6 @@ export function useEmployees(): UseEmployeesReturn {
 
   const deleteEmployee = useCallback(
     async (localId: string): Promise<boolean> => {
-      const confirmed = window.confirm('¿Estás seguro de eliminar este empleado?')
-      if (!confirmed) return false
-
       setLoading(true)
       const result = await employeesService.deleteEmployee(localId)
       if (isOk(result)) {

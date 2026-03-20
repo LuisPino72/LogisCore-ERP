@@ -1,8 +1,21 @@
+/**
+ * Tipo para callbacks de eventos.
+ */
 type EventCallback = (data: unknown) => void;
 
+/**
+ * Sistema de eventos simple para comunicación entre módulos.
+ * Usa console.error directamente para evitar dependencias circulares con el logger.
+ */
 class EventBusClass {
   private events: Map<string, EventCallback[]> = new Map();
 
+  /**
+   * Suscribe un callback a un evento.
+   * @param event - Nombre del evento
+   * @param callback - Función a ejecutar cuando ocurra el evento
+   * @returns Función para cancelar la suscripción
+   */
   on(event: string, callback: EventCallback): () => void {
     if (!this.events.has(event)) {
       this.events.set(event, []);
@@ -18,6 +31,12 @@ class EventBusClass {
     };
   }
 
+  /**
+   * Emite un evento, ejecutando todos los callbacks registrados.
+   * Los errores en callbacks individuales se capturan para no afectar otros callbacks.
+   * @param event - Nombre del evento
+   * @param data - Datos opcionales a pasar a los callbacks
+   */
   emit(event: string, data?: unknown): void {
     const callbacks = this.events.get(event);
     if (callbacks) {
@@ -25,12 +44,17 @@ class EventBusClass {
         try {
           cb(data);
         } catch (error) {
-          console.error(`Error en EventBus evento "${event}":`, error);
+          console.error(`[EventBus] Error in event "${event}":`, error);
         }
       });
     }
   }
 
+  /**
+   * Cancela la suscripción de un callback específico.
+   * @param event - Nombre del evento
+   * @param callback - Callback a remover
+   */
   off(event: string, callback: EventCallback): void {
     const callbacks = this.events.get(event);
     if (callbacks) {
@@ -39,6 +63,9 @@ class EventBusClass {
     }
   }
 
+  /**
+   * Limpia todos los eventos registrados.
+   */
   clear(): void {
     this.events.clear();
   }
@@ -46,6 +73,9 @@ class EventBusClass {
 
 export const EventBus = new EventBusClass();
 
+/**
+ * Constantes de nombres de eventos del sistema.
+ */
 export const Events = {
   SALE_COMPLETED: 'sale.completed',
   SALE_CANCELLED: 'sale.cancelled',

@@ -70,4 +70,6 @@ export const logCategories = {
   SALES: 'SALES',
   DATABASE: 'DATABASE',
   UI: 'UI',
+  ACCOUNTING: 'ACCOUNTING',
+  INVOICING: 'INVOICING',
 } as const;

@@ -290,6 +290,41 @@ export interface Movement {
   syncedAt?: Date;
 }
 
+export type SecurityEventType =
+  | 'LOGIN_SUCCESS'
+  | 'LOGIN_FAILED'
+  | 'LOGOUT'
+  | 'PASSWORD_CHANGE'
+  | 'PASSWORD_RESET_REQUEST'
+  | 'PASSWORD_RESET_COMPLETE'
+  | 'EMPLOYEE_CREATED'
+  | 'EMPLOYEE_DELETED'
+  | 'TENANT_CREATED'
+  | 'TENANT_DELETED'
+  | 'IMPERSONATION_STARTED'
+  | 'IMPERSONATION_ENDED'
+  | 'RATE_LIMITED'
+  | 'UNAUTHORIZED_ACCESS'
+  | 'CROSS_TENANT_ACCESS';
+
+export interface SecurityAuditLog {
+  id?: number;
+  localId: string;
+  tenantId?: string;
+  tenantUuid?: string;
+  eventType: SecurityEventType;
+  userId?: string;
+  userEmail?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  resourceType?: string;
+  resourceId?: string;
+  details?: Record<string, unknown>;
+  success: boolean;
+  createdAt: Date;
+  syncedAt?: Date;
+}
+
 class LogisCoreDB extends Dexie {
   syncQueue!: Table<SyncQueueItem>;
   products!: Table<Product>;
@@ -307,26 +342,28 @@ class LogisCoreDB extends Dexie {
   invoiceSettings!: Table<InvoiceSettings>;
   invoices!: Table<Invoice>;
   movements!: Table<Movement>;
+  securityAuditLog!: Table<SecurityAuditLog>;
 
   constructor() {
     super('LogisCoreERP');
-    this.version(10).stores({
+    this.version(12).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
       products: '++id, localId, tenantId, sku, categoryId, isActive, name',
       categories: '++id, localId, tenantId, name, saleType',
       settings: '[tenantId+key]',
-      sales: '++id, localId, tenantId, status, createdAt, paymentMethod',
-      purchases: '++id, localId, tenantId, status, createdAt, supplier',
+      sales: '++id, localId, tenantId, status, createdAt, paymentMethod, customerId',
+      purchases: '++id, localId, tenantId, status, createdAt, supplier, supplierId',
       recipes: '++id, localId, tenantId, isActive, productId',
       productionLogs: '++id, localId, tenantId, recipeId, createdAt',
-      suppliers: '++id, localId, tenantId, name, isActive',
-      employees: '++id, localId, tenantId, role',
+      suppliers: '++id, localId, tenantId, name, isActive, email',
+      employees: '++id, localId, tenantId, role, userId',
       suspendedSales: '++id, localId, tenantId, createdAt',
       taxpayerInfo: '++id, localId, tenantId',
-      customers: '++id, localId, tenantId, rifCedula, isActive',
+      customers: '++id, localId, tenantId, rifCedula, isActive, email',
       invoiceSettings: '++id, localId, tenantId',
       invoices: '++id, localId, tenantId, customerId, invoiceNumber, controlNumber, estatus, createdAt, saleId',
-      movements: '++id, localId, tenantId, type, category, status, createdAt',
+      movements: '++id, localId, tenantId, type, category, status, createdAt, referenceType, referenceId',
+      securityAuditLog: '++id, localId, tenantId, eventType, userId, createdAt',
     });
   }
 }

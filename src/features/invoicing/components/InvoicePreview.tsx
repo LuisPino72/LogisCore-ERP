@@ -3,6 +3,7 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 import { X, Download, Printer, FileText, Share2, Loader2 } from 'lucide-react';
 import { InvoicePDF } from './InvoicePDF';
 import type { Invoice, TaxpayerInfo } from '@/lib/db';
+import { logger, logCategories } from '@/lib/logger';
 
 interface InvoicePreviewProps {
   invoice: Invoice;
@@ -44,7 +45,7 @@ export function InvoicePreview({ invoice, taxpayerInfo, onClose, isOpen }: Invoi
       }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
-        console.error('Error sharing:', err);
+        logger.error('Error sharing invoice', err as Error, { category: logCategories.INVOICING });
       }
     } finally {
       setGeneratingPdf(false);

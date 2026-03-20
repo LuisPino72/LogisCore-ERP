@@ -3,6 +3,7 @@ import { Purchase, Supplier } from "../../../lib/db";
 import { usePurchases } from "../hooks/usePurchases";
 import Card from "../../../common/Card";
 import Button from "../../../common/Button";
+import { ConfirmationModal } from "../../../common/ConfirmationModal";
 import Input from "../../../common/Input";
 import {
   ShoppingBasket,
@@ -98,6 +99,7 @@ export default function Purchases() {
     phone: "",
     notes: "",
   });
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; localId: string | null }>({ isOpen: false, localId: null });
 
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItem, setNewItem] = useState({
@@ -205,12 +207,15 @@ export default function Purchases() {
     }
   }, [editingSupplier, supplierForm, createSupplier, updateSupplier]);
 
-  const handleDeleteSupplier = useCallback(async (localId: string) => {
-    const confirmed = window.confirm("¿Estás seguro de eliminar este proveedor?");
-    if (confirmed) {
-      await deleteSupplier(localId);
-    }
-  }, [deleteSupplier]);
+  const handleDeleteSupplier = useCallback((localId: string) => {
+    setConfirmDelete({ isOpen: true, localId });
+  }, []);
+
+  const confirmDeleteSupplier = useCallback(async () => {
+    if (!confirmDelete.localId) return;
+    await deleteSupplier(confirmDelete.localId);
+    setConfirmDelete({ isOpen: false, localId: null });
+  }, [confirmDelete.localId, deleteSupplier]);
 
   const editSupplier = useCallback((supplier: Supplier) => {
     setSupplierForm({
@@ -1031,6 +1036,14 @@ export default function Purchases() {
           </div>
         </div>
       )}
+      <ConfirmationModal
+        isOpen={confirmDelete.isOpen}
+        message="¿Estás seguro de eliminar este proveedor?"
+        title="Eliminar Proveedor"
+        confirmText="Eliminar"
+        onConfirm={confirmDeleteSupplier}
+        onCancel={() => setConfirmDelete({ isOpen: false, localId: null })}
+      />
     </div>
   );
 }

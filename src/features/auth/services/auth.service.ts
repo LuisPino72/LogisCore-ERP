@@ -1,12 +1,42 @@
 import { supabase } from '@/lib/supabase';
 import { Result, Ok, Err, AppError, ValidationError, UnauthorizedError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
+import { securityAudit } from '@/lib/audit/securityAudit';
 import type { AuthUser, LoginCredentials, TenantInfo } from '../types/auth.types';
+
+const LOGIN_RATE_LIMIT_WINDOW = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 5;
+const PASSWORD_MIN_LENGTH = 12;
+
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
 
 interface UserRoleResponse {
   role: 'super_admin' | 'owner' | 'employee';
   permissions: Record<string, unknown> | null;
   tenants: TenantInfo | TenantInfo[] | null;
+}
+
+function checkRateLimit(email: string): boolean {
+  const now = Date.now();
+  const attempt = loginAttempts.get(email);
+  
+  if (!attempt || now - attempt.lastAttempt > LOGIN_RATE_LIMIT_WINDOW) {
+    loginAttempts.set(email, { count: 1, lastAttempt: now });
+    return true;
+  }
+  
+  if (attempt.count >= LOGIN_MAX_ATTEMPTS) {
+    return false;
+  }
+  
+  attempt.count++;
+  attempt.lastAttempt = now;
+  loginAttempts.set(email, attempt);
+  return true;
+}
+
+function recordSuccessfulLogin(email: string): void {
+  loginAttempts.delete(email);
 }
 
 async function fetchUserRoles(userId: string): Promise<Result<AuthUser, AppError>> {
@@ -76,18 +106,32 @@ export async function signIn(credentials: LoginCredentials): Promise<Result<Auth
     return Err(new ValidationError('Por favor ingresa la contraseña'));
   }
 
+  if (!checkRateLimit(credentials.email)) {
+    logger.warn('Rate limit exceeded for login attempt', { email: credentials.email, category: logCategories.AUTH });
+    await securityAudit.logRateLimited(credentials.email);
+    return Err(new AppError(
+      'Demasiados intentos de inicio de sesión. Intenta nuevamente en 15 minutos.',
+      'RATE_LIMITED',
+      429
+    ));
+  }
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email: credentials.email,
     password: credentials.password,
   });
 
   if (error) {
+    await securityAudit.logLoginFailed(credentials.email, error.message);
     return Err(new AppError(`Error al iniciar sesión: ${error.message}`, 'SIGN_IN_ERROR', 401));
   }
 
   if (!data.user) {
     return Err(new AppError('Usuario no encontrado', 'USER_NOT_FOUND', 404));
   }
+
+  recordSuccessfulLogin(credentials.email);
+  await securityAudit.logLoginSuccess(data.user.id, credentials.email);
 
   const rolesResult = await fetchUserRoles(data.user.id);
   if (!rolesResult.ok) {
@@ -104,6 +148,17 @@ export async function signIn(credentials: LoginCredentials): Promise<Result<Auth
 }
 
 export async function signOut(): Promise<Result<void, AppError>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (session?.user) {
+    await securityAudit.log({
+      eventType: 'LOGOUT',
+      userId: session.user.id,
+      userEmail: session.user.email ?? undefined,
+      success: true,
+    });
+  }
+  
   const { error } = await supabase.auth.signOut();
   if (error) {
     return Err(new AppError(`Error al cerrar sesión: ${error.message}`, 'SIGN_OUT_ERROR', 500));
@@ -115,6 +170,12 @@ export async function resetPassword(email: string): Promise<Result<void, AppErro
   if (!email.trim()) {
     return Err(new ValidationError('Por favor ingresa tu correo electrónico'));
   }
+
+  await securityAudit.log({
+    eventType: 'PASSWORD_RESET_REQUEST',
+    userEmail: email,
+    success: true,
+  });
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/update-password`,
@@ -132,8 +193,25 @@ export async function updatePassword(newPassword: string): Promise<Result<void, 
     return Err(new ValidationError('Por favor ingresa una contraseña'));
   }
 
-  if (newPassword.length < 6) {
-    return Err(new ValidationError('La contraseña debe tener al menos 6 caracteres'));
+  if (newPassword.length < PASSWORD_MIN_LENGTH) {
+    return Err(new ValidationError(`La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres`));
+  }
+
+  const hasUpperCase = /[A-Z]/.test(newPassword);
+  const hasLowerCase = /[a-z]/.test(newPassword);
+  const hasNumber = /\d/.test(newPassword);
+  const hasSpecial = /[@$!%*?&._-]/.test(newPassword);
+
+  if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecial) {
+    return Err(new ValidationError(
+      'La contraseña debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&._-)'
+    ));
+  }
+
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  
+  if (sessionError) {
+    return Err(new AppError(`Error al verificar sesión: ${sessionError.message}`, 'UPDATE_PASSWORD_ERROR', 500));
   }
 
   const { error } = await supabase.auth.updateUser({
@@ -142,6 +220,10 @@ export async function updatePassword(newPassword: string): Promise<Result<void, 
 
   if (error) {
     return Err(new AppError(`Error al actualizar contraseña: ${error.message}`, 'UPDATE_PASSWORD_ERROR', 500));
+  }
+
+  if (session?.user) {
+    await securityAudit.logPasswordChange(session.user.id, session.user.email ?? '');
   }
 
   return Ok(undefined);

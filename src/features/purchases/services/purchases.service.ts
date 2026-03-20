@@ -7,7 +7,7 @@ import { EventBus, Events } from '@/lib/events/EventBus';
 import * as movementsService from '@/features/accounting/services/movements.service';
 import type { SortConfig, DateRange, PurchaseStatus, PurchaseStats } from '../types/purchases.types';
 
-function getCurrentTenantId(): string {
+function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
     throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
@@ -72,13 +72,13 @@ function validatePurchaseInput(data: CreatePurchaseInput): string[] {
 }
 
 export async function getPurchases(): Promise<Purchase[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.purchases.where('tenantId').equals(tenantId).toArray();
 }
 
 export async function getPurchaseById(localId: string): Promise<Result<Purchase, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const purchase = await db.purchases
       .where('localId')
       .equals(localId)
@@ -98,7 +98,7 @@ export async function getPurchaseById(localId: string): Promise<Result<Purchase,
 
 export async function createPurchase(data: CreatePurchaseInput): Promise<Result<string, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     
     const errors = validatePurchaseInput(data);
     if (errors.length > 0) {
@@ -136,7 +136,7 @@ export async function createPurchase(data: CreatePurchaseInput): Promise<Result<
 
 export async function updatePurchaseStatus(localId: string, status: 'pending' | 'completed' | 'cancelled'): Promise<Result<void, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const purchase = await db.purchases
       .where('localId')
       .equals(localId)
@@ -209,7 +209,7 @@ export async function updatePurchaseStatus(localId: string, status: 'pending' | 
 }
 
 export async function getPendingPurchases(): Promise<Purchase[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.purchases
     .where('tenantId')
     .equals(tenantId)
@@ -231,7 +231,7 @@ export async function filterPurchases(options: FilterOptions = {}): Promise<{
   total: number
   stats: PurchaseStats
 }> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   const { search = '', status = 'all', dateRange, sort, page = 1, pageSize = 20 } = options;
 
   let purchases = await db.purchases

@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState } from 'react'
-import { Button, Input, Card } from '@/common'
+import { Button, Input, Card, ConfirmationModal } from '@/common'
 import { Plus, Search, Edit2, Trash2, Package, X, Cloud, CloudOff, LayoutGrid, List, Filter, Image as ImageIcon, Loader2, Star, Download, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Barcode, Trash, CheckSquare, Square, FolderEdit, RotateCcw } from 'lucide-react'
 import { useInventory } from '../hooks/useInventory'
 import { EventBus, Events } from '@/lib/events/EventBus'
@@ -71,6 +71,7 @@ export default function Inventory() {
 
   const [newCategoryForm, setNewCategoryForm] = useState({ name: '', saleType: 'unit' as SaleType })
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; message: string; onConfirm: () => void }>({ isOpen: false, message: '', onConfirm: () => {} })
 
   useEffect(() => {
     loadData()
@@ -162,11 +163,15 @@ export default function Inventory() {
     setShowModal(true)
   }, [setForm, setImagePreview, setEditingId, setShowModal])
 
-  const handleDelete = useCallback(async (localId: string) => {
-    const confirmed = window.confirm('¿Estás seguro de eliminar este producto?');
-    if (confirmed) {
-      await deleteProduct(localId)
-    }
+  const handleDelete = useCallback((localId: string) => {
+    setConfirmDelete({
+      isOpen: true,
+      message: '¿Estás seguro de eliminar este producto?',
+      onConfirm: () => {
+        deleteProduct(localId)
+        setConfirmDelete(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }, [deleteProduct])
 
   const handleCreateCategory = useCallback(async () => {
@@ -259,10 +264,14 @@ export default function Inventory() {
                   <span className="text-sm text-slate-400">{selectedProducts.length} seleccionados</span>
                   <button
                     onClick={() => {
-                      const confirmed = window.confirm(`¿Eliminar ${selectedProducts.length} productos?`);
-                      if (confirmed) {
-                        deleteSelectedProducts()
-                      }
+                      setConfirmDelete({
+                        isOpen: true,
+                        message: `¿Eliminar ${selectedProducts.length} productos?`,
+                        onConfirm: () => {
+                          deleteSelectedProducts()
+                          setConfirmDelete(prev => ({ ...prev, isOpen: false }))
+                        }
+                      })
                     }}
                 className="flex items-center gap-1 px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
               >
@@ -1080,6 +1089,12 @@ export default function Inventory() {
           </div>
         </div>
       )}
+      <ConfirmationModal
+        isOpen={confirmDelete.isOpen}
+        message={confirmDelete.message}
+        onConfirm={confirmDelete.onConfirm}
+        onCancel={() => setConfirmDelete(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

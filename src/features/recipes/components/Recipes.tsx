@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Product, Recipe, ProductionLog, db } from "../../../lib/db";
-import { useTenantStore } from "../../../store/useTenantStore";
-import { useToast } from "../../../providers/ToastProvider";
-import { filterRecipes, getProductionHistory, createRecipe, updateRecipe, deleteRecipe, produce } from "../services/recipes.service";
+import { Product, Recipe, ProductionLog, db } from "@/lib/db";
+import { useTenantStore } from "@/store/useTenantStore";
+import { useToast } from "@/providers/ToastProvider";
+import { filterRecipes, getProductionHistory, createRecipe, updateRecipe, deleteRecipe, produce } from "@/features/recipes/services/recipes.service";
 import { isOk } from "@/lib/types/result";
-import Card from "../../../common/Card";
-import Button from "../../../common/Button";
-import Input from "../../../common/Input";
+import Card from "@/common/Card";
+import Button from "@/common/Button";
+import Input from "@/common/Input";
+import { ConfirmationModal } from "@/common/ConfirmationModal";
 import {
   ChefHat,
   Plus,
@@ -28,7 +29,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import type { SortField } from "../types/recipes.types";
+import type { SortField } from "@/features/recipes/types/recipes.types";
 
 type FilterStatus = "all" | "active" | "inactive";
 
@@ -70,6 +71,7 @@ export default function Recipes() {
   });
 
   const [produceQty, setProduceQty] = useState(1);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; localId: string | null }>({ isOpen: false, localId: null });
 
   const loadData = useCallback(async () => {
     if (!tenant?.slug) return;
@@ -197,19 +199,21 @@ export default function Recipes() {
   }, [editingRecipe, form, showSuccess, loadRecipes]);
 
   const handleDeleteRecipe = useCallback(
-    async (localId: string) => {
-      const confirmed = window.confirm("¿Estás seguro de eliminar esta receta?");
-      if (confirmed) {
-        const result = await deleteRecipe(localId);
-        if (!isOk(result)) {
-          return;
-        }
-        showSuccess("Receta eliminada");
-        loadRecipes();
-      }
+    (localId: string) => {
+      setConfirmDelete({ isOpen: true, localId });
     },
-    [showSuccess, loadRecipes]
+    []
   );
+
+  const confirmDeleteRecipe = useCallback(async () => {
+    if (!confirmDelete.localId) return;
+    const result = await deleteRecipe(confirmDelete.localId);
+    if (isOk(result)) {
+      showSuccess("Receta eliminada");
+      loadRecipes();
+    }
+    setConfirmDelete({ isOpen: false, localId: null });
+  }, [confirmDelete.localId, showSuccess, loadRecipes]);
 
   const handleProduce = useCallback(async () => {
     if (!selectedRecipe) return;
@@ -428,12 +432,14 @@ export default function Recipes() {
                     <button
                       onClick={() => openEditModal(recipe)}
                       title="Editar receta"
+                      aria-label="Editar receta"
                       className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg text-(--text-muted) hover:text-(--text-primary)">
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteRecipe(recipe.localId)}
                       title="Eliminar receta"
+                      aria-label="Eliminar receta"
                       className="p-1.5 hover:bg-red-500/20 rounded-lg text-(--text-muted) hover:text-red-400">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -510,7 +516,7 @@ export default function Recipes() {
                 <ChefHat className="w-5 h-5 text-(--brand-400)" />
                 Producir: {selectedRecipe.name}
               </h3>
-              <button onClick={() => setSelectedRecipe(null)} title="Cerrar" className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
+              <button onClick={() => setSelectedRecipe(null)} title="Cerrar" aria-label="Cerrar" className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
@@ -577,7 +583,7 @@ export default function Recipes() {
                 <History className="w-5 h-5 text-(--brand-400)" />
                 Historial de Producción
               </h3>
-              <button onClick={() => setShowHistoryModal(false)} title="Cerrar" className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
+              <button onClick={() => setShowHistoryModal(false)} title="Cerrar" aria-label="Cerrar" className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
@@ -619,7 +625,7 @@ export default function Recipes() {
                 <Plus className="w-5 h-5 text-green-400" />
                 {editingRecipe ? "Editar Receta" : "Nueva Receta"}
               </h3>
-              <button onClick={() => { setShowModal(false); setEditingRecipe(null); }} title="Cerrar" className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
+              <button onClick={() => { setShowModal(false); setEditingRecipe(null); }} title="Cerrar" aria-label="Cerrar" className="p-1.5 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
                 <X className="w-5 h-5 text-(--text-muted)" />
               </button>
             </div>
@@ -723,6 +729,7 @@ export default function Recipes() {
                         type="button"
                         onClick={() => setForm({ ...form, ingredients: form.ingredients.filter((_, idx) => idx !== i) })}
                         title="Eliminar ingrediente"
+                        aria-label="Eliminar ingrediente"
                         className="p-2 text-red-400 hover:bg-(--bg-tertiary) rounded-lg transition-colors">
                         <X className="w-4 h-4" />
                       </button>
@@ -740,6 +747,15 @@ export default function Recipes() {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmDelete.isOpen}
+        message="¿Estás seguro de eliminar esta receta? Esta acción no se puede deshacer."
+        title="Eliminar Receta"
+        confirmText="Eliminar"
+        onConfirm={confirmDeleteRecipe}
+        onCancel={() => setConfirmDelete({ isOpen: false, localId: null })}
+      />
     </div>
   );
 }

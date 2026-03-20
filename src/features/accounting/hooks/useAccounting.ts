@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTenantStore } from '@/store/useTenantStore';
 import { useToast } from '@/providers/ToastProvider';
 import * as movementsService from '../services/movements.service';
+import { logger, logCategories } from '@/lib/logger';
 import type { Movement, MovementType, MovementCategory, MovementPaymentMethod } from '@/lib/db';
 
 interface MovementStats {
@@ -57,7 +58,7 @@ export function useAccounting() {
       const data = await movementsService.getMovementStats();
       setStats(data);
     } catch {
-      console.error('Error loading stats:', 'Failed to load movement stats');
+      logger.error('Error loading stats', undefined, { category: logCategories.ACCOUNTING });
     }
   }, [currentTenant?.slug]);
 
@@ -67,7 +68,7 @@ export function useAccounting() {
       const balance = await movementsService.getCashBalance();
       setCashBalance(balance);
     } catch (error) {
-      console.error('Error loading cash balance:', error);
+      logger.error('Error loading cash balance', error instanceof Error ? error : undefined, { category: logCategories.ACCOUNTING });
     }
   }, [currentTenant?.slug]);
 

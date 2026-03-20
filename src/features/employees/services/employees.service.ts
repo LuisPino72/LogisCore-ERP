@@ -8,7 +8,7 @@ import type { EmployeePermissions } from '../types/employees.types';
 import { DEFAULT_EMPLOYEE_PERMISSIONS } from '../types/employees.types';
 import type { SortConfig } from '../types/employees.types';
 
-function getCurrentTenantId(): string {
+function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
     throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
@@ -18,7 +18,7 @@ function getCurrentTenantId(): string {
 
 export async function getEmployees(): Promise<Result<Employee[], AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const employees = await db.employees.where('tenantId').equals(tenantId).toArray();
     return Ok(employees);
   } catch (error) {
@@ -101,8 +101,19 @@ export async function createEmployee(
       return Err(new ValidationError('Email inválido'));
     }
 
-    if (!password || password.length < 6) {
-      return Err(new ValidationError('La contraseña debe tener al menos 6 caracteres'));
+    if (!password || password.length < 12) {
+      return Err(new ValidationError('La contraseña debe tener al menos 12 caracteres'));
+    }
+
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecial = /[@$!%*?&._-]/.test(password);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecial) {
+      return Err(new ValidationError(
+        'La contraseña debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&._-)'
+      ));
     }
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -165,7 +176,7 @@ export async function updateEmployeePermissions(
   permissions: EmployeePermissions
 ): Promise<Result<void, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
 
     const employee = await db.employees
       .where('localId')
@@ -204,7 +215,7 @@ export async function updateEmployeePermissions(
 
 export async function deleteEmployee(localId: string): Promise<Result<void, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
 
     const employee = await db.employees
       .where('localId')
@@ -251,7 +262,7 @@ export async function filterEmployees(options: FilterOptions = {}): Promise<{
   employees: Employee[]
   total: number
 }> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   const { search = '', sort, page = 1, pageSize = 10 } = options;
 
   let employees = await db.employees.where('tenantId').equals(tenantId).toArray();

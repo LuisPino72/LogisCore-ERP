@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Sale } from "../../../lib/db";
 import { formatBs } from "../../exchange-rate/services/exchangeRate.service";
 import Card from "../../../common/Card";
+import { ConfirmationModal } from "../../../common/ConfirmationModal";
 import { useSales } from "../hooks/useSales";
 import {
   ShoppingBag,
@@ -31,6 +32,7 @@ type SalesStatusFilter = "all" | "completed" | "cancelled" | "pending";
 export default function Sales() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<{ isOpen: boolean; localId: string | null }>({ isOpen: false, localId: null });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -58,19 +60,22 @@ export default function Sales() {
     loadSales()
   }, [loadSales])
 
-  const handleCancelSale = useCallback(async (localId: string) => {
-    const confirmed = window.confirm("¿Estás seguro de cancelar esta venta?");
-    if (!confirmed) return
-    
-    setCancellingId(localId)
+  const handleCancelSale = useCallback((localId: string) => {
+    setConfirmCancel({ isOpen: true, localId })
+  }, [])
+
+  const confirmCancelSale = useCallback(async () => {
+    if (!confirmCancel.localId) return
+    setCancellingId(confirmCancel.localId)
     try {
-      await cancelSale(localId)
+      await cancelSale(confirmCancel.localId)
     } catch {
       // Error already handled in hook
     } finally {
       setCancellingId(null)
+      setConfirmCancel({ isOpen: false, localId: null })
     }
-  }, [cancelSale])
+  }, [confirmCancel.localId, cancelSale])
 
   const handleCustomDateApply = useCallback(() => {
     if (customStart && customEnd) {
@@ -553,6 +558,14 @@ export default function Sales() {
           </div>
         </div>
       )}
+      <ConfirmationModal
+        isOpen={confirmCancel.isOpen}
+        message="¿Estás seguro de cancelar esta venta?"
+        title="Cancelar Venta"
+        confirmText="Cancelar"
+        onConfirm={confirmCancelSale}
+        onCancel={() => setConfirmCancel({ isOpen: false, localId: null })}
+      />
     </div>
   );
 }

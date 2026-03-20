@@ -135,46 +135,64 @@ export async function saveInvoiceSettings(
 
 export async function getNextInvoiceNumber(): Promise<Result<NumerationResult, AppError>> {
   try {
-    const settings = await getInvoiceSettings();
-    if (!settings.ok) return Err(settings.error);
-
+    const tenantSlug = getCurrentTenantSlug();
     const today = new Date().toISOString().split('T')[0];
     const currentMonth = today.substring(0, 7);
 
-    let newNumber = 1;
-    let controlPrefix = '';
+    let invoiceNumber = '000001';
+    let controlNumber = '';
 
-    if (settings.value) {
-      switch (settings.value.sequentialType) {
-        case 'daily':
-          if (settings.value.lastInvoiceDate === today) {
-            newNumber = settings.value.lastInvoiceNumber + 1;
-            controlPrefix = today.slice(-2);
-          } else {
-            newNumber = 1;
-            controlPrefix = today.slice(-2);
-          }
-          break;
-        case 'monthly':
-          if (settings.value.lastInvoiceDate?.startsWith(currentMonth)) {
-            newNumber = settings.value.lastInvoiceNumber + 1;
-            controlPrefix = currentMonth.replace('-', '');
-          } else {
-            newNumber = 1;
-            controlPrefix = currentMonth.replace('-', '');
-          }
-          break;
-        case 'global':
-          newNumber = settings.value.lastInvoiceNumber + 1;
-          controlPrefix = settings.value.lastControlPrefix || '00';
-          break;
+    await db.transaction('rw', db.invoiceSettings, async () => {
+      const existing = await db.invoiceSettings.where('tenantId').equals(tenantSlug).first();
+
+      let newNumber = 1;
+      let controlPrefix = today.slice(-2);
+
+      if (existing) {
+        switch (existing.sequentialType) {
+          case 'daily':
+            if (existing.lastInvoiceDate === today) {
+              newNumber = existing.lastInvoiceNumber + 1;
+            }
+            break;
+          case 'monthly':
+            if (existing.lastInvoiceDate?.startsWith(currentMonth)) {
+              newNumber = existing.lastInvoiceNumber + 1;
+              controlPrefix = currentMonth.replace('-', '');
+            }
+            break;
+          case 'global':
+            newNumber = existing.lastInvoiceNumber + 1;
+            controlPrefix = existing.lastControlPrefix || '00';
+            break;
+        }
       }
-    } else {
-      controlPrefix = today.slice(-2);
-    }
 
-    const invoiceNumber = String(newNumber).padStart(6, '0');
-    const controlNumber = `${controlPrefix}-${invoiceNumber}`;
+      invoiceNumber = String(newNumber).padStart(6, '0');
+      controlNumber = `${controlPrefix}-${invoiceNumber}`;
+
+      const num = parseInt(invoiceNumber, 10);
+
+      if (existing) {
+        await db.invoiceSettings.put({
+          ...existing,
+          lastInvoiceNumber: num,
+          lastInvoiceDate: today,
+          lastControlPrefix: controlPrefix,
+        });
+      } else {
+        await db.invoiceSettings.add({
+          localId: crypto.randomUUID(),
+          tenantId: tenantSlug,
+          sequentialType: 'daily',
+          lastInvoiceNumber: num,
+          lastInvoiceDate: today,
+          lastControlPrefix: controlPrefix,
+          igtfEnabled: true,
+          igtfPercentage: IGTF_PERCENTAGE,
+        });
+      }
+    });
 
     return Ok({ invoiceNumber, controlNumber });
   } catch (error) {
@@ -182,35 +200,6 @@ export async function getNextInvoiceNumber(): Promise<Result<NumerationResult, A
       category: logCategories.SALES,
     });
     return Err(new AppError('Error al generar numeración', 'NUMBERING_ERROR', 500));
-  }
-}
-
-export async function updateLastInvoiceNumber(invoiceNumber: string, controlNumber: string): Promise<void> {
-  const tenantSlug = getCurrentTenantSlug();
-  const today = new Date().toISOString().split('T')[0];
-  const num = parseInt(invoiceNumber, 10);
-  const prefix = controlNumber.split('-')[0];
-
-  const existing = await db.invoiceSettings.where('tenantId').equals(tenantSlug).first();
-
-  if (existing) {
-    await db.invoiceSettings.put({
-      ...existing,
-      lastInvoiceNumber: num,
-      lastInvoiceDate: today,
-      lastControlPrefix: prefix,
-    });
-  } else {
-    await db.invoiceSettings.add({
-      localId: crypto.randomUUID(),
-      tenantId: tenantSlug,
-      sequentialType: 'daily',
-      lastInvoiceNumber: num,
-      lastInvoiceDate: today,
-      lastControlPrefix: prefix,
-      igtfEnabled: true,
-      igtfPercentage: IGTF_PERCENTAGE,
-    });
   }
 }
 

@@ -6,7 +6,11 @@ import { Ok, Err, Result, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 import * as movementsService from '@/features/accounting/services/movements.service';
 
-function getCurrentTenantId(): string {
+/**
+ * Obtiene el slug del tenant activo.
+ * @throws {AppError} Si no hay tenant activo
+ */
+function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
     throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
@@ -64,13 +68,13 @@ function validateSaleInput(data: CreateSaleInput): string[] {
 }
 
 export async function getSales(): Promise<Sale[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.sales.where('tenantId').equals(tenantId).toArray();
 }
 
 export async function getSaleById(localId: string): Promise<Result<Sale, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const sale = await db.sales
       .where('localId')
       .equals(localId)
@@ -90,7 +94,7 @@ export async function getSaleById(localId: string): Promise<Result<Sale, AppErro
 
 export async function createSale(data: CreateSaleInput): Promise<Result<string, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     
     const errors = validateSaleInput(data);
     if (errors.length > 0) {
@@ -180,7 +184,7 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
 
 export async function cancelSale(localId: string): Promise<Result<void, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const sale = await db.sales
       .where('localId')
       .equals(localId)
@@ -213,7 +217,7 @@ export async function cancelSale(localId: string): Promise<Result<void, AppError
 }
 
 export async function getSalesByDateRange(startDate: Date, endDate: Date): Promise<Sale[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.sales
     .where('tenantId')
     .equals(tenantId)
@@ -227,7 +231,7 @@ export async function getSalesStats(): Promise<{
   completedCount: number;
   cancelledCount: number;
 }> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   const sales = await db.sales.where('tenantId').equals(tenantId).toArray();
   
   return {
@@ -249,7 +253,7 @@ export async function getDailyStats(): Promise<{
     pago_movil: number;
   };
 }> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);

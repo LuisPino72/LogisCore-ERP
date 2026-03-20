@@ -4,7 +4,7 @@ import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 
-function getCurrentTenantId(): string {
+function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
     throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
@@ -13,13 +13,13 @@ function getCurrentTenantId(): string {
 }
 
 export async function getCategories(): Promise<Category[]> {
-  const tenantId = getCurrentTenantId();
+  const tenantId = getCurrentTenantSlug();
   return db.categories.where('tenantId').equals(tenantId).toArray();
 }
 
 export async function createCategory(data: Omit<Category, 'id' | 'localId' | 'tenantId' | 'createdAt' | 'syncedAt'>): Promise<Result<string, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
 
     if (!data.name?.trim()) {
       return Err(new ValidationError('El nombre de la categoría es requerido'));
@@ -46,7 +46,7 @@ export async function createCategory(data: Omit<Category, 'id' | 'localId' | 'te
 
 export async function updateCategory(localId: string, data: Partial<Category>): Promise<Result<void, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const category = await db.categories
       .where('localId')
       .equals(localId)
@@ -71,7 +71,7 @@ export async function updateCategory(localId: string, data: Partial<Category>): 
 
 export async function deleteCategory(localId: string): Promise<Result<void, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const category = await db.categories
       .where('localId')
       .equals(localId)

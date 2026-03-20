@@ -6,6 +6,7 @@ import type { SortField } from '../types/employees.types'
 import { Employee } from '@/lib/db'
 import Card from '@/common/Card'
 import Button from '@/common/Button'
+import { ConfirmationModal } from '@/common/ConfirmationModal'
 import {
   Users,
   Search,
@@ -169,6 +170,7 @@ export default function Employees() {
   const [currentPage, setCurrentPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set())
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; localId: string | null }>({ isOpen: false, localId: null })
 
   const { loading, loadEmployees, createEmployee, updatePermissions, deleteEmployee } = useEmployees()
 
@@ -213,11 +215,17 @@ export default function Employees() {
     return success
   }
 
-  const handleDeleteEmployee = async (employee: Employee) => {
-    const success = await deleteEmployee(employee.localId)
+  const handleDeleteEmployee = (employee: Employee) => {
+    setConfirmDelete({ isOpen: true, localId: employee.localId })
+  }
+
+  const confirmDeleteEmployee = async () => {
+    if (!confirmDelete.localId) return
+    const success = await deleteEmployee(confirmDelete.localId)
     if (success) {
       loadEmployeesData(searchQuery, sort, currentPage, PAGE_SIZE)
     }
+    setConfirmDelete({ isOpen: false, localId: null })
   }
 
   const openCreateModal = () => {
@@ -433,6 +441,14 @@ export default function Employees() {
         onClose={() => setShowModal(false)}
         onSave={isEditing ? handleUpdatePermissions : handleCreateEmployee}
         isEditing={isEditing}
+      />
+      <ConfirmationModal
+        isOpen={confirmDelete.isOpen}
+        message="¿Estás seguro de eliminar este empleado?"
+        title="Eliminar Empleado"
+        confirmText="Eliminar"
+        onConfirm={confirmDeleteEmployee}
+        onCancel={() => setConfirmDelete({ isOpen: false, localId: null })}
       />
     </div>
   )

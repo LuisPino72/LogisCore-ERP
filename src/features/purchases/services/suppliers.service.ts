@@ -4,7 +4,7 @@ import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, NotFoundError, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 
-function getCurrentTenantId(): string {
+function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
   if (!currentTenant) {
     throw new AppError('No hay tenant activo', 'NO_TENANT', 400);
@@ -14,7 +14,7 @@ function getCurrentTenantId(): string {
 
 export async function getSuppliers(): Promise<Supplier[]> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     return db.suppliers.where('tenantId').equals(tenantId).toArray();
   } catch (_error) {
     return [];
@@ -23,7 +23,7 @@ export async function getSuppliers(): Promise<Supplier[]> {
 
 export async function createSupplier(data: Omit<Supplier, 'id' | 'localId' | 'tenantId' | 'createdAt' | 'updatedAt' | 'syncedAt'>): Promise<Result<string, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
 
     if (!data.name?.trim()) {
       return Err(new ValidationError('El nombre del proveedor es requerido'));
@@ -54,7 +54,7 @@ export async function createSupplier(data: Omit<Supplier, 'id' | 'localId' | 'te
 
 export async function updateSupplier(localId: string, data: Partial<Supplier>): Promise<Result<void, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const supplier = await db.suppliers
       .where('localId')
       .equals(localId)
@@ -79,7 +79,7 @@ export async function updateSupplier(localId: string, data: Partial<Supplier>): 
 
 export async function deleteSupplier(localId: string): Promise<Result<void, AppError>> {
   try {
-    const tenantId = getCurrentTenantId();
+    const tenantId = getCurrentTenantSlug();
     const supplier = await db.suppliers
       .where('localId')
       .equals(localId)
