@@ -26,7 +26,7 @@ class Logger {
   }
 
   private output(entry: LogEntry): void {
-    if (!this.isDevelopment && entry.level === 'debug') return;
+    if (!this.isDevelopment && (entry.level === 'debug' || entry.level === 'info')) return;
 
     const prefix = `[${entry.timestamp}] [${entry.level.toUpperCase()}]`;
     
