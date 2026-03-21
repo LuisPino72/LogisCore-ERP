@@ -137,14 +137,6 @@ export default function Inventory() {
     }
   }, [loadData])
 
-  useEffect(() => {
-    if (filters.barcodeScan && paginatedProducts.length === 1) {
-      const product = paginatedProducts[0]
-      handleEdit(product)
-      setBarcodeScan('')
-    }
-  }, [filters.barcodeScan, paginatedProducts])
-
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -212,6 +204,18 @@ export default function Inventory() {
     setEditingId(product.localId)
     setShowModal(true)
   }, [setForm, setImagePreview, setEditingId, setShowModal])
+
+  useEffect(() => {
+    if (filters.barcodeScan && paginatedProducts.length === 1) {
+      const product = paginatedProducts[0]
+      handleEdit(product)
+      setBarcodeScan('')
+    }
+  }, [filters.barcodeScan, paginatedProducts, handleEdit, setBarcodeScan])
+
+  const handleSortChange = useCallback((sortConfig: SortConfig) => {
+    setSort(sortConfig)
+  }, [setSort])
 
   const handleDelete = useCallback(async (localId: string) => {
     const success = await deleteProduct(localId)
@@ -314,11 +318,11 @@ export default function Inventory() {
             totalPages={totalPages}
             filteredCount={filteredProducts.length}
             selectedProducts={selectedProducts}
-            sort={filters.sort as any}
+            sort={filters.sort}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onPageChange={setCurrentPage}
-            onSort={setSort as any}
+            onSort={handleSortChange}
             onToggleSelection={toggleProductSelection}
             getStockStatus={getStockStatus}
           />

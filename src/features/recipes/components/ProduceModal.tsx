@@ -18,10 +18,10 @@ export default function ProduceModal({ recipe, products, onClose, onProduce }: P
     return products.find((p) => p.localId === productId)?.name || "Sin producto";
   };
 
-  const getIngredientStock = (productId: string) => {
+  const getIngredientStock = useCallback((productId: string) => {
     const product = products.find((p) => p.localId === productId);
     return product?.stock || 0;
-  };
+  }, [products]);
 
   const canProduce = useCallback((qty: number) => {
     return recipe.ingredients.every((ing) => {
@@ -29,7 +29,7 @@ export default function ProduceModal({ recipe, products, onClose, onProduce }: P
       const needed = (ing.quantity * qty) / recipe.yield;
       return stock >= needed;
     });
-  }, [recipe, products]);
+  }, [recipe, getIngredientStock]);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">

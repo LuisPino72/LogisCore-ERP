@@ -96,6 +96,31 @@ export default function POS() {
 
   const { missingDependencies } = checkModuleDependencies("pos", tenant);
 
+  const loadDailyStats = useCallback(async () => {
+    try {
+      const stats = await getDailyStats();
+      setDailyStats(stats);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const loadSuspended = useCallback(async () => {
+    if (!tenant?.slug) return;
+    try {
+      const result = await getSuspendedSales(tenant.slug);
+      if (result.ok) {
+        setSuspendedSales(result.value);
+      } else {
+        logger.error("Error loading suspended sales", result.error, { category: logCategories.SYNC });
+        showError("Error al cargar ventas suspendidas");
+      }
+    } catch (error) {
+      logger.error("Error loading suspended sales", error as Error, { category: logCategories.SYNC });
+      showError("Error al cargar ventas suspendidas");
+    }
+  }, [tenant?.slug, showError]);
+
   useEffect(() => {
     getExchangeRate().then((result) => {
       if (isOk(result) && result.value) setExchangeRate(result.value.rate);
@@ -114,32 +139,7 @@ export default function POS() {
     });
     loadDailyStats();
     loadSuspended();
-  }, [tenant?.slug]);
-
-  const loadDailyStats = async () => {
-    try {
-      const stats = await getDailyStats();
-      setDailyStats(stats);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const loadSuspended = useCallback(async () => {
-    if (!tenant?.slug) return;
-    try {
-      const result = await getSuspendedSales(tenant.slug);
-      if (result.ok) {
-        setSuspendedSales(result.value);
-      } else {
-        logger.error("Error loading suspended sales", result.error, { category: logCategories.SYNC });
-        showError("Error al cargar ventas suspendidas");
-      }
-    } catch (error) {
-      logger.error("Error loading suspended sales", error as Error, { category: logCategories.SYNC });
-      showError("Error al cargar ventas suspendidas");
-    }
-  }, [tenant?.slug, showError]);
+  }, [tenant, loadDailyStats, loadSuspended]);
 
   const filteredProducts = useMemo(
     () => filterProducts(products, search, selectedCategory, sort, showFavoritesOnly),
@@ -258,7 +258,7 @@ export default function POS() {
     } catch {
       showError("Error al registrar la venta");
     }
-  }, [tenant, cart, cartTotal, paymentMethod, exchangeRate, showError, showSuccess, invoicingEnabled]);
+  }, [tenant, cart, cartTotal, paymentMethod, exchangeRate, showError, showSuccess, invoicingEnabled, loadDailyStats]);
 
   const handleGenerateInvoice = useCallback(() => {
     if (lastSaleId && lastSaleCart.length > 0) {
@@ -283,7 +283,7 @@ export default function POS() {
     setShowSuspendInputModal(false);
     showSuccess("Venta suspendida");
     loadSuspended();
-  }, [tenant, cart, suspendNote, showSuccess, loadSuspended]);
+  }, [tenant, cart, suspendNote, showSuccess, showError, loadSuspended]);
 
   const handleResumeSale = useCallback(
     async (sale: SuspendedSale) => {
@@ -312,7 +312,7 @@ export default function POS() {
     loadSuspended();
     showSuccess("Venta eliminada");
     setConfirmDelete({ isOpen: false, localId: null });
-  }, [confirmDelete.localId, loadSuspended, showSuccess]);
+  }, [confirmDelete.localId, loadSuspended, showSuccess, showError]);
 
   const getStockStatus = (stock: number) =>
     stock === 0 || stock <= 5 ? "text-red-400" : stock <= 10 ? "text-amber-400" : "text-slate-500";

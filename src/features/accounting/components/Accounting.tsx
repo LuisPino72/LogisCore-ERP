@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
+import { MovementType, MovementCategory } from '@/lib/db';
 import { useAccounting, AccountingTab } from '../hooks/useAccounting';
 import StatsCards from './StatsCards';
 import MovementFilters from './MovementFilters';
@@ -79,8 +80,8 @@ export default function Accounting() {
               type={filters.type}
               category={filters.category}
               search={filters.search}
-              onTypeChange={(value) => setFilters({ ...filters, type: value as any })}
-              onCategoryChange={(value) => setFilters({ ...filters, category: value as any })}
+              onTypeChange={(value) => setFilters({ ...filters, type: value as MovementType | 'all' })}
+              onCategoryChange={(value) => setFilters({ ...filters, category: value as MovementCategory | 'all' })}
               onSearchChange={(value) => setFilters({ ...filters, search: value })}
             />
 

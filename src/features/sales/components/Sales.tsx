@@ -102,13 +102,13 @@ export default function Sales() {
         customStart={customStart}
         customEnd={customEnd}
         onSearchChange={setSearch}
-        onDateRangeChange={setDateRange as any}
+        onDateRangeChange={setDateRange}
         onCustomDateApply={handleCustomDateApply}
         onCustomStartChange={setCustomStart}
         onCustomEndChange={setCustomEnd}
         onToggleDatePicker={() => setShowDatePicker(!showDatePicker)}
-        onPaymentFilterChange={setPaymentFilter as any}
-        onStatusFilterChange={setStatusFilter as any}
+        onPaymentFilterChange={setPaymentFilter}
+        onStatusFilterChange={setStatusFilter}
       />
 
       <Card>
