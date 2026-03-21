@@ -157,6 +157,57 @@ export async function deleteProduct(localId: string): Promise<Result<void, AppEr
   }
 }
 
+export async function softDeleteProduct(localId: string): Promise<Result<void, AppError>> {
+  try {
+    const productResult = await getProductById(localId);
+    
+    if (!productResult.ok) {
+      return Err(productResult.error);
+    }
+
+    const product = productResult.value;
+    const updated = { ...product, isActive: false, updatedAt: new Date() };
+    
+    await db.products.put(updated);
+    await SyncEngine.addToQueue('products', 'update', updated as unknown as Record<string, unknown>, localId);
+    
+    EventBus.emit(Events.INVENTORY_UPDATED, { action: 'soft_delete', localId });
+    logger.info('Producto desactivado (soft delete)', { localId, category: logCategories.INVENTORY });
+    
+    return Ok(undefined);
+  } catch (error) {
+    if (error instanceof AppError) {
+      return Err(error);
+    }
+    logger.error('Error al desactivar producto', error as Error, { category: logCategories.INVENTORY });
+    return Err(new AppError('Error al desactivar producto', 'SOFT_DELETE_PRODUCT_ERROR', 500));
+  }
+}
+
+export async function hardDeleteProduct(localId: string): Promise<Result<void, AppError>> {
+  try {
+    const productResult = await getProductById(localId);
+    
+    if (!productResult.ok) {
+      return Err(productResult.error);
+    }
+
+    await db.products.where('localId').equals(localId).delete();
+    await SyncEngine.addToQueue('products', 'delete', { localId }, localId);
+    
+    EventBus.emit(Events.INVENTORY_UPDATED, { action: 'hard_delete', localId });
+    logger.info('Producto eliminado permanentemente (hard delete)', { localId, category: logCategories.INVENTORY });
+    
+    return Ok(undefined);
+  } catch (error) {
+    if (error instanceof AppError) {
+      return Err(error);
+    }
+    logger.error('Error al eliminar producto permanentemente', error as Error, { category: logCategories.INVENTORY });
+    return Err(new AppError('Error al eliminar producto', 'HARD_DELETE_PRODUCT_ERROR', 500));
+  }
+}
+
 export async function updateStock(localId: string, quantity: number): Promise<Result<void, AppError>> {
   try {
     const productResult = await getProductById(localId);

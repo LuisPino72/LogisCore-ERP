@@ -9,6 +9,7 @@ import type { ProductFormData, StockFilter, StatusFilter, ViewMode, SortConfig, 
 import { DEFAULT_PRODUCT_FORM } from '../types/inventory.types'
 import { isOk } from '@/lib/types/result'
 import { EventBus, Events } from '@/lib/events/EventBus'
+import { checkProductReferences, type ReferenceWarning } from '@/lib/integrity/referenceChecker'
 
 export interface UseInventoryFilters {
   search: string
@@ -44,6 +45,12 @@ export interface UseInventoryReturn {
   showCategoryModal: boolean
   editingCategory: Category | null
   showBarcodeScanner: boolean
+  deleteWarnings: ReferenceWarning[]
+  showDeleteWarningModal: boolean
+  pendingDeleteIds: string[]
+  setDeleteWarnings: (warnings: ReferenceWarning[]) => void
+  setShowDeleteWarningModal: (show: boolean) => void
+  setPendingDeleteIds: (ids: string[]) => void
   setSearch: (search: string) => void
   setSelectedCategory: (category: number | string) => void
   setViewMode: (mode: ViewMode) => void
@@ -117,6 +124,9 @@ export function useInventory(): UseInventoryReturn {
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
+  const [deleteWarnings, setDeleteWarnings] = useState<ReferenceWarning[]>([])
+  const [showDeleteWarningModal, setShowDeleteWarningModal] = useState(false)
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([])
 
   const loadData = useCallback(async () => {
     if (!tenant?.slug) return
@@ -201,6 +211,25 @@ export function useInventory(): UseInventoryReturn {
 
   const deleteSelectedProducts = useCallback(async () => {
     if (selectedProducts.length === 0) return false
+    
+    const warnings: ReferenceWarning[] = [];
+    for (const localId of selectedProducts) {
+      const checkResult = await checkProductReferences(localId);
+      if (isOk(checkResult) && checkResult.value.warnings.length > 0) {
+        warnings.push(...checkResult.value.warnings);
+      }
+    }
+    
+    if (warnings.length > 0) {
+      const uniqueWarnings = warnings.filter((w, i, arr) => 
+        arr.findIndex(x => x.table === w.table) === i
+      );
+      setDeleteWarnings(uniqueWarnings);
+      setPendingDeleteIds(selectedProducts);
+      setShowDeleteWarningModal(true);
+      return false;
+    }
+    
     setLoading(true)
     let successCount = 0
     for (const localId of selectedProducts) {
@@ -337,6 +366,15 @@ export function useInventory(): UseInventoryReturn {
 
   const deleteProduct = useCallback(
     async (localId: string): Promise<boolean> => {
+      const checkResult = await checkProductReferences(localId);
+      
+      if (isOk(checkResult) && checkResult.value.warnings.length > 0) {
+        setDeleteWarnings(checkResult.value.warnings);
+        setPendingDeleteIds([localId]);
+        setShowDeleteWarningModal(true);
+        return false;
+      }
+      
       setLoading(true)
       const result = await productsService.deleteProduct(localId)
       if (isOk(result)) {
@@ -414,6 +452,12 @@ export function useInventory(): UseInventoryReturn {
     showCategoryModal,
     editingCategory,
     showBarcodeScanner,
+    deleteWarnings,
+    showDeleteWarningModal,
+    pendingDeleteIds,
+    setDeleteWarnings,
+    setShowDeleteWarningModal,
+    setPendingDeleteIds,
     setSearch,
     setSelectedCategory,
     setViewMode,

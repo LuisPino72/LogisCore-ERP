@@ -1,4 +1,4 @@
-import { db, Sale } from '@/lib/db';
+import { db, Sale, Product } from '@/lib/db';
 import { SyncEngine } from '@/lib/sync/SyncEngine';
 import { EventBus, Events } from '@/lib/events/EventBus';
 import { useTenantStore } from '@/store/useTenantStore';
@@ -116,6 +116,12 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
       exchangeRateSource: data.exchangeRateSource || 'manual',
     };
 
+    // 1. ENCOLAR EN SYNC ENGINE PRIMERO (crítico para consistencia offline)
+    await SyncEngine.addToQueue('sales', 'create', sale as unknown as Record<string, unknown>, localId);
+
+    // 2. TRANSACCION: Deduce stock y crea venta
+    const updatedProducts: { localId: string; product: Product; newStock: number }[] = [];
+    
     await db.transaction('rw', db.sales, db.products, db.categories, async () => {
       for (const item of data.items) {
         const product = await db.products
@@ -147,18 +153,23 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
           throw new ValidationError(`Stock insuficiente para ${item.productName}. Disponible: ${product.stock}`);
         }
         
+        const newStock = product.stock - stockToDeduct;
+        updatedProducts.push({ localId: product.localId, product, newStock });
+        
         await db.products.put({
           ...product,
-          stock: product.stock - stockToDeduct,
+          stock: newStock,
           updatedAt: new Date(),
         });
+        
+        // 3. ENCOLAR SYNC DE STOCK (después de actualizar, pero dentro de tx conceptualmente)
+        await SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock } as unknown as Record<string, unknown>, product.localId);
       }
       
       await db.sales.add(sale);
     });
-    
-    await SyncEngine.addToQueue('sales', 'create', sale as unknown as Record<string, unknown>, localId);
 
+    // 4. CREAR MOVIMIENTO CONTABLE (después de tx, fire-and-forget)
     await movementsService.createMovement({
       type: 'income',
       category: 'sale',
@@ -169,7 +180,10 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
       referenceId: localId,
     }).catch(err => logger.error('Error creando movimiento de venta', err, { category: logCategories.SALES }));
 
+    // 5. EMITIR EVENTO (fire-and-forget)
     EventBus.emit(Events.SALE_COMPLETED, { sale });
+    EventBus.emit(Events.INVENTORY_UPDATED, { action: 'sale_completed', sale, updatedProducts });
+    
     logger.info('Venta creada', { saleId: localId, total: data.total, category: logCategories.SALES });
     
     return Ok(localId);

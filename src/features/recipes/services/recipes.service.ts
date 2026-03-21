@@ -194,6 +194,7 @@ export async function canProduce(recipe: Recipe, quantity: number): Promise<Resu
 
 export async function produce(localId: string, quantity: number): Promise<Result<void, AppError>> {
   try {
+    const tenantId = getCurrentTenantSlug();
     const recipeResult = await getRecipeById(localId);
     
     if (!isOk(recipeResult)) {
@@ -207,16 +208,64 @@ export async function produce(localId: string, quantity: number): Promise<Result
       return Err(new ValidationError('Stock insuficiente para producir'));
     }
     
-    const ingredientsUsed: { productId: string; quantity: number }[] = [];
+    const productionLogLocalId = crypto.randomUUID();
+    const productionLog: ProductionLog = {
+      localId: productionLogLocalId,
+      tenantId,
+      recipeId: localId,
+      quantity,
+      ingredientsUsed: [],
+      createdAt: new Date(),
+    };
+
+    // 1. ENCOLAR TODOS LOS SYNC ANTES DE LA TRANSACCION
+    // Production log
+    await SyncEngine.addToQueue('production_logs', 'create', productionLog as unknown as Record<string, unknown>, productionLogLocalId);
     
+    // Preparar datos de ingredientes y productos para encolar
+    const ingredientUpdates: { product: { localId: string; stock: number; updatedAt: Date }; newStock: number }[] = [];
+    
+    for (const ing of recipe.ingredients) {
+      const usedQuantity = (ing.quantity * quantity) / recipe.yield;
+      const product = await db.products
+        .where('localId')
+        .equals(ing.productId)
+        .filter(p => p.tenantId === tenantId)
+        .first();
+      
+      if (product) {
+        const newStock = product.stock - usedQuantity;
+        ingredientUpdates.push({ product: { ...product, stock: product.stock, updatedAt: new Date() }, newStock });
+        
+        // Encolar sync de producto con nuevo stock
+        await SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock, updatedAt: new Date() } as unknown as Record<string, unknown>, product.localId);
+      }
+    }
+    
+    // Obtener producto terminado
+    const finishedProduct = await db.products
+      .where('localId')
+      .equals(recipe.productId)
+      .filter(p => p.tenantId === tenantId)
+      .first();
+    
+    let finishedProductNewStock = 0;
+    if (finishedProduct) {
+      finishedProductNewStock = finishedProduct.stock + quantity;
+      await SyncEngine.addToQueue('products', 'update', { ...finishedProduct, stock: finishedProductNewStock, updatedAt: new Date() } as unknown as Record<string, unknown>, finishedProduct.localId);
+    }
+
+    // 2. TRANSACCION: Solo cambios locales en Dexie
     await db.transaction('rw', db.products, db.productionLogs, async () => {
+      const ingredientsUsed: { productId: string; quantity: number }[] = [];
+      
       for (const ing of recipe.ingredients) {
         const usedQuantity = (ing.quantity * quantity) / recipe.yield;
         
         const product = await db.products
           .where('localId')
           .equals(ing.productId)
-          .filter(p => p.tenantId === getCurrentTenantSlug())
+          .filter(p => p.tenantId === tenantId)
           .first();
         
         if (!product || product.stock < usedQuantity) {
@@ -229,47 +278,35 @@ export async function produce(localId: string, quantity: number): Promise<Result
           updatedAt: new Date(),
         });
         
-        await SyncEngine.addToQueue('products', 'update', { ...product, stock: product.stock - usedQuantity } as unknown as Record<string, unknown>, product.localId);
-        
         ingredientsUsed.push({ productId: ing.productId, quantity: usedQuantity });
       }
       
-      const producedQuantity = quantity;
-      
-      const finishedProduct = await db.products
+      const finishedProductUpdate = await db.products
         .where('localId')
         .equals(recipe.productId)
-        .filter(p => p.tenantId === getCurrentTenantSlug())
+        .filter(p => p.tenantId === tenantId)
         .first();
       
-      if (finishedProduct) {
-        const newStock = finishedProduct.stock + producedQuantity;
+      if (finishedProductUpdate) {
+        const newStock = finishedProductUpdate.stock + quantity;
         await db.products.put({
-          ...finishedProduct,
+          ...finishedProductUpdate,
           stock: newStock,
           updatedAt: new Date(),
         });
-        await SyncEngine.addToQueue('products', 'update', { ...finishedProduct, stock: newStock } as unknown as Record<string, unknown>, finishedProduct.localId);
         
         logger.info('Stock de producto terminado actualizado', {
           productId: recipe.productId,
-          addedStock: producedQuantity,
+          addedStock: quantity,
           newStock,
           category: logCategories.INVENTORY
         });
       }
       
-      const productionLog: ProductionLog = {
-        localId: crypto.randomUUID(),
-        tenantId: getCurrentTenantSlug(),
-        recipeId: localId,
-        quantity,
-        ingredientsUsed,
-        createdAt: new Date(),
-      };
+      // Actualizar productionLog con ingredientsUsed
+      productionLog.ingredientsUsed = ingredientsUsed;
       
       await db.productionLogs.add(productionLog);
-      await SyncEngine.addToQueue('production_logs', 'create', productionLog as unknown as Record<string, unknown>, productionLog.localId);
     });
     
     logger.info('Producción registrada', { 
@@ -278,6 +315,7 @@ export async function produce(localId: string, quantity: number): Promise<Result
       category: logCategories.DATABASE 
     });
     
+    // 3. EMITIR EVENTO (fire-and-forget)
     EventBus.emit(Events.INVENTORY_UPDATED, { action: 'produce', recipe, quantity });
     
     return Ok(undefined);

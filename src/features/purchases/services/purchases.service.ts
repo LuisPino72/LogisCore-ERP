@@ -149,41 +149,42 @@ export async function updatePurchaseStatus(localId: string, status: 'pending' | 
 
     const wasCompleted = purchase.status === 'completed';
     const isNowCompleted = status === 'completed';
-
     const updated = { ...purchase, status };
-    await db.purchases.put(updated);
+
+    // 1. ENCOLAR SYNC DE PURCHASE PRIMERO
     await SyncEngine.addToQueue('purchases', 'update', updated as unknown as Record<string, unknown>, localId);
 
+    // 2. SI SE COMPLETA: Usar transacción para actualizar inventario
     if (!wasCompleted && isNowCompleted) {
-      const inventoryUpdates = purchase.items.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        cost: item.cost,
-      }));
+      await db.transaction('rw', db.purchases, db.products, async () => {
+        await db.purchases.put(updated);
 
-      for (const item of inventoryUpdates) {
-        const product = await db.products
-          .where('localId')
-          .equals(item.productId)
-          .filter(p => p.tenantId === tenantId)
-          .first();
+        for (const item of purchase.items) {
+          const product = await db.products
+            .where('localId')
+            .equals(item.productId)
+            .filter(p => p.tenantId === tenantId)
+            .first();
 
-        if (product) {
-          const newStock = product.stock + item.quantity;
-          const updatedProduct = { ...product, stock: newStock };
-          await db.products.put(updatedProduct);
-          await SyncEngine.addToQueue('products', 'update', updatedProduct as unknown as Record<string, unknown>, item.productId);
+          if (product) {
+            const newStock = product.stock + item.quantity;
+            const updatedProduct = { ...product, stock: newStock };
+            await db.products.put(updatedProduct);
+            
+            // 3. ENCOLAR SYNC DE PRODUCTS (dentro de tx)
+            await SyncEngine.addToQueue('products', 'update', updatedProduct as unknown as Record<string, unknown>, item.productId);
 
-          logger.info('Inventario actualizado por compra', { 
-            productId: item.productId, 
-            addedStock: item.quantity,
-            newStock,
-            category: logCategories.INVENTORY 
-          });
+            logger.info('Inventario actualizado por compra', { 
+              productId: item.productId, 
+              addedStock: item.quantity,
+              newStock,
+              category: logCategories.INVENTORY 
+            });
+          }
         }
-      }
+      });
 
+      // 4. EMITIR EVENTO Y CREAR MOVIMIENTO (fire-and-forget)
       EventBus.emit(Events.INVENTORY_UPDATED, { action: 'purchase_completed', purchase });
 
       await movementsService.createMovement({
@@ -194,6 +195,9 @@ export async function updatePurchaseStatus(localId: string, status: 'pending' | 
         referenceType: 'purchase',
         referenceId: localId,
       }).catch(err => logger.error('Error creando movimiento de compra', err, { category: logCategories.DATABASE }));
+    } else {
+      // Solo actualizar purchase si no se está completando
+      await db.purchases.put(updated);
     }
     
     logger.info('Estado de compra actualizado', { purchaseId: localId, status, category: logCategories.DATABASE });

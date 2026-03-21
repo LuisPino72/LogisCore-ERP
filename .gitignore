@@ -43,3 +43,14 @@ _agent/
 # OpenCode MCP config (puede contener tokens)
 opencode.json
 
+# Supabase
+supabase/.temp/
+supabase/.branches.json
+supabase/config.toml
+
+# Test coverage
+coverage/
+
+# Misc
+*.tsbuildinfo
+

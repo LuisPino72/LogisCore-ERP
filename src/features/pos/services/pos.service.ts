@@ -1,4 +1,5 @@
 import { db, Product, Category, SuspendedSale } from '@/lib/db';
+import { Ok, Err, Result, AppError } from '@/lib/types/result';
 import type { SortConfig, CartItem, SaleItem } from '../types/pos.types';
 
 export type { CartItem, SaleItem } from '../types/pos.types';
@@ -139,40 +140,59 @@ export function prepareSaleItems(cart: CartItem[]): SaleItem[] {
   });
 }
 
-export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], note?: string): Promise<string> {
-  const localId = crypto.randomUUID();
-  const cartData = cart.map(item => ({
-    productId: item.product.localId,
-    productName: item.product.name,
-    quantity: item.quantity,
-    unit: item.unit || 'unit',
-    unitPrice: item.product.price,
-    total: item.product.price * item.quantity,
-    productSnapshot: item.product,
-  }));
-  
-  await db.suspendedSales.add({
-    localId,
-    tenantId: tenantSlug,
-    cart: cartData,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    note,
-  });
-  
-  return localId;
+export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], note?: string): Promise<Result<string, AppError>> {
+  try {
+    const localId = crypto.randomUUID();
+    const cartData = cart.map(item => ({
+      productId: item.product.localId,
+      productName: item.product.name,
+      quantity: item.quantity,
+      unit: item.unit || 'unit',
+      unitPrice: item.product.price,
+      total: item.product.price * item.quantity,
+      productSnapshot: item.product,
+    }));
+    
+    await db.suspendedSales.add({
+      localId,
+      tenantId: tenantSlug,
+      cart: cartData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      note,
+    });
+    
+    return Ok(localId);
+  } catch (_error) {
+    return Err(new AppError('Error al guardar venta suspendida', 'SAVE_SUSPENDED_SALE_ERROR', 500));
+  }
 }
 
-export async function getSuspendedSales(tenantSlug: string): Promise<SuspendedSale[]> {
-  return db.suspendedSales.where('tenantId').equals(tenantSlug).reverse().sortBy('createdAt');
+export async function getSuspendedSales(tenantSlug: string): Promise<Result<SuspendedSale[], AppError>> {
+  try {
+    const sales = await db.suspendedSales.where('tenantId').equals(tenantSlug).reverse().sortBy('createdAt');
+    return Ok(sales);
+  } catch (_error) {
+    return Err(new AppError('Error al obtener ventas suspendidas', 'GET_SUSPENDED_SALES_ERROR', 500));
+  }
 }
 
-export async function loadSuspendedSale(localId: string): Promise<SuspendedSale | undefined> {
-  return db.suspendedSales.where('localId').equals(localId).first();
+export async function loadSuspendedSale(localId: string): Promise<Result<SuspendedSale | undefined, AppError>> {
+  try {
+    const sale = await db.suspendedSales.where('localId').equals(localId).first();
+    return Ok(sale);
+  } catch (_error) {
+    return Err(new AppError('Error al cargar venta suspendida', 'LOAD_SUSPENDED_SALE_ERROR', 500));
+  }
 }
 
-export async function deleteSuspendedSale(localId: string): Promise<void> {
-  await db.suspendedSales.where('localId').equals(localId).delete();
+export async function deleteSuspendedSale(localId: string): Promise<Result<void, AppError>> {
+  try {
+    await db.suspendedSales.where('localId').equals(localId).delete();
+    return Ok(undefined);
+  } catch (_error) {
+    return Err(new AppError('Error al eliminar venta suspendida', 'DELETE_SUSPENDED_SALE_ERROR', 500));
+  }
 }
 
 export function findProductBySku(products: Product[], sku: string): Product | undefined {

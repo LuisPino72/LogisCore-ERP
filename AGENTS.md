@@ -65,15 +65,20 @@ supabase.from('products').eq('tenant_slug', tenant.slug)
 if (!data.name?.trim()) return Err(new ValidationError('...'));
 // 2. Guardar en Dexie
 await db.products.add(product);
-// 3. Encolar sync (CRÍTICO)
+// 3. Encolar sync (ANTES de transacción si hay alguna)
 await SyncEngine.addToQueue('products', 'create', product, localId);
 // 4. Emitir evento
 EventBus.emit(Events.INVENTORY_UPDATED, { action: 'create', product });
 ```
-> **Si omites el paso 3, los datos NO se sincronizan.**
+> **SyncEngine.addToQueue SIEMPRE antes de la transacción.**
 
 ## 2.4 Transacciones en Dexie
-> Para operaciones que modifican múltiples tablas, usar `db.transaction('rw', db.table1, db.table2, ...)`.
+> Para operaciones que modifican múltiples tablas, usar `TransactionManager` singleton:
+
+```typescript
+import { txManager } from '@/lib/db/TransactionManager';
+const result = await txManager.transaction([db.sales, db.products], async () => { ... });
+```
 
 ## 2.5 Code-Splitting
 > Usar `lazy()` para módulos no críticos: `const POS = lazy(() => import('@/features/pos'))`
@@ -91,6 +96,27 @@ getSuspendedSales(tenantSlug)
 deleteSuspendedSale(localId)
 ```
 
+## 2.8 Soft-Delete y Hard-Delete
+```typescript
+// Soft-delete: desactiva (para productos con referencias)
+softDeleteProduct(localId)     // products.service.ts
+
+// Hard-delete: elimina permanentemente (owner solo, verificar refs primero)
+hardDeleteProduct(localId)     // products.service.ts
+hardDeleteCustomer(localId)     // customers.service.ts
+```
+
+## 2.9 Verificación de Integridad Referencial
+```typescript
+import { checkProductReferences, checkCustomerReferences } from '@/lib/integrity/referenceChecker';
+
+const result = await checkProductReferences(localId);
+if (isOk(result)) {
+  result.value.warnings;  // ReferenceWarning[]
+  result.value.canDelete; // boolean (false si hay severity: 'block')
+}
+```
+
 ---
 
 # SECCIÓN 3: Sistema de Módulos
@@ -106,17 +132,6 @@ deleteSuspendedSale(localId)
 | `sales` | `inventory` | Descuenta stock |
 | `dashboard`, `reports`, `exchange-rate` | - | Siempre visibles |
 
-## Helper para Verificar Módulos
-```typescript
-import { isModuleEnabled, checkModuleDependencies } from '@/store/useTenantStore';
-
-// Verificar módulo y dependencias
-const { enabled, missingDependencies } = checkModuleDependencies('pos', tenant);
-if (missingDependencies.length > 0) {
-  // Mostrar mensaje: "Activa el módulo: inventory"
-}
-```
-
 ## Planes de Suscripción
 
 | Plan | Módulos | Descripción |
@@ -126,8 +141,6 @@ if (missingDependencies.length > 0) {
 | **POS** | +pos, sales | Punto de venta con registro |
 | **Negocio** | +customers, purchases | Con clientes y compras |
 | **Empresa** | +employees, accounting, invoicing, recipes | Control total |
-
-**Dependencias:** `inventory → pos → sales → invoicing` (invoicing requiere customers)
 
 **Configuración por defecto:**
 ```json
@@ -142,11 +155,6 @@ if (missingDependencies.length > 0) {
 2. Consultar `user_roles` del usuario
 3. Si `super_admin` → acceso al panel admin
 4. Si `owner`/`employee` → cargar tenant relacionado
-
-**Estructura user_roles:**
-```sql
-user_roles: user_id, role, tenant_id (NULL para super_admin), tenant_slug, permissions
-```
 
 **Filtrado por tenant_slug EXACTO:**
 ```typescript
@@ -163,15 +171,25 @@ supabase.from('products').or(`tenant_slug.eq.${tenantSlug},tenant_slug.is.null`)
 ## Edge Function sync_table_item
 Recibe: `p_table`, `p_operation`, `p_data`, `p_local_id`, `p_tenant_uuid`, `p_tenant_slug`
 
-La función debe setear `tenant_id` (UUID) y `tenant_slug` en operaciones create/update.
-
 ## Circuit Breaker
 ```typescript
 SyncEngine.getCircuitStatus()           // { status, failures, ... }
 SyncEngine.resolveConflict(itemId, 'local' | 'server')
 SyncEngine.getConflicts()
 SyncEngine.retryFailedItems()
-SyncEngine.getSyncStats()                // { pending, failed, conflicts }
+SyncEngine.getSyncStats()              // { pending, failed, conflicts }
+```
+
+## SyncStatusBadge
+Componente en navbar que muestra estado de sincronización. Ubicado en:
+```
+src/features/reports/components/SyncStatusBadge.tsx
+```
+
+## useRealtimeSync
+Hook para suscripción a eventos del EventBus en POS:
+```
+src/features/pos/hooks/useRealtimeSync.ts
 ```
 
 ---
@@ -219,9 +237,6 @@ useEffect(() => { loadData(); }, [loadData]);
 useEffect(() => { async function loadData() { ... } loadData(); }, [tenant?.slug]);
 ```
 
-## Campos Opcionales en Dexie
-> No requieren migraciones. Agregar campo opcional al interface y usar `?.` al guardar.
-
 ## UI Collapsible
 ```tsx
 const [showHistory, setShowHistory] = useState(false);
@@ -233,25 +248,32 @@ const [showHistory, setShowHistory] = useState(false);
 
 ---
 
-# SECCIÓN 9: Testing
+# SECCIÓN 9: Estructura de Archivos
+
+Cada feature sigue esta estructura:
+```
+src/features/{modulo}/
+├── components/     # UI (JSX, NO accede a db)
+├── services/       # Lógica de negocio (OBLIGATORIO)
+├── types/          # Tipos TypeScript
+├── hooks/          # Custom hooks
+├── test/           # Tests unitarios
+└── index.ts        # Exports
+```
+
+---
+
+# SECCIÓN 10: Testing
 
 ## Mocks Estándar
 ```typescript
 vi.mock('@/store/useTenantStore', () => ({
   useTenantStore: { getState: vi.fn(() => ({ currentTenant: { slug: 'test' } })) },
 }));
-
 vi.mock('@/lib/sync/SyncEngine', () => ({
   SyncEngine: { addToQueue: vi.fn().mockResolvedValue(undefined) },
 }));
 ```
-
-## Tests por Feature
-Cada módulo debe tener:
-- `*.validation.test.ts` - Validaciones
-- `*.service.test.ts` - Lógica de negocio
-
-> **Warnings de `any` en tests son intencionales.** NO agregar `eslint-disable`.
 
 ## Eventos del Sistema
 ```typescript
@@ -267,7 +289,7 @@ Events.STOCK_LOW         // 'stock.low'
 
 - [ ] ¿La lógica está en un servicio, no en el componente?
 - [ ] ¿El servicio retorna `Result<T, AppError>`?
-- [ ] ¿Las escrituras usan transacción si modifican múltiples tablas?
+- [ ] ¿SyncEngine.addToQueue está ANTES de la transacción?
 - [ ] ¿Se usa `useToast()` en lugar de `alert()`?
 - [ ] ¿Nueva tabla tiene RLS?
 - [ ] ¿Se usa `tenant.slug` para filtrar en Dexie?
@@ -282,11 +304,13 @@ Events.STOCK_LOW         // 'stock.low'
 | Archivo | Propósito |
 |---------|-----------|
 | `src/lib/db/index.ts` | Schema Dexie y tipos |
+| `src/lib/db/TransactionManager.ts` | Singleton para transacciones |
+| `src/lib/integrity/referenceChecker.ts` | Verificación de integridad referencial |
 | `src/types/result.ts` | Result<T>, AppError |
 | `src/lib/sync/SyncEngine.ts` | Sincronización offline |
 | `src/features/*/services/*.service.ts` | Servicios por módulo |
 | `src/App.tsx` | Login, carga de datos |
-| Edge Function: `sync_table_item` | Sync a Supabase |
+| `supabase/functions/sync_table_item/` | Edge Function de sincronización |
 
 ---
 
@@ -295,24 +319,6 @@ Events.STOCK_LOW         // 'stock.low'
 | ❌ Error | ✅ Corrección |
 |----------|---------------|
 | `db.table.delete(localId)` | `db.table.where('localId').equals(localId).delete()` |
-| Sin transacción | Usar `db.transaction('rw', db.table1, ...)` |
-| No deducir stock en ventas | Descontar siempre en `createSale()` |
+| SyncEngine.after tx | SyncEngine ANTES de `db.transaction()` |
 | Componente → Supabase directo | Siempre pasar por Dexie + SyncEngine |
 | Filtrar por `tenant_id` en Supabase | Usar `tenant_slug` |
-
----
-
-# Estructura de Archivos por Feature
-
-```
-src/features/{modulo}/
-├── components/     # UI (JSX, handlers simples)
-├── services/      # Lógica de negocio (OBLIGATORIO)
-├── types/         # Tipos TypeScript
-├── hooks/         # Custom hooks
-├── test/          # Tests unitarios
-└── index.ts       # Exports
-```
-
-**services/**: Acceso a Dexie, retorna `Result<T, AppError>`, funciones async
-**components/**: Solo JSX, NO accede a `db` directamente

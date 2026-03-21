@@ -4,7 +4,7 @@ import { useThemeStore, applyCssVariables } from "@/store/useThemeStore";
 import { Login } from "@/features/auth";
 import AdminPanel from "@/features/adminpanel/components/AdminPanel";
 import UpdatePassword from "@/features/auth/components/UpdatePassword";
-import SyncStatus from "@/features/auth/components/SyncStatus";
+import { SyncStatusBadge } from "@/features/reports/components/SyncStatusBadge";
 import { ToastProvider } from "@/providers/ToastProvider";
 import { initializeCatalogs } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
@@ -675,7 +675,7 @@ function App() {
               </div>
 
               <div className="flex items-center gap-3">
-
+                <SyncStatusBadge />
                 <span className="px-3 py-1 bg-(--brand-500)/10 rounded-full text-xs font-medium uppercase tracking-wider text-(--brand-400) border border-(--brand-500)/30">
                   {role}
                 </span>
@@ -723,7 +723,6 @@ function App() {
         )}
 
         <main className="p-6">{renderModule()}</main>
-        {!isAdminPanel && <SyncStatus />}
       </div>
 
       {mobileMenuOpen && !isAdminPanel && (

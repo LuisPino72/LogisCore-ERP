@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTenantStore } from '@/store/useTenantStore'
 import { useToast } from '@/providers/ToastProvider'
 import * as posService from '../services/pos.service'
 import * as salesService from '@/features/sales/services/sales.service'
 import * as productsService from '@/features/inventory/services/products.service'
 import * as exchangeRateService from '@/features/exchange-rate/services/exchangeRate.service'
+import { useRealtimeSync } from './useRealtimeSync'
 import type { CartItem, SaleItem } from '../types/pos.types'
 import { isOk } from '@/lib/types/result'
 import type { Product, Category } from '@/lib/db'
@@ -51,14 +52,20 @@ export function usePOS(): UsePOSReturn {
   const [exchangeRate, setExchangeRate] = useState(0)
   const [loading, setLoading] = useState(false)
 
-  const loadData = useCallback(async () => {
+  const loadDataRef = useRef<() => Promise<void>>(async () => {
     if (!tenant?.slug) return
     setLoading(true)
     const data = await posService.loadPOSData(tenant.slug)
     setProducts(data.products)
     setCategories(data.categories)
     setLoading(false)
-  }, [tenant?.slug])
+  })
+
+  const loadData = useCallback(async () => {
+    await loadDataRef.current()
+  }, [])
+
+  useRealtimeSync(loadDataRef.current, loadDataRef.current)
 
   useEffect(() => {
     const loadExchangeRate = async () => {
@@ -165,9 +172,10 @@ export function usePOS(): UsePOSReturn {
     setCart([])
     setShowCheckout(false)
     showSuccess('Venta registrada exitosamente!')
-    await loadData()
     setLoading(false)
-  }, [tenant, cart, cartTotal, paymentMethod, exchangeRate, showError, showSuccess, loadData])
+    // No necesitamos llamar loadData() manualmente
+    // useRealtimeSync se encarga de actualizar cuando recibe SALE_COMPLETED
+  }, [tenant, cart, cartTotal, paymentMethod, exchangeRate, showError, showSuccess])
 
   return {
     products,

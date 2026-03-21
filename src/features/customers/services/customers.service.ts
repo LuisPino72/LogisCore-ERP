@@ -264,6 +264,34 @@ export async function deleteCustomer(localId: string): Promise<Result<void, AppE
   }
 }
 
+export async function hardDeleteCustomer(localId: string): Promise<Result<void, AppError>> {
+  try {
+    const tenantSlug = getCurrentTenantSlug();
+    const customer = await db.customers
+      .where('localId')
+      .equals(localId)
+      .filter((c) => c.tenantId === tenantSlug)
+      .first();
+
+    if (!customer) {
+      return Err(new AppError('Cliente no encontrado', 'NOT_FOUND', 404));
+    }
+
+    await db.customers.where('localId').equals(localId).delete();
+    await SyncEngine.addToQueue('customers', 'delete', { localId }, localId);
+
+    logger.info('Customer permanently deleted', { customerId: localId, category: logCategories.SALES });
+
+    return Ok(undefined);
+  } catch (error) {
+    logger.error('Error permanently deleting customer', error instanceof Error ? error : undefined, {
+      category: logCategories.SALES,
+    });
+    if (error instanceof AppError) return Err(error);
+    return Err(new AppError('Error al eliminar cliente permanentemente', 'HARD_DELETE_CUSTOMER_ERROR', 500));
+  }
+}
+
 export async function searchCustomers(query: string): Promise<Result<Customer[], AppError>> {
   return getCustomers({ search: query, isActive: true });
 }
