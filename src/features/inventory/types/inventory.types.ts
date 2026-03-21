@@ -50,9 +50,3 @@ export const DEFAULT_PRODUCT_FORM: ProductFormData = {
   pricePerKg: undefined,
   samples: undefined,
 }
-
-export const DEFAULT_CATEGORY_FORM: CategoryFormData = {
-  name: '',
-  description: undefined,
-  saleType: 'unit',
-}

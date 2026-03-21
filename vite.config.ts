@@ -20,7 +20,7 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
           'vendor-supabase': ['@supabase/supabase-js'],
-          'vendor-dexie': ['dexie', 'dexie-react-hooks'],
+          'vendor-dexie': ['dexie'],
           'vendor-zustand': ['zustand'],
           'vendor-lucide': ['lucide-react'],
           'vendor-reactpdf': ['@react-pdf/renderer'],

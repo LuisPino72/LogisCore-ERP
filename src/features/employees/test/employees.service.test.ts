@@ -3,6 +3,10 @@ import { getEmployees, createEmployee, deleteEmployee } from '../services/employ
 import { DEFAULT_EMPLOYEE_PERMISSIONS } from '../types/employees.types';
 import { isOk, isErr } from '@/lib/types/result';
 
+vi.stubGlobal('crypto', {
+  randomUUID: vi.fn(() => 'mock-uuid-123'),
+});
+
 vi.mock('@/store/useTenantStore', () => ({
   useTenantStore: {
     getState: vi.fn(() => ({
@@ -90,20 +94,20 @@ describe('Employees Service', () => {
 
   describe('createEmployee', () => {
     it('debe crear un empleado correctamente', async () => {
-      const result = await createEmployee('test@test.com', 'password123', DEFAULT_EMPLOYEE_PERMISSIONS);
+      const result = await createEmployee('test@test.com', 'ValidPass@123', DEFAULT_EMPLOYEE_PERMISSIONS);
       
       expect(isOk(result)).toBe(true);
       expect(mockDb.employees.add).toHaveBeenCalled();
     });
 
     it('debe fallar si el email es inválido', async () => {
-      const result = await createEmployee('', 'password123', DEFAULT_EMPLOYEE_PERMISSIONS);
+      const result = await createEmployee('', 'ValidPass@123', DEFAULT_EMPLOYEE_PERMISSIONS);
       
       expect(isErr(result)).toBe(true);
     });
 
     it('debe fallar si la contraseña es muy corta', async () => {
-      const result = await createEmployee('test@test.com', '123', DEFAULT_EMPLOYEE_PERMISSIONS);
+      const result = await createEmployee('test@test.com', 'Short@1', DEFAULT_EMPLOYEE_PERMISSIONS);
       
       expect(isErr(result)).toBe(true);
     });

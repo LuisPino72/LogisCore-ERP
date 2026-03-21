@@ -50,30 +50,6 @@ export async function getAllTenants(): Promise<Result<Tenant[], AppError>> {
   }
 }
 
-export async function getTenantById(id: string): Promise<Result<Tenant, AppError>> {
-  try {
-    if (!id?.trim()) {
-      return Err(new ValidationError('El ID del tenant es requerido'))
-    }
-
-    const { data, error } = await supabase
-      .from('tenants')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (error) {
-      logger.error('getTenantById: Error fetching tenant', error instanceof Error ? error : undefined, { tenantId: id, category: logCategories.DATABASE })
-      return Err(new AppError('Tenant no encontrado', 'TENANT_NOT_FOUND', 404, { detail: error.message }))
-    }
-
-    return Ok(data)
-  } catch (error) {
-    logger.error('getTenantById: Unexpected error', error instanceof Error ? error : undefined, { tenantId: id, category: logCategories.DATABASE })
-    return Err(new AppError('Error al obtener tenant', 'GET_TENANT_ERROR', 500))
-  }
-}
-
 export async function createTenant(name: string, slug: string): Promise<Result<Tenant, AppError>> {
   try {
     if (!name?.trim()) {

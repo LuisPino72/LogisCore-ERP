@@ -51,6 +51,7 @@ vi.mock('@/lib/db', () => ({
       first: vi.fn(),
       put: vi.fn().mockResolvedValue(undefined),
     },
+    transaction: vi.fn((_mode, _tables, callback) => callback()),
   },
 }));
 
@@ -66,6 +67,16 @@ vi.mock('@/lib/logger', () => ({
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
+  },
+  logCategories: {
+    SYNC: 'SYNC',
+    AUTH: 'AUTH',
+    INVENTORY: 'INVENTORY',
+    SALES: 'SALES',
+    DATABASE: 'DATABASE',
+    UI: 'UI',
+    ACCOUNTING: 'ACCOUNTING',
+    INVOICING: 'INVOICING',
   },
 }));
 

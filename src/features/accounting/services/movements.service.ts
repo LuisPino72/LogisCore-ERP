@@ -112,24 +112,6 @@ export async function createMovement(data: CreateMovementInput): Promise<Result<
   }
 }
 
-export async function getMovementsByDateRange(startDate: Date, endDate: Date): Promise<Movement[]> {
-  const tenantId = getCurrentTenantSlug();
-  return db.movements
-    .where('tenantId')
-    .equals(tenantId)
-    .filter(m => m.createdAt >= startDate && m.createdAt <= endDate)
-    .toArray();
-}
-
-export async function getMovementsByCategory(category: MovementCategory): Promise<Movement[]> {
-  const tenantId = getCurrentTenantSlug();
-  return db.movements
-    .where('tenantId')
-    .equals(tenantId)
-    .filter(m => m.category === category)
-    .toArray();
-}
-
 export interface MovementStats {
   totalIncome: number;
   totalExpense: number;
