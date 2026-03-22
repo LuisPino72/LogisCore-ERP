@@ -1,5 +1,6 @@
 import { db, Product, Category, SuspendedSale } from '@/lib/db';
 import { Ok, Err, Result, AppError } from '@/lib/types/result';
+import { logger, logCategories } from '@/lib/logger';
 import type { SortConfig, CartItem, SaleItem } from '../types/pos.types';
 
 export type { CartItem, SaleItem } from '../types/pos.types';
@@ -140,7 +141,7 @@ export function prepareSaleItems(cart: CartItem[]): SaleItem[] {
   });
 }
 
-export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], note?: string): Promise<Result<string, AppError>> {
+export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], note?: string, customerId?: string, customerName?: string): Promise<Result<string, AppError>> {
   try {
     const localId = crypto.randomUUID();
     const cartData = cart.map(item => ({
@@ -160,6 +161,8 @@ export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], no
       createdAt: new Date(),
       updatedAt: new Date(),
       note,
+      customerId,
+      customerName,
     });
     
     return Ok(localId);
@@ -180,7 +183,65 @@ export async function getSuspendedSales(tenantSlug: string): Promise<Result<Susp
 export async function loadSuspendedSale(localId: string): Promise<Result<SuspendedSale | undefined, AppError>> {
   try {
     const sale = await db.suspendedSales.where('localId').equals(localId).first();
-    return Ok(sale);
+    
+    if (!sale) {
+      return Ok(undefined);
+    }
+
+    const productIds = sale.cart.map(item => item.productId);
+    const currentProducts = await db.products
+      .where('localId')
+      .anyOf(productIds)
+      .toArray();
+    
+    const productsMap = new Map(currentProducts.map(p => [p.localId, p]));
+    
+    let hasChanges = false;
+    const updatedCart = sale.cart.map(item => {
+      const currentProduct = productsMap.get(item.productId);
+      
+      if (currentProduct) {
+        const snapshotChanged = 
+          currentProduct.price !== item.productSnapshot.price ||
+          currentProduct.name !== item.productSnapshot.name ||
+          currentProduct.stock !== item.productSnapshot.stock ||
+          currentProduct.isActive !== item.productSnapshot.isActive;
+        
+        if (snapshotChanged) {
+          hasChanges = true;
+          return {
+            ...item,
+            productSnapshot: currentProduct,
+            unitPrice: currentProduct.price,
+            total: currentProduct.price * item.quantity,
+          };
+        }
+      } else {
+        hasChanges = true;
+        return {
+          ...item,
+          productSnapshot: { ...item.productSnapshot, isActive: false },
+        };
+      }
+      
+      return item;
+    });
+
+    if (hasChanges) {
+      await db.suspendedSales.update(sale.id!, {
+        cart: updatedCart,
+        updatedAt: new Date(),
+      });
+      
+      logger.info('Product snapshots refreshed for suspended sale', { 
+        saleId: localId, 
+        changesCount: updatedCart.filter((_, i) => updatedCart[i] !== sale.cart[i]).length,
+        category: logCategories.SALES 
+      });
+    }
+    
+    const updatedSale = await db.suspendedSales.where('localId').equals(localId).first();
+    return Ok(updatedSale);
   } catch (_error) {
     return Err(new AppError('Error al cargar venta suspendida', 'LOAD_SUSPENDED_SALE_ERROR', 500));
   }

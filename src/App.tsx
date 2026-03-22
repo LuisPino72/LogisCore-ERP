@@ -171,7 +171,8 @@ function App() {
           customersRes,
           invoicesRes,
           taxpayerInfoRes,
-          invoiceSettingsRes
+          invoiceSettingsRes,
+          movementsRes
         ] = await Promise.all([
           supabase.from("products").select("*").eq('tenant_slug', tenantSlug),
           supabase.from("categories").select("*").eq('tenant_slug', tenantSlug),
@@ -182,6 +183,7 @@ function App() {
           supabase.from("invoices").select("*").eq('tenant_slug', tenantSlug),
           supabase.from("taxpayer_info").select("*").eq('tenant_slug', tenantSlug),
           supabase.from("invoice_settings").select("*").eq('tenant_slug', tenantSlug),
+          supabase.from("movements").select("*").eq('tenant_slug', tenantSlug),
         ]);
 
         const productsData = productsRes.data || [];
@@ -193,6 +195,7 @@ function App() {
         const invoicesData = invoicesRes.data || [];
         const taxpayerInfoData = taxpayerInfoRes.data || [];
         const invoiceSettingsData = invoiceSettingsRes.data || [];
+        const movementsData = movementsRes.data || [];
 
         const sanitizeCategory = (c: Record<string, unknown>) => ({
           localId: String(c.local_id ?? c.id ?? ""),
@@ -360,6 +363,22 @@ function App() {
           syncedAt: s.created_at ? new Date(s.created_at as string) : undefined,
         });
 
+        const sanitizeMovement = (m: Record<string, unknown>) => ({
+          localId: String(m.local_id ?? m.id ?? ""),
+          tenantId: tenantSlug,
+          type: (m.type as 'income' | 'expense' | 'transfer') || 'income',
+          category: (m.category as string) || 'other',
+          referenceType: m.reference_type ? String(m.reference_type) : undefined,
+          referenceId: m.reference_id ? String(m.reference_id) : undefined,
+          amount: Number(m.amount) || 0,
+          currency: String(m.currency ?? 'VES'),
+          paymentMethod: m.payment_method ? String(m.payment_method) as 'cash' | 'card' | 'pago_movil' | 'bank_transfer' : undefined,
+          description: m.description ? String(m.description) : undefined,
+          status: (m.status as 'pending' | 'completed' | 'cancelled') || 'completed',
+          createdAt: m.created_at ? new Date(m.created_at as string) : new Date(),
+          syncedAt: m.created_at ? new Date(m.created_at as string) : undefined,
+        });
+
         if (categoriesData) {
           await db.categories.bulkPut(categoriesData.map(sanitizeCategory));
         }
@@ -401,6 +420,11 @@ function App() {
         if (invoiceSettingsData.length > 0) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await db.invoiceSettings.bulkPut(invoiceSettingsData.map(sanitizeInvoiceSettings) as any);
+        }
+
+        if (movementsData.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await db.movements.bulkPut(movementsData.map(sanitizeMovement) as any);
         }
       } catch (error) {
         logger.error("Error loading tenant data", error instanceof Error ? error : undefined, { category: logCategories.DATABASE });

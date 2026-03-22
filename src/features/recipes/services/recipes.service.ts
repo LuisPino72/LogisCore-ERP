@@ -4,6 +4,7 @@ import { EventBus, Events } from '@/lib/events/EventBus';
 import { useTenantStore } from '@/store/useTenantStore';
 import { Ok, Err, Result, ValidationError, AppError, isOk } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
+import * as movementsService from '@/features/accounting/services/movements.service';
 
 function getCurrentTenantSlug(): string {
   const { currentTenant } = useTenantStore.getState();
@@ -218,15 +219,9 @@ export async function produce(localId: string, quantity: number): Promise<Result
       createdAt: new Date(),
     };
 
-    // 1. ENCOLAR TODOS LOS SYNC ANTES DE LA TRANSACCION
-    // Production log
-    await SyncEngine.addToQueue('production_logs', 'create', productionLog as unknown as Record<string, unknown>, productionLogLocalId);
-    
-    // Preparar datos de ingredientes y productos para encolar
-    const ingredientUpdates: { product: { localId: string; stock: number; updatedAt: Date }; newStock: number }[] = [];
-    
+    const updatedIngredients: { localId: string; productName: string; stockRestored: number }[] = [];
+
     for (const ing of recipe.ingredients) {
-      const usedQuantity = (ing.quantity * quantity) / recipe.yield;
       const product = await db.products
         .where('localId')
         .equals(ing.productId)
@@ -234,28 +229,27 @@ export async function produce(localId: string, quantity: number): Promise<Result
         .first();
       
       if (product) {
+        const usedQuantity = (ing.quantity * quantity) / recipe.yield;
         const newStock = product.stock - usedQuantity;
-        ingredientUpdates.push({ product: { ...product, stock: product.stock, updatedAt: new Date() }, newStock });
+        updatedIngredients.push({ localId: product.localId, productName: product.name, stockRestored: usedQuantity });
         
-        // Encolar sync de producto con nuevo stock
         await SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock, updatedAt: new Date() } as unknown as Record<string, unknown>, product.localId);
       }
     }
     
-    // Obtener producto terminado
     const finishedProduct = await db.products
       .where('localId')
       .equals(recipe.productId)
       .filter(p => p.tenantId === tenantId)
       .first();
     
-    let finishedProductNewStock = 0;
     if (finishedProduct) {
-      finishedProductNewStock = finishedProduct.stock + quantity;
-      await SyncEngine.addToQueue('products', 'update', { ...finishedProduct, stock: finishedProductNewStock, updatedAt: new Date() } as unknown as Record<string, unknown>, finishedProduct.localId);
+      const newStock = finishedProduct.stock + quantity;
+      await SyncEngine.addToQueue('products', 'update', { ...finishedProduct, stock: newStock, updatedAt: new Date() } as unknown as Record<string, unknown>, finishedProduct.localId);
     }
 
-    // 2. TRANSACCION: Solo cambios locales en Dexie
+    await SyncEngine.addToQueue('production_logs', 'create', productionLog as unknown as Record<string, unknown>, productionLogLocalId);
+
     await db.transaction('rw', db.products, db.productionLogs, async () => {
       const ingredientsUsed: { productId: string; quantity: number }[] = [];
       
@@ -303,20 +297,29 @@ export async function produce(localId: string, quantity: number): Promise<Result
         });
       }
       
-      // Actualizar productionLog con ingredientsUsed
       productionLog.ingredientsUsed = ingredientsUsed;
       
       await db.productionLogs.add(productionLog);
     });
     
+    await movementsService.createMovement({
+      type: 'transfer',
+      category: 'production',
+      amount: 0,
+      description: `Producción: ${recipe.name} x${quantity}`,
+      referenceType: 'recipe',
+      referenceId: localId,
+    }).catch(err => logger.error('Error creando movimiento de producción', err, { category: logCategories.DATABASE }));
+
+    EventBus.emit(Events.PRODUCTION_COMPLETED, { recipe, quantity, productionLogId: productionLogLocalId });
+    EventBus.emit(Events.INVENTORY_UPDATED, { action: 'produce', recipe, quantity, updatedIngredients });
+    
     logger.info('Producción registrada', { 
       recipeId: localId, 
-      quantity, 
+      quantity,
+      recipeName: recipe.name,
       category: logCategories.DATABASE 
     });
-    
-    // 3. EMITIR EVENTO (fire-and-forget)
-    EventBus.emit(Events.INVENTORY_UPDATED, { action: 'produce', recipe, quantity });
     
     return Ok(undefined);
   } catch (error) {

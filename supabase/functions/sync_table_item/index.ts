@@ -16,7 +16,8 @@ const VALID_TABLES = [
   'taxpayer_info',
   'invoice_settings',
   'settings',
-  'security_audit_log'
+  'security_audit_log',
+  'movements'
 ] as const;
 
 type ValidTable = typeof VALID_TABLES[number];
@@ -46,6 +47,10 @@ const TABLE_COLUMN_MAPPING: Record<string, string[]> = {
   security_audit_log: [
     'event_type', 'user_id', 'user_email', 'tenant_id', 'tenant_uuid',
     'ip_address', 'user_agent', 'resource_type', 'resource_id', 'details', 'success'
+  ],
+  movements: [
+    'type', 'category', 'reference_type', 'reference_id',
+    'amount', 'currency', 'payment_method', 'description', 'status'
   ],
 };
 

@@ -16,6 +16,10 @@ export interface SaleItem {
   total: number
 }
 
+export interface SaleInput {
+  customerId?: string
+}
+
 export type PaymentMethod = 'cash' | 'card' | 'pago_movil'
 export type POSView = 'grid' | 'list'
 

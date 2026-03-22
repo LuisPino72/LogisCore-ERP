@@ -23,8 +23,19 @@ function getCurrentTenantUuid(): string {
 }
 
 export function validateRif(rif: string): boolean {
-  return /^[JGVEPG]-?\d{7,8}-?\d$/i.test(rif.replace(/\s/g, ''));
+  const cleaned = rif.replace(/\s/g, '');
+  return /^[JGVEPGCS]-?\d{7,8}-?\d$/i.test(cleaned);
 }
+
+export const RIF_TYPE_LABELS: Record<string, string> = {
+  J: 'Gobierno Nacional',
+  G: 'Persona Jurídica',
+  V: 'Venezolano',
+  E: 'Extranjero',
+  P: 'Pasaporte',
+  C: 'Comerciante',
+  S: 'Sindicato',
+};
 
 export function validateCustomerInput(data: CreateCustomerInput): string[] {
   const errors: string[] = [];

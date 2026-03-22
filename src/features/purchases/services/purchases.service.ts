@@ -106,23 +106,80 @@ export async function createPurchase(data: CreatePurchaseInput): Promise<Result<
     }
     
     const localId = crypto.randomUUID();
-    const purchase: Purchase = {
-      localId,
-      tenantId,
-      supplier: data.supplier,
-      invoiceNumber: data.invoiceNumber,
-      items: data.items,
-      subtotal: data.subtotal,
-      tax: data.tax,
-      total: data.total,
-      status: data.status,
-      createdAt: new Date(),
-    };
-
-    await db.purchases.add(purchase);
-    await SyncEngine.addToQueue('purchases', 'create', purchase as unknown as Record<string, unknown>, localId);
     
-    logger.info('Compra creada', { purchaseId: localId, supplier: data.supplier, category: logCategories.DATABASE });
+    if (data.status === 'completed') {
+      await db.transaction('rw', db.purchases, db.products, async () => {
+        const purchase: Purchase = {
+          localId,
+          tenantId,
+          supplier: data.supplier,
+          invoiceNumber: data.invoiceNumber,
+          items: data.items,
+          subtotal: data.subtotal,
+          tax: data.tax,
+          total: data.total,
+          status: data.status,
+          createdAt: new Date(),
+        };
+
+        for (const item of data.items) {
+          const product = await db.products
+            .where('localId')
+            .equals(item.productId)
+            .filter(p => p.tenantId === tenantId)
+            .first();
+
+          if (product) {
+            const newStock = product.stock + item.quantity;
+            const updatedProduct = { ...product, stock: newStock, updatedAt: new Date() };
+            await db.products.put(updatedProduct);
+            
+            await SyncEngine.addToQueue('products', 'update', updatedProduct as unknown as Record<string, unknown>, item.productId);
+            
+            logger.info('Inventario actualizado por compra directa', { 
+              productId: item.productId, 
+              addedStock: item.quantity,
+              newStock,
+              category: logCategories.INVENTORY 
+            });
+          }
+        }
+
+        await db.purchases.add(purchase);
+        await SyncEngine.addToQueue('purchases', 'create', purchase as unknown as Record<string, unknown>, localId);
+      });
+
+      await movementsService.createMovement({
+        type: 'expense',
+        category: 'purchase',
+        amount: data.total,
+        description: `Compra ${data.invoiceNumber || localId.slice(0, 8)}`,
+        referenceType: 'purchase',
+        referenceId: localId,
+      }).catch(err => logger.error('Error creando movimiento de compra', err, { category: logCategories.DATABASE }));
+
+      EventBus.emit(Events.INVENTORY_UPDATED, { action: 'purchase_completed', purchaseId: localId });
+      
+      logger.info('Compra creada (completada)', { purchaseId: localId, supplier: data.supplier, category: logCategories.DATABASE });
+    } else {
+      const purchase: Purchase = {
+        localId,
+        tenantId,
+        supplier: data.supplier,
+        invoiceNumber: data.invoiceNumber,
+        items: data.items,
+        subtotal: data.subtotal,
+        tax: data.tax,
+        total: data.total,
+        status: data.status,
+        createdAt: new Date(),
+      };
+
+      await db.purchases.add(purchase);
+      await SyncEngine.addToQueue('purchases', 'create', purchase as unknown as Record<string, unknown>, localId);
+      
+      logger.info('Compra creada', { purchaseId: localId, supplier: data.supplier, status: data.status, category: logCategories.DATABASE });
+    }
     
     return Ok(localId);
   } catch (error) {

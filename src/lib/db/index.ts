@@ -155,6 +155,7 @@ export interface Employee {
   createdAt: Date;
   updatedAt?: Date;
   syncedAt?: Date;
+  pendingDelete?: boolean;
 }
 
 export interface SuspendedSale {
@@ -165,6 +166,8 @@ export interface SuspendedSale {
   createdAt: Date;
   updatedAt: Date;
   note?: string;
+  customerId?: string;
+  customerName?: string;
 }
 
 export interface TaxpayerInfo {
@@ -246,6 +249,7 @@ export interface Invoice {
   aplicaIgtf: boolean;
   montoIgtfBs?: number;
   totalFinalBs: number;
+  paymentMethod?: 'cash' | 'card' | 'pago_movil';
   saleId?: string;
   createdBy?: string;
   createdAt: Date;
@@ -346,7 +350,7 @@ class LogisCoreDB extends Dexie {
 
   constructor() {
     super('LogisCoreERP');
-    this.version(12).stores({
+    this.version(13).stores({
       syncQueue: '++id, localId, tableName, status, tenantId, createdAt',
       products: '++id, localId, tenantId, sku, categoryId, isActive, name',
       categories: '++id, localId, tenantId, name, saleType',
@@ -359,7 +363,7 @@ class LogisCoreDB extends Dexie {
       employees: '++id, localId, tenantId, role, userId',
       suspendedSales: '++id, localId, tenantId, createdAt',
       taxpayerInfo: '++id, localId, tenantId',
-      customers: '++id, localId, tenantId, rifCedula, isActive, email',
+      customers: '++id, localId, tenantId, &rifCedula, isActive, email',
       invoiceSettings: '++id, localId, tenantId',
       invoices: '++id, localId, tenantId, customerId, invoiceNumber, controlNumber, estatus, createdAt, saleId',
       movements: '++id, localId, tenantId, type, category, status, createdAt, referenceType, referenceId',

@@ -81,6 +81,7 @@ export const Events = {
   SALE_CANCELLED: 'sale.cancelled',
   INVENTORY_UPDATED: 'inventory.updated',
   STOCK_LOW: 'stock.low',
+  STOCK_RESTORED: 'stock.restored',
   SYNC_STATUS_CHANGED: 'sync.status.changed',
   CONFLICT_DETECTED: 'conflict.detected',
   TENANT_CHANGED: 'tenant.changed',

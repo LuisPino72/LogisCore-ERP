@@ -5,6 +5,7 @@ import { Ok, Err, Result, ValidationError, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
 import { EventBus, Events } from '@/lib/events/EventBus';
 import { getExchangeRate } from '@/features/exchange-rate/services/exchangeRate.service';
+import * as movementsService from '@/features/accounting/services/movements.service';
 import {
   CreateInvoiceInput,
   CreateInvoiceItemInput,
@@ -133,74 +134,86 @@ export async function saveInvoiceSettings(
   }
 }
 
-export async function getNextInvoiceNumber(): Promise<Result<NumerationResult, AppError>> {
-  try {
-    const tenantSlug = getCurrentTenantSlug();
-    const today = new Date().toISOString().split('T')[0];
-    const currentMonth = today.substring(0, 7);
+export async function getNextInvoiceNumber(maxRetries = 3): Promise<Result<NumerationResult, AppError>> {
+  const retryGetNumber = async (attempt: number): Promise<Result<NumerationResult, AppError>> => {
+    try {
+      const tenantSlug = getCurrentTenantSlug();
+      const today = new Date().toISOString().split('T')[0];
+      const currentMonth = today.substring(0, 7);
 
-    let invoiceNumber = '000001';
-    let controlNumber = '';
+      let invoiceNumber = '000001';
+      let controlNumber = '';
 
-    await db.transaction('rw', db.invoiceSettings, async () => {
-      const existing = await db.invoiceSettings.where('tenantId').equals(tenantSlug).first();
+      await db.transaction('rw', db.invoiceSettings, async () => {
+        const existing = await db.invoiceSettings.where('tenantId').equals(tenantSlug).first();
 
-      let newNumber = 1;
-      let controlPrefix = today.slice(-2);
+        let newNumber = 1;
+        let controlPrefix = today.slice(-2);
 
-      if (existing) {
-        switch (existing.sequentialType) {
-          case 'daily':
-            if (existing.lastInvoiceDate === today) {
+        if (existing) {
+          switch (existing.sequentialType) {
+            case 'daily':
+              if (existing.lastInvoiceDate === today) {
+                newNumber = existing.lastInvoiceNumber + 1;
+              }
+              break;
+            case 'monthly':
+              if (existing.lastInvoiceDate?.startsWith(currentMonth)) {
+                newNumber = existing.lastInvoiceNumber + 1;
+                controlPrefix = currentMonth.replace('-', '');
+              }
+              break;
+            case 'global':
               newNumber = existing.lastInvoiceNumber + 1;
-            }
-            break;
-          case 'monthly':
-            if (existing.lastInvoiceDate?.startsWith(currentMonth)) {
-              newNumber = existing.lastInvoiceNumber + 1;
-              controlPrefix = currentMonth.replace('-', '');
-            }
-            break;
-          case 'global':
-            newNumber = existing.lastInvoiceNumber + 1;
-            controlPrefix = existing.lastControlPrefix || '00';
-            break;
+              controlPrefix = existing.lastControlPrefix || '00';
+              break;
+          }
         }
+
+        invoiceNumber = String(newNumber).padStart(6, '0');
+        controlNumber = `${controlPrefix}-${invoiceNumber}`;
+
+        const num = parseInt(invoiceNumber, 10);
+
+        if (existing) {
+          await db.invoiceSettings.put({
+            ...existing,
+            lastInvoiceNumber: num,
+            lastInvoiceDate: today,
+            lastControlPrefix: controlPrefix,
+          });
+        } else {
+          await db.invoiceSettings.add({
+            localId: crypto.randomUUID(),
+            tenantId: tenantSlug,
+            sequentialType: 'daily',
+            lastInvoiceNumber: num,
+            lastInvoiceDate: today,
+            lastControlPrefix: controlPrefix,
+            igtfEnabled: true,
+            igtfPercentage: IGTF_PERCENTAGE,
+          });
+        }
+      });
+
+      return Ok({ invoiceNumber, controlNumber });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      if (attempt < maxRetries && (errorMessage.includes('TransactionInactiveError') || errorMessage.includes('ConstraintError'))) {
+        logger.warn(`Retrying invoice number generation (attempt ${attempt + 1}/${maxRetries})`, { category: logCategories.SALES });
+        await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1)));
+        return retryGetNumber(attempt + 1);
       }
+      
+      logger.error('Error generating invoice number', error instanceof Error ? error : undefined, {
+        category: logCategories.SALES,
+      });
+      return Err(new AppError('Error al generar numeración', 'NUMBERING_ERROR', 500));
+    }
+  };
 
-      invoiceNumber = String(newNumber).padStart(6, '0');
-      controlNumber = `${controlPrefix}-${invoiceNumber}`;
-
-      const num = parseInt(invoiceNumber, 10);
-
-      if (existing) {
-        await db.invoiceSettings.put({
-          ...existing,
-          lastInvoiceNumber: num,
-          lastInvoiceDate: today,
-          lastControlPrefix: controlPrefix,
-        });
-      } else {
-        await db.invoiceSettings.add({
-          localId: crypto.randomUUID(),
-          tenantId: tenantSlug,
-          sequentialType: 'daily',
-          lastInvoiceNumber: num,
-          lastInvoiceDate: today,
-          lastControlPrefix: controlPrefix,
-          igtfEnabled: true,
-          igtfPercentage: IGTF_PERCENTAGE,
-        });
-      }
-    });
-
-    return Ok({ invoiceNumber, controlNumber });
-  } catch (error) {
-    logger.error('Error generating invoice number', error instanceof Error ? error : undefined, {
-      category: logCategories.SALES,
-    });
-    return Err(new AppError('Error al generar numeración', 'NUMBERING_ERROR', 500));
-  }
+  return retryGetNumber(0);
 }
 
 export function calculateTotals(
@@ -258,7 +271,7 @@ export function validateInvoiceInput(data: CreateInvoiceInput): string[] {
 
   if (!data.clienteRifCedula?.trim()) {
     errors.push('El RIF/Cédula del cliente es requerido');
-  } else if (!/^[JGVEPG]-?\d{7,8}-?\d$/i.test(data.clienteRifCedula.replace(/\s/g, ''))) {
+  } else if (!/^[JGVEPGCS]-?\d{7,8}-?\d$/i.test(data.clienteRifCedula.replace(/\s/g, ''))) {
     errors.push('El formato del RIF/Cédula no es válido');
   }
 
@@ -399,6 +412,15 @@ export async function createInvoice(data: CreateInvoiceInput): Promise<Result<st
       invoice.localId
     );
 
+    await movementsService.createMovement({
+      type: 'income',
+      category: 'sale',
+      amount: totals.totalFinalBs,
+      description: `Factura #${invoiceNumber} - ${data.clienteNombre}`,
+      referenceType: 'invoice',
+      referenceId: invoice.localId,
+    }).catch(err => logger.error('Error creando movimiento de factura', err, { category: logCategories.SALES }));
+
     EventBus.emit(Events.INVOICE_CREATED, { invoice, invoiceNumber, total: totals.totalFinalBs });
 
     logger.info('Invoice created', {
@@ -534,7 +556,30 @@ export async function annulInvoice(localId: string, reason: string): Promise<Res
 
     await SyncEngine.addToQueue('invoices', 'update', updated as unknown as Record<string, unknown>, localId);
 
-    logger.info('Invoice annulled', { invoiceId: localId, reason, category: logCategories.SALES });
+    await movementsService.createMovement({
+      type: 'expense',
+      category: 'refund',
+      amount: invoice.totalFinalBs,
+      description: `Anulación de factura #${invoice.invoiceNumber} - ${reason}`,
+      referenceType: 'invoice',
+      referenceId: localId,
+    }).catch(err => logger.error('Error creando movimiento de anulación', err, { category: logCategories.SALES }));
+
+    EventBus.emit(Events.INVOICE_CANCELLED, { invoice, reason });
+
+    if (invoice.saleId) {
+      const { cancelSale } = await import('@/features/sales/services/sales.service');
+      cancelSale(invoice.saleId).catch(err => {
+        logger.warn('No se pudo cancelar venta asociada a factura', { 
+          invoiceId: localId, 
+          saleId: invoice.saleId, 
+          error: err instanceof Error ? err.message : String(err),
+          category: logCategories.SALES 
+        });
+      });
+    }
+
+    logger.info('Invoice annulled', { invoiceId: localId, invoiceNumber: invoice.invoiceNumber, reason, hasSaleId: !!invoice.saleId, category: logCategories.SALES });
 
     return Ok(undefined);
   } catch (error) {

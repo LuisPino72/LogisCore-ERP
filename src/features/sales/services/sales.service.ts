@@ -35,6 +35,7 @@ export interface CreateSaleInput {
   paymentMethod: 'cash' | 'card' | 'pago_movil';
   exchangeRate?: number;
   exchangeRateSource?: 'api' | 'manual';
+  customerId?: string;
 }
 
 function validateSaleInput(data: CreateSaleInput): string[] {
@@ -111,6 +112,7 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
       total: data.total,
       paymentMethod: data.paymentMethod,
       status: 'completed',
+      customerId: data.customerId,
       createdAt: new Date(),
       exchangeRate: data.exchangeRate || 0,
       exchangeRateSource: data.exchangeRateSource || 'manual',
@@ -213,12 +215,67 @@ export async function cancelSale(localId: string): Promise<Result<void, AppError
       return Err(new ValidationError('La venta ya está cancelada'));
     }
     
-    const updated = { ...sale, status: 'cancelled' as const };
-    await db.sales.put(updated);
-    await SyncEngine.addToQueue('sales', 'update', updated as unknown as Record<string, unknown>, localId);
+    const updatedProducts: { localId: string; product: Product; stockRestored: number }[] = [];
     
-    EventBus.emit(Events.SALE_CANCELLED, { sale: updated });
-    logger.info('Venta cancelada', { saleId: localId, category: logCategories.SALES });
+    await db.transaction('rw', db.sales, db.products, db.categories, async () => {
+      for (const item of sale.items) {
+        const product = await db.products
+          .where('localId')
+          .equals(item.productId)
+          .filter(p => p.tenantId === tenantId)
+          .first();
+        
+        if (!product) {
+          continue;
+        }
+        
+        let stockToRestore = item.quantity;
+        
+        if (product.categoryId) {
+          const category = await db.categories
+            .where('id')
+            .equals(product.categoryId)
+            .first();
+          
+          if (category?.saleType === 'weight') {
+            stockToRestore = item.quantity / 1000;
+          } else if (category?.saleType === 'sample') {
+            stockToRestore = 1;
+          }
+        }
+        
+        const newStock = product.stock + stockToRestore;
+        updatedProducts.push({ localId: product.localId, product, stockRestored: stockToRestore });
+        
+        await db.products.put({
+          ...product,
+          stock: newStock,
+          updatedAt: new Date(),
+        });
+        
+        await SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock } as unknown as Record<string, unknown>, product.localId);
+      }
+      
+      const updated = { ...sale, status: 'cancelled' as const };
+      await db.sales.put(updated);
+      await SyncEngine.addToQueue('sales', 'update', updated as unknown as Record<string, unknown>, localId);
+    });
+    
+    await movementsService.createMovement({
+      type: 'expense',
+      category: 'refund',
+      amount: sale.total,
+      paymentMethod: sale.paymentMethod,
+      description: `Cancelación de venta #${localId.slice(0, 8)}`,
+      referenceType: 'sale',
+      referenceId: localId,
+    }).catch(err => logger.error('Error creando movimiento de cancelación', err, { category: logCategories.SALES }));
+    
+    EventBus.emit(Events.SALE_CANCELLED, { sale });
+    EventBus.emit(Events.STOCK_RESTORED, { source: 'sale_cancellation', saleId: localId, products: updatedProducts });
+    EventBus.emit(Events.INVENTORY_UPDATED, { action: 'sale_cancelled', sale, restoredProducts: updatedProducts });
+    
+    logger.info('Venta cancelada con devolución de inventario', { saleId: localId, restoredProducts: updatedProducts.length, category: logCategories.SALES });
     
     return Ok(undefined);
   } catch (error) {

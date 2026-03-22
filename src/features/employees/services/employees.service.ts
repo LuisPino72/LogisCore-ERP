@@ -227,20 +227,35 @@ export async function deleteEmployee(localId: string): Promise<Result<void, AppE
       return Err(new AppError('Empleado no encontrado', 'NOT_FOUND', 404));
     }
 
-    const { error: supabaseError } = await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', employee.userId);
+    await SyncEngine.addToQueue('employees', 'delete', { localId, userId: employee.userId }, localId);
 
-    if (supabaseError) {
-      logger.error('Error deleting employee from Supabase', supabaseError, { category: logCategories.AUTH });
-      return Err(new AppError('Error al eliminar empleado del servidor', 'DELETE_EMPLOYEE_ERROR', 500));
+    try {
+      const { error: supabaseError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', employee.userId);
+
+      if (supabaseError) {
+        throw supabaseError;
+      }
+
+      await db.employees.where('localId').equals(localId).delete();
+      
+      logger.info('Employee deleted successfully', { localId, userId: employee.userId, category: logCategories.AUTH });
+    } catch (supabaseError) {
+      await db.employees.update(employee.id!, {
+        pendingDelete: true,
+        updatedAt: new Date(),
+      });
+      
+      logger.warn('Employee marked for pending deletion (Supabase sync failed)', { 
+        localId, 
+        userId: employee.userId, 
+        error: supabaseError instanceof Error ? supabaseError.message : String(supabaseError),
+        category: logCategories.AUTH 
+      });
     }
 
-    await db.employees.where('localId').equals(localId).delete();
-    await SyncEngine.addToQueue('employees', 'delete', { localId }, localId);
-
-    logger.info('Employee deleted', { localId, userId: employee.userId, category: logCategories.AUTH });
     return Ok(undefined);
   } catch (error) {
     logger.error('Error deleting employee', error instanceof Error ? error : undefined, { category: logCategories.AUTH });
