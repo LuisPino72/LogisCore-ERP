@@ -108,20 +108,22 @@ export async function createPurchase(data: CreatePurchaseInput): Promise<Result<
     const localId = crypto.randomUUID();
     
     if (data.status === 'completed') {
-      await db.transaction('rw', db.purchases, db.products, async () => {
-        const purchase: Purchase = {
-          localId,
-          tenantId,
-          supplier: data.supplier,
-          invoiceNumber: data.invoiceNumber,
-          items: data.items,
-          subtotal: data.subtotal,
-          tax: data.tax,
-          total: data.total,
-          status: data.status,
-          createdAt: new Date(),
-        };
+      const purchase: Purchase = {
+        localId,
+        tenantId,
+        supplier: data.supplier,
+        invoiceNumber: data.invoiceNumber,
+        items: data.items,
+        subtotal: data.subtotal,
+        tax: data.tax,
+        total: data.total,
+        status: data.status,
+        createdAt: new Date(),
+      };
 
+      await SyncEngine.addToQueue('purchases', 'create', purchase as unknown as Record<string, unknown>, localId);
+
+      await db.transaction('rw', db.purchases, db.products, async () => {
         for (const item of data.items) {
           const product = await db.products
             .where('localId')
@@ -131,10 +133,7 @@ export async function createPurchase(data: CreatePurchaseInput): Promise<Result<
 
           if (product) {
             const newStock = product.stock + item.quantity;
-            const updatedProduct = { ...product, stock: newStock, updatedAt: new Date() };
-            await db.products.put(updatedProduct);
-            
-            await SyncEngine.addToQueue('products', 'update', updatedProduct as unknown as Record<string, unknown>, item.productId);
+            await db.products.put({ ...product, stock: newStock, updatedAt: new Date() });
             
             logger.info('Inventario actualizado por compra directa', { 
               productId: item.productId, 
@@ -146,8 +145,20 @@ export async function createPurchase(data: CreatePurchaseInput): Promise<Result<
         }
 
         await db.purchases.add(purchase);
-        await SyncEngine.addToQueue('purchases', 'create', purchase as unknown as Record<string, unknown>, localId);
       });
+
+      for (const item of data.items) {
+        const product = await db.products
+          .where('localId')
+          .equals(item.productId)
+          .filter(p => p.tenantId === tenantId)
+          .first();
+        
+        if (product) {
+          const newStock = product.stock + item.quantity;
+          SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock } as unknown as Record<string, unknown>, item.productId);
+        }
+      }
 
       await movementsService.createMovement({
         type: 'expense',
@@ -175,8 +186,8 @@ export async function createPurchase(data: CreatePurchaseInput): Promise<Result<
         createdAt: new Date(),
       };
 
-      await db.purchases.add(purchase);
       await SyncEngine.addToQueue('purchases', 'create', purchase as unknown as Record<string, unknown>, localId);
+      await db.purchases.add(purchase);
       
       logger.info('Compra creada', { purchaseId: localId, supplier: data.supplier, status: data.status, category: logCategories.DATABASE });
     }
@@ -225,11 +236,7 @@ export async function updatePurchaseStatus(localId: string, status: 'pending' | 
 
           if (product) {
             const newStock = product.stock + item.quantity;
-            const updatedProduct = { ...product, stock: newStock };
-            await db.products.put(updatedProduct);
-            
-            // 3. ENCOLAR SYNC DE PRODUCTS (dentro de tx)
-            await SyncEngine.addToQueue('products', 'update', updatedProduct as unknown as Record<string, unknown>, item.productId);
+            await db.products.put({ ...product, stock: newStock });
 
             logger.info('Inventario actualizado por compra', { 
               productId: item.productId, 
@@ -241,7 +248,20 @@ export async function updatePurchaseStatus(localId: string, status: 'pending' | 
         }
       });
 
-      // 4. EMITIR EVENTO Y CREAR MOVIMIENTO (fire-and-forget)
+      for (const item of purchase.items) {
+        const product = await db.products
+          .where('localId')
+          .equals(item.productId)
+          .filter(p => p.tenantId === tenantId)
+          .first();
+        
+        if (product) {
+          const newStock = product.stock + item.quantity;
+          SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock } as unknown as Record<string, unknown>, item.productId);
+        }
+      }
+
+      // 3. EMITIR EVENTO Y CREAR MOVIMIENTO (fire-and-forget)
       EventBus.emit(Events.INVENTORY_UPDATED, { action: 'purchase_completed', purchase });
 
       await movementsService.createMovement({
@@ -253,7 +273,6 @@ export async function updatePurchaseStatus(localId: string, status: 'pending' | 
         referenceId: localId,
       }).catch(err => logger.error('Error creando movimiento de compra', err, { category: logCategories.DATABASE }));
     } else {
-      // Solo actualizar purchase si no se está completando
       await db.purchases.put(updated);
     }
     

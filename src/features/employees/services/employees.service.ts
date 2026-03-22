@@ -227,8 +227,6 @@ export async function deleteEmployee(localId: string): Promise<Result<void, AppE
       return Err(new AppError('Empleado no encontrado', 'NOT_FOUND', 404));
     }
 
-    await SyncEngine.addToQueue('employees', 'delete', { localId, userId: employee.userId }, localId);
-
     try {
       const { error: supabaseError } = await supabase
         .from('user_roles')
@@ -239,14 +237,19 @@ export async function deleteEmployee(localId: string): Promise<Result<void, AppE
         throw supabaseError;
       }
 
+      await SyncEngine.addToQueue('employees', 'delete', { localId, userId: employee.userId }, localId);
       await db.employees.where('localId').equals(localId).delete();
       
       logger.info('Employee deleted successfully', { localId, userId: employee.userId, category: logCategories.AUTH });
     } catch (supabaseError) {
-      await db.employees.update(employee.id!, {
+      const updated = {
+        ...employee,
         pendingDelete: true,
         updatedAt: new Date(),
-      });
+      };
+      
+      await SyncEngine.addToQueue('employees', 'update', updated as unknown as Record<string, unknown>, localId);
+      await db.employees.update(employee.id!, updated);
       
       logger.warn('Employee marked for pending deletion (Supabase sync failed)', { 
         localId, 

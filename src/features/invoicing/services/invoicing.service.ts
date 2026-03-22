@@ -552,9 +552,9 @@ export async function annulInvoice(localId: string, reason: string): Promise<Res
       annulledReason: reason,
     };
 
-    await db.invoices.put(updated);
-
     await SyncEngine.addToQueue('invoices', 'update', updated as unknown as Record<string, unknown>, localId);
+
+    await db.invoices.put(updated);
 
     await movementsService.createMovement({
       type: 'expense',

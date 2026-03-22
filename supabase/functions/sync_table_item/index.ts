@@ -40,7 +40,7 @@ const TABLE_COLUMN_MAPPING: Record<string, string[]> = {
   production_logs: ['recipe_id', 'quantity', 'ingredients_used'],
   suppliers: ['name', 'contact_name', 'email', 'phone', 'address', 'notes', 'is_active'],
   employees: ['user_id', 'role', 'permissions'],
-  suspended_sales: ['cart', 'note'],
+  suspended_sales: ['cart', 'note', 'customer_id', 'customer_name'],
   taxpayer_info: ['rif', 'razon_social', 'direccion_fiscal', 'numero_providencia', 'logo_url'],
   invoice_settings: ['sequential_type', 'last_invoice_date', 'last_invoice_number', 'last_control_prefix', 'igtf_enabled', 'igtf_percentage'],
   settings: ['key', 'value'],

@@ -93,8 +93,8 @@ export async function createProduct(data: Omit<Product, 'id' | 'localId' | 'tena
       updatedAt: new Date(),
     };
 
-    await db.products.add(product);
     await SyncEngine.addToQueue('products', 'create', product as unknown as Record<string, unknown>, localId);
+    await db.products.add(product);
     
     EventBus.emit(Events.INVENTORY_UPDATED, { action: 'create', product });
     
@@ -119,8 +119,8 @@ export async function updateProduct(localId: string, data: Partial<Product>): Pr
     const product = productResult.value;
     const updated = { ...product, ...data, updatedAt: new Date() };
     
-    await db.products.put(updated);
     await SyncEngine.addToQueue('products', 'update', updated as unknown as Record<string, unknown>, localId);
+    await db.products.put(updated);
     
     EventBus.emit(Events.INVENTORY_UPDATED, { action: 'update', product: updated });
     
@@ -142,8 +142,8 @@ export async function deleteProduct(localId: string): Promise<Result<void, AppEr
       return Err(productResult.error);
     }
 
-    await db.products.where('localId').equals(localId).delete();
     await SyncEngine.addToQueue('products', 'delete', { localId }, localId);
+    await db.products.where('localId').equals(localId).delete();
     
     EventBus.emit(Events.INVENTORY_UPDATED, { action: 'delete', localId });
     
@@ -168,8 +168,8 @@ export async function softDeleteProduct(localId: string): Promise<Result<void, A
     const product = productResult.value;
     const updated = { ...product, isActive: false, updatedAt: new Date() };
     
-    await db.products.put(updated);
     await SyncEngine.addToQueue('products', 'update', updated as unknown as Record<string, unknown>, localId);
+    await db.products.put(updated);
     
     EventBus.emit(Events.INVENTORY_UPDATED, { action: 'soft_delete', localId });
     logger.info('Producto desactivado (soft delete)', { localId, category: logCategories.INVENTORY });
@@ -192,8 +192,8 @@ export async function hardDeleteProduct(localId: string): Promise<Result<void, A
       return Err(productResult.error);
     }
 
-    await db.products.where('localId').equals(localId).delete();
     await SyncEngine.addToQueue('products', 'delete', { localId }, localId);
+    await db.products.where('localId').equals(localId).delete();
     
     EventBus.emit(Events.INVENTORY_UPDATED, { action: 'hard_delete', localId });
     logger.info('Producto eliminado permanentemente (hard delete)', { localId, category: logCategories.INVENTORY });

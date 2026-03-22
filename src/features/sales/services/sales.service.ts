@@ -121,55 +121,62 @@ export async function createSale(data: CreateSaleInput): Promise<Result<string, 
     // 1. ENCOLAR EN SYNC ENGINE PRIMERO (crítico para consistencia offline)
     await SyncEngine.addToQueue('sales', 'create', sale as unknown as Record<string, unknown>, localId);
 
-    // 2. TRANSACCION: Deduce stock y crea venta
-    const updatedProducts: { localId: string; product: Product; newStock: number }[] = [];
+    // 2. Calcular updates de productos (para encolarlos después)
+    const productUpdates: { localId: string; product: Product; newStock: number }[] = [];
     
-    await db.transaction('rw', db.sales, db.products, db.categories, async () => {
-      for (const item of data.items) {
-        const product = await db.products
-          .where('localId')
-          .equals(item.productId)
-          .filter(p => p.tenantId === tenantId)
+    for (const item of data.items) {
+      const product = await db.products
+        .where('localId')
+        .equals(item.productId)
+        .filter(p => p.tenantId === tenantId)
+        .first();
+      
+      if (!product) {
+        throw new AppError(`Producto no encontrado: ${item.productName}`, 'PRODUCT_NOT_FOUND', 404);
+      }
+      
+      let stockToDeduct = item.quantity;
+      
+      if (product.categoryId) {
+        const category = await db.categories
+          .where('id')
+          .equals(product.categoryId)
           .first();
         
-        if (!product) {
-          throw new AppError(`Producto no encontrado: ${item.productName}`, 'PRODUCT_NOT_FOUND', 404);
+        if (category?.saleType === 'weight') {
+          stockToDeduct = item.quantity / 1000;
+        } else if (category?.saleType === 'sample') {
+          stockToDeduct = 1;
         }
-        
-        let stockToDeduct = item.quantity;
-        
-        if (product.categoryId) {
-          const category = await db.categories
-            .where('id')
-            .equals(product.categoryId)
-            .first();
-          
-          if (category?.saleType === 'weight') {
-            stockToDeduct = item.quantity / 1000;
-          } else if (category?.saleType === 'sample') {
-            stockToDeduct = 1;
-          }
-        }
-        
-        if (product.stock < stockToDeduct) {
-          throw new ValidationError(`Stock insuficiente para ${item.productName}. Disponible: ${product.stock}`);
-        }
-        
-        const newStock = product.stock - stockToDeduct;
-        updatedProducts.push({ localId: product.localId, product, newStock });
-        
+      }
+      
+      if (product.stock < stockToDeduct) {
+        throw new ValidationError(`Stock insuficiente para ${item.productName}. Disponible: ${product.stock}`);
+      }
+      
+      const newStock = product.stock - stockToDeduct;
+      productUpdates.push({ localId: product.localId, product, newStock });
+    }
+
+    // 3. TRANSACCION: Deduce stock y crea venta
+    await db.transaction('rw', db.sales, db.products, db.categories, async () => {
+      for (const update of productUpdates) {
         await db.products.put({
-          ...product,
-          stock: newStock,
+          ...update.product,
+          stock: update.newStock,
           updatedAt: new Date(),
         });
-        
-        // 3. ENCOLAR SYNC DE STOCK (después de actualizar, pero dentro de tx conceptualmente)
-        await SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock } as unknown as Record<string, unknown>, product.localId);
       }
       
       await db.sales.add(sale);
     });
+
+    // 4. ENCOLAR SYNC DE PRODUCTS (después de transacción exitosa)
+    for (const update of productUpdates) {
+      SyncEngine.addToQueue('products', 'update', { ...update.product, stock: update.newStock } as unknown as Record<string, unknown>, update.localId);
+    }
+    
+    const updatedProducts = productUpdates;
 
     // 4. CREAR MOVIMIENTO CONTABLE (después de tx, fire-and-forget)
     await movementsService.createMovement({
@@ -215,6 +222,10 @@ export async function cancelSale(localId: string): Promise<Result<void, AppError
       return Err(new ValidationError('La venta ya está cancelada'));
     }
     
+    const updated = { ...sale, status: 'cancelled' as const };
+
+    await SyncEngine.addToQueue('sales', 'update', updated as unknown as Record<string, unknown>, localId);
+    
     const updatedProducts: { localId: string; product: Product; stockRestored: number }[] = [];
     
     await db.transaction('rw', db.sales, db.products, db.categories, async () => {
@@ -253,12 +264,10 @@ export async function cancelSale(localId: string): Promise<Result<void, AppError
           updatedAt: new Date(),
         });
         
-        await SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock } as unknown as Record<string, unknown>, product.localId);
+        SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock } as unknown as Record<string, unknown>, product.localId);
       }
       
-      const updated = { ...sale, status: 'cancelled' as const };
       await db.sales.put(updated);
-      await SyncEngine.addToQueue('sales', 'update', updated as unknown as Record<string, unknown>, localId);
     });
     
     await movementsService.createMovement({

@@ -219,36 +219,9 @@ export async function produce(localId: string, quantity: number): Promise<Result
       createdAt: new Date(),
     };
 
-    const updatedIngredients: { localId: string; productName: string; stockRestored: number }[] = [];
-
-    for (const ing of recipe.ingredients) {
-      const product = await db.products
-        .where('localId')
-        .equals(ing.productId)
-        .filter(p => p.tenantId === tenantId)
-        .first();
-      
-      if (product) {
-        const usedQuantity = (ing.quantity * quantity) / recipe.yield;
-        const newStock = product.stock - usedQuantity;
-        updatedIngredients.push({ localId: product.localId, productName: product.name, stockRestored: usedQuantity });
-        
-        await SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock, updatedAt: new Date() } as unknown as Record<string, unknown>, product.localId);
-      }
-    }
-    
-    const finishedProduct = await db.products
-      .where('localId')
-      .equals(recipe.productId)
-      .filter(p => p.tenantId === tenantId)
-      .first();
-    
-    if (finishedProduct) {
-      const newStock = finishedProduct.stock + quantity;
-      await SyncEngine.addToQueue('products', 'update', { ...finishedProduct, stock: newStock, updatedAt: new Date() } as unknown as Record<string, unknown>, finishedProduct.localId);
-    }
-
     await SyncEngine.addToQueue('production_logs', 'create', productionLog as unknown as Record<string, unknown>, productionLogLocalId);
+
+    const updatedIngredients: { localId: string; productName: string; stockRestored: number }[] = [];
 
     await db.transaction('rw', db.products, db.productionLogs, async () => {
       const ingredientsUsed: { productId: string; quantity: number }[] = [];
@@ -266,9 +239,12 @@ export async function produce(localId: string, quantity: number): Promise<Result
           throw new ValidationError(`Stock insuficiente para ${ing.productId}`);
         }
         
+        const newStock = product.stock - usedQuantity;
+        updatedIngredients.push({ localId: product.localId, productName: product.name, stockRestored: usedQuantity });
+        
         await db.products.put({
           ...product,
-          stock: product.stock - usedQuantity,
+          stock: newStock,
           updatedAt: new Date(),
         });
         
@@ -301,6 +277,31 @@ export async function produce(localId: string, quantity: number): Promise<Result
       
       await db.productionLogs.add(productionLog);
     });
+
+    for (const ing of recipe.ingredients) {
+      const product = await db.products
+        .where('localId')
+        .equals(ing.productId)
+        .filter(p => p.tenantId === tenantId)
+        .first();
+      
+      if (product) {
+        const usedQuantity = (ing.quantity * quantity) / recipe.yield;
+        const newStock = product.stock - usedQuantity;
+        SyncEngine.addToQueue('products', 'update', { ...product, stock: newStock, updatedAt: new Date() } as unknown as Record<string, unknown>, product.localId);
+      }
+    }
+    
+    const finishedProduct = await db.products
+      .where('localId')
+      .equals(recipe.productId)
+      .filter(p => p.tenantId === tenantId)
+      .first();
+    
+    if (finishedProduct) {
+      const newStock = finishedProduct.stock + quantity;
+      SyncEngine.addToQueue('products', 'update', { ...finishedProduct, stock: newStock, updatedAt: new Date() } as unknown as Record<string, unknown>, finishedProduct.localId);
+    }
     
     await movementsService.createMovement({
       type: 'transfer',

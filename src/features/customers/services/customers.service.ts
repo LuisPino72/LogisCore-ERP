@@ -133,6 +133,17 @@ export async function createCustomer(data: CreateCustomerInput): Promise<Result<
       createdAt: new Date(),
     };
 
+    await SyncEngine.addToQueue(
+      'customers',
+      'create',
+      {
+        ...customer,
+        tenant_uuid: getCurrentTenantUuid(),
+        tenant_slug: tenantSlug,
+      } as unknown as Record<string, unknown>,
+      localId
+    );
+
     await db.transaction('rw', db.customers, async () => {
       const existing = await db.customers
         .where('tenantId')
@@ -146,17 +157,6 @@ export async function createCustomer(data: CreateCustomerInput): Promise<Result<
 
       await db.customers.add(customer);
     });
-
-    await SyncEngine.addToQueue(
-      'customers',
-      'create',
-      {
-        ...customer,
-        tenant_uuid: getCurrentTenantUuid(),
-        tenant_slug: tenantSlug,
-      } as unknown as Record<string, unknown>,
-      localId
-    );
 
     EventBus.emit(Events.CUSTOMER_CREATED, { customer });
 
@@ -209,6 +209,8 @@ export async function updateCustomer(
       updatedAt: new Date(),
     };
 
+    await SyncEngine.addToQueue('customers', 'update', updated as unknown as Record<string, unknown>, localId);
+
     await db.transaction('rw', db.customers, async () => {
       if (data.rifCedula && data.rifCedula !== customer.rifCedula) {
         const newRif = data.rifCedula.trim();
@@ -225,8 +227,6 @@ export async function updateCustomer(
 
       await db.customers.put(updated);
     });
-
-    await SyncEngine.addToQueue('customers', 'update', updated as unknown as Record<string, unknown>, localId);
 
     logger.info('Customer updated', { customerId: localId, category: logCategories.SALES });
 
@@ -259,9 +259,8 @@ export async function deleteCustomer(localId: string): Promise<Result<void, AppE
       updatedAt: new Date(),
     };
 
-    await db.customers.put(updated);
-
     await SyncEngine.addToQueue('customers', 'update', updated as unknown as Record<string, unknown>, localId);
+    await db.customers.put(updated);
 
     logger.info('Customer deactivated', { customerId: localId, category: logCategories.SALES });
 
@@ -288,8 +287,8 @@ export async function hardDeleteCustomer(localId: string): Promise<Result<void, 
       return Err(new AppError('Cliente no encontrado', 'NOT_FOUND', 404));
     }
 
-    await db.customers.where('localId').equals(localId).delete();
     await SyncEngine.addToQueue('customers', 'delete', { localId }, localId);
+    await db.customers.where('localId').equals(localId).delete();
 
     logger.info('Customer permanently deleted', { customerId: localId, category: logCategories.SALES });
 

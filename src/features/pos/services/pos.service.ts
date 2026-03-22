@@ -1,6 +1,7 @@
 import { db, Product, Category, SuspendedSale } from '@/lib/db';
 import { Ok, Err, Result, AppError } from '@/lib/types/result';
 import { logger, logCategories } from '@/lib/logger';
+import { SyncEngine } from '@/lib/sync/SyncEngine';
 import type { SortConfig, CartItem, SaleItem } from '../types/pos.types';
 
 export type { CartItem, SaleItem } from '../types/pos.types';
@@ -154,7 +155,7 @@ export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], no
       productSnapshot: item.product,
     }));
     
-    await db.suspendedSales.add({
+    const suspendedSale = {
       localId,
       tenantId: tenantSlug,
       cart: cartData,
@@ -163,7 +164,10 @@ export async function saveSuspendedSale(tenantSlug: string, cart: CartItem[], no
       note,
       customerId,
       customerName,
-    });
+    };
+    
+    await SyncEngine.addToQueue('suspended_sales', 'create', suspendedSale as unknown as Record<string, unknown>, localId);
+    await db.suspendedSales.add(suspendedSale);
     
     return Ok(localId);
   } catch (_error) {
@@ -228,10 +232,14 @@ export async function loadSuspendedSale(localId: string): Promise<Result<Suspend
     });
 
     if (hasChanges) {
-      await db.suspendedSales.update(sale.id!, {
+      const updated = {
+        ...sale,
         cart: updatedCart,
         updatedAt: new Date(),
-      });
+      };
+      
+      await SyncEngine.addToQueue('suspended_sales', 'update', updated as unknown as Record<string, unknown>, localId);
+      await db.suspendedSales.update(sale.id!, updated);
       
       logger.info('Product snapshots refreshed for suspended sale', { 
         saleId: localId, 
@@ -249,6 +257,7 @@ export async function loadSuspendedSale(localId: string): Promise<Result<Suspend
 
 export async function deleteSuspendedSale(localId: string): Promise<Result<void, AppError>> {
   try {
+    await SyncEngine.addToQueue('suspended_sales', 'delete', { localId }, localId);
     await db.suspendedSales.where('localId').equals(localId).delete();
     return Ok(undefined);
   } catch (_error) {

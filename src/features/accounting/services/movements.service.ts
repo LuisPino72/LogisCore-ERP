@@ -97,8 +97,8 @@ export async function createMovement(data: CreateMovementInput): Promise<Result<
       createdAt: new Date(),
     };
 
-    await db.movements.add(movement);
     await SyncEngine.addToQueue('movements', 'create', movement as unknown as Record<string, unknown>, localId);
+    await db.movements.add(movement);
 
     logger.info('Movimiento creado', { movementId: localId, type: data.type, amount: data.amount, category: logCategories.DATABASE });
 

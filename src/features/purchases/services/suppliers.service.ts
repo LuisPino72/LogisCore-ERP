@@ -39,8 +39,8 @@ export async function createSupplier(data: Omit<Supplier, 'id' | 'localId' | 'te
       isActive: data.isActive ?? true,
     };
 
-    await db.suppliers.add(supplier);
     await SyncEngine.addToQueue('suppliers', 'create', supplier as unknown as Record<string, unknown>, localId);
+    await db.suppliers.add(supplier);
     
     logger.info('Proveedor creado', { supplierName: data.name, category: logCategories.DATABASE });
     
@@ -66,8 +66,8 @@ export async function updateSupplier(localId: string, data: Partial<Supplier>): 
     }
 
     const updated = { ...supplier, ...data, updatedAt: new Date() };
-    await db.suppliers.put(updated);
     await SyncEngine.addToQueue('suppliers', 'update', updated as unknown as Record<string, unknown>, localId);
+    await db.suppliers.put(updated);
     
     return Ok(undefined);
   } catch (error) {
@@ -96,8 +96,8 @@ export async function deleteSupplier(localId: string): Promise<Result<void, AppE
       return Err(new ValidationError('No se puede eliminar un proveedor con historial de compras. Considere desactivarlo.'));
     }
 
-    await db.suppliers.where('localId').equals(localId).delete();
     await SyncEngine.addToQueue('suppliers', 'delete', { localId }, localId);
+    await db.suppliers.where('localId').equals(localId).delete();
     
     return Ok(undefined);
   } catch (error) {
