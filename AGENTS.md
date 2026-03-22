@@ -63,14 +63,15 @@ supabase.from('products').eq('tenant_slug', tenant.slug)
 ```typescript
 // 1. Validar localmente
 if (!data.name?.trim()) return Err(new ValidationError('...'));
-// 2. Guardar en Dexie
-await db.products.add(product);
-// 3. Encolar sync (ANTES de transacción si hay alguna)
+// 2. Encolar sync (ANTES de cualquier operación de base de datos)
+const localId = crypto.randomUUID();
 await SyncEngine.addToQueue('products', 'create', product, localId);
+// 3. Guardar en Dexie
+await db.products.add({ ...product, localId });
 // 4. Emitir evento
 EventBus.emit(Events.INVENTORY_UPDATED, { action: 'create', product });
 ```
-> **SyncEngine.addToQueue SIEMPRE antes de la transacción.**
+> **SyncEngine.addToQueue SIEMPRE antes de cualquier operación de base de datos (db.add, db.put, db.delete, db.transaction()).**
 
 ## 2.4 Transacciones en Dexie
 > Para operaciones que modifican múltiples tablas, usar `TransactionManager` singleton:
@@ -311,6 +312,29 @@ Events.STOCK_LOW         // 'stock.low'
 | `src/features/*/services/*.service.ts` | Servicios por módulo |
 | `src/App.tsx` | Login, carga de datos |
 | `supabase/functions/sync_table_item/` | Edge Function de sincronización |
+
+---
+
+# Tablas en Supabase
+
+| Tabla | Sincroniza | Notas |
+|-------|-----------|-------|
+| products | ✅ | Sincronizado |
+| categories | ✅ | Sincronizado |
+| sales | ✅ | Sincronizado |
+| purchases | ✅ | Sincronizado |
+| recipes | ✅ | Sincronizado |
+| production_logs | ✅ | Sincronizado |
+| suppliers | ✅ | Sincronizado |
+| customers | ✅ | Sincronizado |
+| invoices | ✅ | Sincronizado |
+| invoice_settings | ✅ | Sincronizado |
+| movements | ✅ | Sincronizado |
+| taxpayer_info | ✅ | Sincronizado |
+| security_audit_log | ✅ | Sincronizado |
+| suspended_sales | ✅ | Sincronizado |
+| employees | ❌ | No sincroniza (usa user_roles de Supabase Auth) |
+| settings | ❌ | No sincroniza (local only) |
 
 ---
 
